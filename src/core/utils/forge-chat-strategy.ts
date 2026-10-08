@@ -37,13 +37,13 @@ import { DULFS_CATEGORY_LABELS } from "./category-detect";
 
 /** The conversation as the Scenario model should see it: the chat's messages
  *  without the placeholder about to be filled and without anything
- *  empty. */
+ *  empty. An undone Build reply is left out: what it built no longer exists. */
 function conversation(
   messages: ChatMessage[],
   placeholderId?: string,
 ): ChatMessage[] {
   return messages.filter(
-    (m) => m.id !== placeholderId && m.content.trim() !== "",
+    (m) => m.id !== placeholderId && !m.undone && m.content.trim() !== "",
   );
 }
 

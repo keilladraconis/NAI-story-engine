@@ -3,6 +3,8 @@ import { createStore, combineReducers } from "nai-store";
 import {
   forgeChatHandler,
   executeForgeCommand,
+  undoForgeAction,
+  undoTurn,
 } from "../../../../../src/core/store/effects/handlers/forge-chat";
 import type { CompletionContext } from "../../../../../src/core/store/effects/generation-handlers";
 import type {
@@ -18,7 +20,14 @@ import {
   threadCreated,
   threadLedgerUpdated,
   threadWishSet,
+  entitySummaryUpdated,
 } from "../../../../../src/core/store/slices/world";
+import {
+  chatSlice,
+  initialChatState,
+  chatCreated,
+  forgeSegmentsSet,
+} from "../../../../../src/core/store/slices/chat";
 import { FieldID } from "../../../../../src/config/field-definitions";
 import type { ForgeSegment } from "../../../../../src/core/chat-types/types";
 import {
@@ -68,8 +77,11 @@ function harness(seed: { entities?: WorldEntity[]; threads?: unknown[] } = {}) {
   const entities = seed.entities ?? [];
   const entitiesById: Record<string, WorldEntity> = {};
   for (const e of entities) entitiesById[e.id] = e;
-  const store = createStore<{ world: typeof initialWorldState }>(
-    combineReducers({ world: worldSlice.reducer }),
+  const store = createStore<{
+    world: typeof initialWorldState;
+    chat: typeof initialChatState;
+  }>(
+    combineReducers({ world: worldSlice.reducer, chat: chatSlice.reducer }),
     false,
   );
   // Seed through the store's own reducer: forge each entity, create each thread.
@@ -942,5 +954,254 @@ describe("a Build command writes for real", () => {
       "applied",
       "applied",
     ]);
+  });
+});
+
+describe("undoing a Build command", () => {
+  const run = async (h: ReturnType<typeof harness>, cmd: ParsedCommand) =>
+    executeForgeCommand(cmd, "c1", "m1", h.getState, h.dispatch);
+
+  it("removes a created entity and the entry Build made, even if edited since", async () => {
+    const h = harness();
+    const rec = await run(h, {
+      kind: "CREATE",
+      elementType: "CHARACTER",
+      name: "Mikki",
+      content: "A fox.",
+    });
+    h.dispatch(
+      entitySummaryUpdated({
+        entityId: rec.entityId!,
+        summary: "Edited by hand.",
+      }),
+    );
+    expect(await undoForgeAction(rec, h.getState, h.dispatch)).toBe("undone");
+    expect(h.getState().world.entitiesById[rec.entityId!]).toBeUndefined();
+    expect(api.v1.lorebook.removeEntry).toHaveBeenCalledWith("e-new");
+  });
+
+  it("unbinds, and keeps, an entry that existed before Build bound it", async () => {
+    vi.mocked(api.v1.lorebook.entries).mockResolvedValue([
+      { id: "e-old", displayName: "Mikki" },
+    ]);
+    const h = harness();
+    const rec = await run(h, {
+      kind: "CREATE",
+      elementType: "CHARACTER",
+      name: "Mikki",
+      content: "A fox.",
+    });
+    await undoForgeAction(rec, h.getState, h.dispatch);
+    expect(api.v1.lorebook.removeEntry).not.toHaveBeenCalled();
+    expect(h.getState().world.entitiesById[rec.entityId!]).toBeUndefined();
+  });
+
+  it("restores a revised summary, unless it changed since", async () => {
+    const h = harness({ entities: [imported("Kei", "Old.")] });
+    const rec = await run(h, { kind: "REVISE", name: "Kei", content: "New." });
+    expect(await undoForgeAction(rec, h.getState, h.dispatch)).toBe("undone");
+    expect(Object.values(h.getState().world.entitiesById)[0].summary).toBe(
+      "Old.",
+    );
+
+    const rec2 = await run(h, {
+      kind: "REVISE",
+      name: "Kei",
+      content: "Newer.",
+    });
+    h.dispatch(
+      entitySummaryUpdated({ entityId: rec2.entityId!, summary: "Mine." }),
+    );
+    expect(await undoForgeAction(rec2, h.getState, h.dispatch)).toBe("skipped");
+    expect(Object.values(h.getState().world.entitiesById)[0].summary).toBe(
+      "Mine.",
+    );
+  });
+
+  it("restores a name, on the entity and its entry", async () => {
+    vi.mocked(api.v1.lorebook.entry).mockResolvedValue({
+      id: "e1",
+      displayName: "Kay",
+      keys: ["x"],
+    });
+    const h = harness({ entities: [imported("Kei", "S.", "e1")] });
+    const rec = await run(h, {
+      kind: "RENAME",
+      oldName: "Kei",
+      newName: "Kay",
+    });
+    expect(await undoForgeAction(rec, h.getState, h.dispatch)).toBe("undone");
+    expect(Object.values(h.getState().world.entitiesById)[0].name).toBe("Kei");
+    expect(api.v1.lorebook.updateEntry).toHaveBeenLastCalledWith(
+      "e1",
+      expect.objectContaining({ displayName: "Kei" }),
+    );
+  });
+
+  it("brings a deleted entity back with its entry and its Threads", async () => {
+    const entry = {
+      id: "e1",
+      displayName: "Kei",
+      text: "Lore.",
+      keys: ["kei"],
+      enabled: true,
+    };
+    vi.mocked(api.v1.lorebook.entry).mockResolvedValue(entry);
+    const built = { ...imported("Kei", "S.", "e1"), sourceChatId: "c0" };
+    const h = harness({
+      entities: [built],
+      threads: [
+        {
+          id: "t1",
+          title: "T",
+          state: "",
+          latent: "",
+          wish: "",
+          entityIds: [built.id],
+          status: "open",
+        },
+      ],
+    });
+    const rec = await run(h, { kind: "DELETE", name: "Kei" });
+    expect(h.getState().world.threads[0].entityIds).toEqual([]);
+    expect(await undoForgeAction(rec, h.getState, h.dispatch)).toBe("undone");
+    expect(h.getState().world.entitiesById[built.id]).toEqual(built);
+    expect(h.getState().world.threads[0].entityIds).toEqual([built.id]);
+    expect(api.v1.lorebook.createEntry).toHaveBeenCalledWith(entry);
+  });
+
+  it("removes a created Thread, and restores a rewritten one unless it changed", async () => {
+    const h = harness({ entities: [imported("A", "s"), imported("B", "s")] });
+    const made = await run(h, {
+      kind: "THREAD",
+      title: "Half",
+      memberNames: ["A", "B"],
+      state: "S0",
+      latent: "P0",
+      wish: "W0",
+    });
+    const rewrote = await run(h, {
+      kind: "THREAD",
+      title: "Half",
+      memberNames: ["A"],
+      state: "S1",
+      latent: "",
+      wish: "",
+    });
+    expect(await undoForgeAction(rewrote, h.getState, h.dispatch)).toBe(
+      "undone",
+    );
+    expect(h.getState().world.threads[0]).toMatchObject({
+      state: "S0",
+      latent: "P0",
+      wish: "W0",
+    });
+
+    const again = await run(h, {
+      kind: "THREAD",
+      title: "Half",
+      memberNames: ["A"],
+      state: "S2",
+      latent: "",
+      wish: "",
+    });
+    h.dispatch(
+      threadLedgerUpdated({
+        threadId: made.threadId!,
+        state: "By hand",
+        latent: "P0",
+      }),
+    );
+    expect(await undoForgeAction(again, h.getState, h.dispatch)).toBe(
+      "skipped",
+    );
+
+    expect(await undoForgeAction(made, h.getState, h.dispatch)).toBe("undone");
+    expect(h.getState().world.threads).toHaveLength(0);
+  });
+
+  it("reports a lorebook failure and changes nothing", async () => {
+    const h = harness();
+    const rec = await run(h, {
+      kind: "CREATE",
+      elementType: "CHARACTER",
+      name: "Mikki",
+      content: "A fox.",
+    });
+    vi.mocked(api.v1.lorebook.removeEntry).mockRejectedValue(new Error("no"));
+    expect(await undoForgeAction(rec, h.getState, h.dispatch)).toBe("failed");
+    expect(h.getState().world.entitiesById[rec.entityId!]).toBeDefined();
+  });
+
+  /** A chat c1 holding a Build reply m1 whose segments are a CREATE of Mikki
+   *  and a REVISE of Mikki, both really applied through `run`. */
+  const withBuildReply = async () => {
+    const h = harness();
+    const created = await run(h, {
+      kind: "CREATE",
+      elementType: "CHARACTER",
+      name: "Mikki",
+      content: "A fox.",
+    });
+    const revised = await run(h, {
+      kind: "REVISE",
+      name: "Mikki",
+      content: "A red fox.",
+    });
+    h.dispatch(
+      chatCreated({
+        chat: {
+          id: "c1",
+          type: "scenario",
+          title: "Scenario 1",
+          seed: { kind: "blank" },
+          messages: [
+            { id: "m1", role: "assistant", content: "x", mode: "build" },
+          ],
+        },
+      }),
+    );
+    h.dispatch(
+      forgeSegmentsSet({
+        chatId: "c1",
+        id: "m1",
+        segments: [
+          { kind: "action", action: created },
+          { kind: "action", action: revised },
+        ],
+      }),
+    );
+    const message = () =>
+      h.getState().chat.chats.find((c) => c.id === "c1")!.messages[0];
+    return { h, message };
+  };
+
+  it("undoTurn reverses a reply's commands last first and marks it undone", async () => {
+    const { h, message } = await withBuildReply();
+    expect(await undoTurn(h.getState, h.dispatch, "c1", "m1")).toBe(true);
+    const m = message();
+    expect(m.undone).toBe(true);
+    expect(
+      m.forgeSegments!.map((s) => s.kind === "action" && s.action.undoResult),
+    ).toEqual(["undone", "undone"]);
+    expect(Object.keys(h.getState().world.entitiesById)).toHaveLength(0);
+  });
+
+  it("undoTurn leaves the reply standing when a command could not be reversed, and retries only that one", async () => {
+    const { h, message } = await withBuildReply();
+    vi.mocked(api.v1.lorebook.removeEntry)
+      .mockRejectedValueOnce(new Error("no"))
+      .mockResolvedValue(undefined);
+    expect(await undoTurn(h.getState, h.dispatch, "c1", "m1")).toBe(false);
+    expect(message().undone).toBeUndefined();
+    // The REVISE (last) was reversed; only the CREATE failed.
+    expect(
+      message().forgeSegments!.map(
+        (s) => s.kind === "action" && s.action.undoResult,
+      ),
+    ).toEqual(["failed", "undone"]);
+    expect(await undoTurn(h.getState, h.dispatch, "c1", "m1")).toBe(true);
+    expect(message().undone).toBe(true);
+    expect(api.v1.lorebook.removeEntry).toHaveBeenCalledTimes(2);
   });
 });

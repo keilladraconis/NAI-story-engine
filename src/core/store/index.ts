@@ -94,6 +94,7 @@ export * from "./slices/foundation";
 export * from "./slices/engine";
 export {
   forgeChatContinueRequested,
+  scenarioTurnUndoRequested,
   entityDiscardRequested,
 } from "./effects/forge-chat-effects";
 // The HUD's ⚡ dispatches this; the engine effect runs the pass. The real

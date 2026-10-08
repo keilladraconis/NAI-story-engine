@@ -28,6 +28,7 @@ import {
 } from "../store/effects/lorebook-sync";
 import {
   entityDeleted,
+  entityRestored,
   threadCreated,
   threadDeleted,
   threadLedgerUpdated,
@@ -350,6 +351,12 @@ export function registerThreadConditionEffects(
   // Deleting an entity removes it from every cast in the reducer, with no
   // thread action to announce it.
   subscribeEffect(matchesAction(entityDeleted), () => {
+    for (const thread of getState().world.threads) settle(thread.id);
+  });
+
+  // A restored entity rejoins its casts in the reducer, with no thread action
+  // to announce it.
+  subscribeEffect(matchesAction(entityRestored), () => {
     for (const thread of getState().world.threads) settle(thread.id);
   });
 

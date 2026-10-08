@@ -1,7 +1,7 @@
 /**
  * Forge Chat Effects — Signal handlers for the Scenario chat.
  *
- * Three signals, each with a single handler:
+ * Four signals, each with a single handler:
  *   1. forgeChatContinueRequested  → queue a Build turn: append an assistant
  *                                     placeholder, submit a forgeChat generation.
  *                                     The request says whether the send was
@@ -11,7 +11,8 @@
  *                                     writes is applied.
  *      Both do all of it before they yield, so the queue is what refuses a
  *      second send.
- *   3. entityDiscardRequested      → discard a manual draft ("+ Add Entity", not
+ *   3. scenarioTurnUndoRequested   → reverse the latest standing Build reply.
+ *   4. entityDiscardRequested      → discard a manual draft ("+ Add Entity", not
  *                                     yet saved): delete the entity.
  *
  * All actions are local to this module — declared with a static `.type`
@@ -29,6 +30,8 @@ import {
   buildScenarioBuildStrategy,
   buildScenarioPlanStrategy,
 } from "../../utils/forge-chat-strategy";
+import { latestUndoable } from "../../chat-types/undo";
+import { undoTurn } from "./handlers/forge-chat";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Action creators — ForgeChatContinueRequested lives in forge-chat-actions.ts
@@ -40,11 +43,13 @@ import {
 import {
   forgeChatContinueRequested,
   scenarioPlanRequested,
+  scenarioTurnUndoRequested,
   type ForgeChatContinueRequestedPayload,
 } from "./forge-chat-actions";
 export {
   forgeChatContinueRequested,
   scenarioPlanRequested,
+  scenarioTurnUndoRequested,
   type ForgeChatContinueRequestedPayload,
 };
 
@@ -72,7 +77,10 @@ function findChat(state: RootState, id: string): Chat | undefined {
  *  turn) is already queued or in flight. Scenario sends guard on this
  *  so a second one is a no-op rather than another stacked empty assistant turn.
  *  A Plan turn is an ordinary chat request, told apart by its id. */
-function scenarioRequestPending(state: RootState, chatId: string): boolean {
+export function scenarioRequestPending(
+  state: RootState,
+  chatId: string,
+): boolean {
   return [state.runtime.activeRequest, ...state.runtime.queue].some(
     (r) =>
       !!r &&
@@ -165,6 +173,26 @@ export function registerForgeChatEffects(
         }),
       );
       dispatch(generationSubmitted(strategy));
+    },
+  );
+
+  // ─── Undo a Build turn ──────────────────────────────────────────────────────
+  // The work spans awaits (lorebook calls), so a second press is refused here.
+  const undoing = new Set<string>();
+  subscribeEffect(
+    matchesAction(scenarioTurnUndoRequested),
+    async (action, { getState: latest }) => {
+      const { chatId, messageId } = action.payload;
+      const chat = findChat(latest(), chatId);
+      if (!chat || latestUndoable(chat.messages)?.id !== messageId) return;
+      if (scenarioRequestPending(latest(), chatId)) return;
+      if (undoing.has(messageId)) return;
+      undoing.add(messageId);
+      try {
+        await undoTurn(latest, dispatch, chatId, messageId);
+      } finally {
+        undoing.delete(messageId);
+      }
     },
   );
 

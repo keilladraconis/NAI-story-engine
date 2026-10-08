@@ -86,6 +86,9 @@ export interface ChatMessage {
   /** Which Scenario mode wrote this assistant message. Absent on messages
    *  from before the modes existed, which render as plain text. */
   mode?: "plan" | "build";
+  /** True once this Build reply's commands were reversed by Undo. Its pills
+   *  stay, struck through, and later turns are not shown it. */
+  undone?: boolean;
 }
 
 export type ChatSeed =

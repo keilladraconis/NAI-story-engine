@@ -3,6 +3,7 @@ import {
   worldSlice,
   entityForged,
   entityDeleted,
+  entityRestored,
   entitySummaryUpdated,
   entityLorebookEntryBound,
   entityBound,
@@ -516,5 +517,53 @@ describe("a Thread's wish", () => {
       latent: "hidden",
       wish: "W",
     });
+  });
+});
+
+describe("entityRestored", () => {
+  it("puts an entity back, into the Threads it was in", () => {
+    const entity: WorldEntity = {
+      id: "e1",
+      categoryId: FieldID.DramatisPersonae,
+      name: "Kei",
+      summary: "s",
+      lifecycle: "live",
+    };
+    const start = {
+      entityIds: [],
+      entitiesById: {},
+      threads: [
+        {
+          id: "t1",
+          title: "T",
+          state: "",
+          latent: "",
+          wish: "",
+          entityIds: ["x"],
+          status: "open" as const,
+        },
+        {
+          id: "t2",
+          title: "U",
+          state: "",
+          latent: "",
+          wish: "",
+          entityIds: [],
+          status: "open" as const,
+        },
+      ],
+    };
+    const next = worldSlice.reducer(
+      start,
+      entityRestored({ entity, threadIds: ["t1"] }),
+    );
+    expect(next.entitiesById.e1).toEqual(entity);
+    expect(next.entityIds).toEqual(["e1"]);
+    expect(next.threads[0].entityIds).toEqual(["x", "e1"]);
+    expect(next.threads[1].entityIds).toEqual([]);
+    // A second delivery changes nothing.
+    expect(
+      worldSlice.reducer(next, entityRestored({ entity, threadIds: ["t1"] })),
+    ).toBe(next);
   });
 });

@@ -1,6 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Store } from "nai-store";
+import { createStore, combineReducers } from "nai-store";
 import { makeTestStore } from "../helpers/store-helpers";
+import { chatSlice } from "../../../../src/core/store/slices/chat";
+import { uiSlice } from "../../../../src/core/store/slices/ui";
+import { runtimeSlice } from "../../../../src/core/store/slices/runtime";
+import {
+  worldSlice,
+  entityForged,
+} from "../../../../src/core/store/slices/world";
+import { FieldID } from "../../../../src/config/field-definitions";
+import type { ChatMessage } from "../../../../src/core/chat-types/types";
 import {
   registerChatEffects,
   sameSummarySource,
@@ -473,5 +483,156 @@ describe("retrying a Scenario turn", () => {
     expect(seen).not.toContain(forgeChatContinueRequested.type);
     // …and the ordinary path still runs.
     expect(seen).toContain("ui/generationSubmitted");
+  });
+});
+
+describe("retrying a Build reply undoes it first", () => {
+  const revise = (id: string, before: string, wrote: string): ChatMessage => ({
+    id,
+    role: "assistant",
+    content: "x",
+    mode: "build",
+    forgeSegments: [
+      {
+        kind: "action",
+        action: {
+          kind: "REVISE",
+          status: "applied",
+          name: "Kei",
+          entityId: "k",
+          undo: { op: "summary", entityId: "k", before, wrote },
+        },
+      },
+    ],
+  });
+  const create = (id: string): ChatMessage => ({
+    id,
+    role: "assistant",
+    content: "x",
+    mode: "build",
+    forgeSegments: [
+      {
+        kind: "action",
+        action: {
+          kind: "CREATE",
+          status: "applied",
+          name: "Kei",
+          entityId: "k",
+          undo: { op: "entityCreated", entityId: "k", entryCreated: true },
+        },
+      },
+    ],
+  });
+
+  /** A real store with the chat effects; the forge-chat effects are not
+   *  registered, so a recorder stands where they would queue the new turn and
+   *  captures what the World looked like when it was asked for. */
+  const arrange = (messages: ChatMessage[]) => {
+    const store = createStore(
+      combineReducers({
+        chat: chatSlice.reducer,
+        ui: uiSlice.reducer,
+        runtime: runtimeSlice.reducer,
+        world: worldSlice.reducer,
+      }),
+      false,
+    );
+    registerChatEffects(
+      store.subscribeEffect as never,
+      store.dispatch as never,
+      store.getState as never,
+    );
+    store.dispatch(
+      entityForged({
+        entity: {
+          id: "k",
+          categoryId: FieldID.DramatisPersonae,
+          name: "Kei",
+          summary: "New.",
+          lifecycle: "live",
+          lorebookEntryId: "e1",
+        },
+      }),
+    );
+    store.dispatch(
+      chatCreated({
+        chat: {
+          id: "c1",
+          type: "scenario",
+          title: "Scenario 1",
+          messages,
+          seed: { kind: "blank" },
+        },
+      }),
+    );
+    const requests: { summary: string; ids: string[] }[] = [];
+    store.subscribeEffect(
+      (a: Action) => a.type === forgeChatContinueRequested.type,
+      () => {
+        requests.push({
+          summary: store.getState().world.entitiesById.k.summary,
+          ids: store
+            .getState()
+            .chat.chats.find((c) => c.id === "c1")!
+            .messages.map((m) => m.id),
+        });
+      },
+    );
+    const ids = () =>
+      store
+        .getState()
+        .chat.chats.find((c) => c.id === "c1")!
+        .messages.map((m) => m.id);
+    const retry = async (messageId: string) => {
+      store.dispatch(uiChatRetryGeneration({ chatId: "c1", messageId }));
+      for (let i = 0; i < 20; i++) await Promise.resolve();
+    };
+    return { store, requests, ids, retry };
+  };
+
+  beforeEach(() => {
+    vi.mocked(api.v1.ui.toast).mockClear();
+    vi.mocked(api.v1.lorebook.removeEntry).mockReset();
+    vi.mocked(api.v1.lorebook.removeEntry).mockResolvedValue(undefined);
+  });
+
+  it("undoes a Build reply before re-running it", async () => {
+    const { store, requests, ids, retry } = arrange([
+      { id: "u1", role: "user", content: "go" },
+      revise("b1", "Old.", "New."),
+    ]);
+    await retry("b1");
+    expect(requests).toEqual([{ summary: "Old.", ids: ["u1"] }]);
+    expect(ids()).toEqual(["u1"]);
+    expect(store.getState().world.entitiesById.k.summary).toBe("Old.");
+  });
+
+  it("refuses a retry that would drop a later Build reply still applied", async () => {
+    const { store, requests, ids, retry } = arrange([
+      { id: "u1", role: "user", content: "go" },
+      revise("b1", "Old.", "Mid."),
+      { id: "u2", role: "user", content: "more" },
+      revise("b2", "Mid.", "New."),
+    ]);
+    await retry("b1");
+    expect(ids()).toEqual(["u1", "b1", "u2", "b2"]);
+    expect(requests).toHaveLength(0);
+    expect(store.getState().world.entitiesById.k.summary).toBe("New.");
+    expect(api.v1.ui.toast).toHaveBeenCalledWith(
+      expect.stringContaining("Undo"),
+      expect.anything(),
+    );
+  });
+
+  it("refuses the retry when the undo could not finish", async () => {
+    vi.mocked(api.v1.lorebook.removeEntry).mockRejectedValue(new Error("no"));
+    const { store, requests, ids, retry } = arrange([
+      { id: "u1", role: "user", content: "go" },
+      create("b1"),
+    ]);
+    await retry("b1");
+    expect(ids()).toEqual(["u1", "b1"]);
+    expect(requests).toHaveLength(0);
+    expect(store.getState().world.entitiesById.k).toBeDefined();
   });
 });

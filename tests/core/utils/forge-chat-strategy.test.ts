@@ -485,3 +485,28 @@ describe("what a Scenario turn reads from the store", () => {
     });
   }
 });
+
+describe("an undone Build reply", () => {
+  it("is left out of the conversation and the rejections", () => {
+    const undone: ChatMessage = {
+      id: "b1",
+      role: "assistant",
+      mode: "build",
+      undone: true,
+      content: '[CREATE CHARACTER "Mikki" | A fox.]',
+      forgeSegments: [
+        {
+          kind: "action",
+          action: {
+            kind: "DELETE",
+            status: "rejected",
+            name: "X",
+            reason: "not found",
+          },
+        },
+      ],
+    };
+    expect(scenarioConversation([undone])).toEqual([]);
+    expect(formatRejections([undone])).toBe("");
+  });
+});

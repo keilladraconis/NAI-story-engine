@@ -112,7 +112,8 @@ slice beside the transcript, which already carries them as text.
   Otherwise that record is skipped and its pill says so.
 - A created entity is removed even if edited since. Its entry is removed if
   Build created it, and only unbound if Build bound an existing one. A created
-  Thread is removed with its entry.
+  Thread is removed, and its entry switched off as when a Thread is deleted in
+  the World.
 - A deleted entity is restored with its entry and its Thread memberships.
 - Undo is refused while any request for the chat is queued or running.
 

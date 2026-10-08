@@ -9,7 +9,9 @@ import {
   entitySummaryUpdated,
   entityEdited,
   entityDeleted,
+  entityRestored,
   threadCreated,
+  threadDeleted,
   threadLedgerUpdated,
   threadWishSet,
 } from "../../slices/world";
@@ -18,6 +20,7 @@ import {
   messageUpdated,
   messageRemoved,
   forgeSegmentsSet,
+  messageUndone,
 } from "../../slices/chat";
 import { WorldEntity, ThreadDraft, RootState, AppDispatch } from "../../types";
 import {
@@ -459,6 +462,130 @@ async function buildForgeSegments(
   }
   flush();
   return segments;
+}
+
+/** Reverse one applied command. "skipped" means the thing changed since the
+ *  command wrote it, so the newer value is left alone. */
+export async function undoForgeAction(
+  action: ForgeActionRecord,
+  getState: () => RootState,
+  dispatch: AppDispatch,
+): Promise<"undone" | "skipped" | "failed"> {
+  const undo = action.undo;
+  if (!undo) return "skipped";
+  try {
+    const world = getState().world;
+    switch (undo.op) {
+      case "entityCreated": {
+        const entity = world.entitiesById[undo.entityId];
+        if (!entity) return "undone";
+        if (undo.entryCreated && entity.lorebookEntryId) {
+          await api.v1.lorebook.removeEntry(entity.lorebookEntryId);
+        }
+        dispatch(entityDeleted({ entityId: entity.id }));
+        return "undone";
+      }
+      case "summary": {
+        const entity = world.entitiesById[undo.entityId];
+        if (!entity || entity.summary !== undo.wrote) return "skipped";
+        dispatch(
+          entitySummaryUpdated({ entityId: entity.id, summary: undo.before }),
+        );
+        return "undone";
+      }
+      case "name": {
+        const entity = world.entitiesById[undo.entityId];
+        if (!entity || entity.name !== undo.wrote) return "skipped";
+        if (entity.lorebookEntryId) {
+          await renameEntry(entity.lorebookEntryId, undo.wrote, undo.before);
+        }
+        dispatch(
+          entityEdited({
+            entityId: entity.id,
+            name: undo.before,
+            summary: entity.summary,
+          }),
+        );
+        return "undone";
+      }
+      case "entityDeleted": {
+        if (world.entitiesById[undo.entity.id]) return "undone";
+        if (undo.entry) await api.v1.lorebook.createEntry(undo.entry);
+        dispatch(
+          entityRestored({ entity: undo.entity, threadIds: undo.threadIds }),
+        );
+        return "undone";
+      }
+      case "threadCreated": {
+        const thread = world.threads.find((t) => t.id === undo.threadId);
+        if (!thread) return "undone";
+        dispatch(
+          threadDeleted({
+            threadId: thread.id,
+            lorebookEntryId: thread.lorebookEntryId,
+          }),
+        );
+        return "undone";
+      }
+      case "threadRewritten": {
+        const thread = world.threads.find((t) => t.id === undo.threadId);
+        if (
+          !thread ||
+          thread.state !== undo.wrote[0] ||
+          thread.latent !== undo.wrote[1] ||
+          thread.wish !== undo.wrote[2]
+        ) {
+          return "skipped";
+        }
+        dispatch(
+          threadLedgerUpdated({
+            threadId: thread.id,
+            state: undo.before[0],
+            latent: undo.before[1],
+          }),
+        );
+        dispatch(threadWishSet({ threadId: thread.id, wish: undo.before[2] }));
+        return "undone";
+      }
+    }
+  } catch (error) {
+    api.v1.log("[scenario] undo failed:", error);
+    return "failed";
+  }
+}
+
+/** Reverse a Build reply's applied commands, last first. Commands already
+ *  reversed by an earlier attempt are left alone. Marks the reply undone only
+ *  when none failed; returns whether it did. */
+export async function undoTurn(
+  getState: () => RootState,
+  dispatch: AppDispatch,
+  chatId: string,
+  messageId: string,
+): Promise<boolean> {
+  const message = getState()
+    .chat.chats.find((c) => c.id === chatId)
+    ?.messages.find((m) => m.id === messageId);
+  const segments = message?.forgeSegments;
+  if (!segments) return false;
+
+  const next = [...segments];
+  let failed = false;
+  for (let i = next.length - 1; i >= 0; i--) {
+    const seg = next[i];
+    if (seg.kind !== "action") continue;
+    const { action } = seg;
+    if (action.status !== "applied" || !action.undo) continue;
+    if (action.undoResult === "undone" || action.undoResult === "skipped") {
+      continue;
+    }
+    const undoResult = await undoForgeAction(action, getState, dispatch);
+    if (undoResult === "failed") failed = true;
+    next[i] = { kind: "action", action: { ...action, undoResult } };
+  }
+  dispatch(forgeSegmentsSet({ chatId, id: messageId, segments: next }));
+  if (!failed) dispatch(messageUndone({ chatId, id: messageId }));
+  return !failed;
 }
 
 export const forgeChatHandler: GenerationHandlers<ForgeChatTarget> = {

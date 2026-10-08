@@ -4,6 +4,7 @@ import {
   forgeChatContinueRequested,
   entityDiscardRequested,
   scenarioPlanRequested,
+  scenarioTurnUndoRequested,
 } from "../../../../src/core/store/effects/forge-chat-effects";
 import { chatHandler } from "../../../../src/core/store/effects/handlers/chat";
 import type {
@@ -12,9 +13,16 @@ import type {
 } from "../../../../src/core/store/effects/generation-handlers";
 import { createStore, combineReducers } from "nai-store";
 import { chatSlice } from "../../../../src/core/store/slices/chat";
-import { worldSlice } from "../../../../src/core/store/slices/world";
+import {
+  worldSlice,
+  entityForged,
+} from "../../../../src/core/store/slices/world";
+import {
+  runtimeSlice,
+  requestQueued,
+} from "../../../../src/core/store/slices/runtime";
 import type { RootState, WorldEntity } from "../../../../src/core/store/types";
-import type { Chat } from "../../../../src/core/chat-types/types";
+import type { Chat, ChatMessage } from "../../../../src/core/chat-types/types";
 import { FieldID } from "../../../../src/config/field-definitions";
 import { SCENARIO_BUILD_INSTRUCTION } from "../../../../src/core/utils/prompts";
 
@@ -404,5 +412,117 @@ describe("scenarioPlanRequested effect", () => {
     expect(reply.content).toBe(text);
     expect(reply.forgeSegments).toBeUndefined();
     expect(store.getState().world.entityIds).toEqual([]);
+  });
+});
+
+describe("undoing a Build turn", () => {
+  const applied = (
+    name: string,
+    before: string,
+    wrote: string,
+  ): ChatMessage => ({
+    id: `b-${name}`,
+    role: "assistant",
+    content: "x",
+    mode: "build",
+    forgeSegments: [
+      {
+        kind: "action",
+        action: {
+          kind: "REVISE",
+          status: "applied",
+          name,
+          entityId: "k",
+          undo: { op: "summary", entityId: "k", before, wrote },
+        },
+      },
+    ],
+  });
+
+  /** A real store with the effects registered: Kei is "New." now, and the
+   *  chat holds the given Build replies. */
+  const arrange = (messages: ChatMessage[]) => {
+    const store = createStore(
+      combineReducers({
+        chat: chatSlice.reducer,
+        world: worldSlice.reducer,
+        runtime: runtimeSlice.reducer,
+      }),
+      false,
+    );
+    registerForgeChatEffects(
+      store.subscribeEffect as never,
+      store.dispatch as never,
+      store.getState as never,
+    );
+    store.dispatch(
+      entityForged({
+        entity: makeEntity({
+          id: "k",
+          name: "Kei",
+          summary: "New.",
+          lifecycle: "live",
+        }),
+      }),
+    );
+    store.dispatch(
+      chatSlice.actions.chatCreated({ chat: makeChat({ id: "c1", messages }) }),
+    );
+    const flush = async () => {
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+    };
+    const message = (id: string) =>
+      store
+        .getState()
+        .chat.chats.find((c) => c.id === "c1")!
+        .messages.find((m) => m.id === id)!;
+    const summary = () => store.getState().world.entitiesById.k.summary;
+    return { store, flush, message, summary };
+  };
+
+  it("undoes the latest standing Build reply", async () => {
+    const { store, flush, message, summary } = arrange([
+      applied("Kei", "Old.", "New."),
+    ]);
+    store.dispatch(
+      scenarioTurnUndoRequested({ chatId: "c1", messageId: "b-Kei" }),
+    );
+    await flush();
+    expect(summary()).toBe("Old.");
+    expect(message("b-Kei").undone).toBe(true);
+  });
+
+  it("refuses a reply that is not the latest standing one", async () => {
+    const { store, flush, message, summary } = arrange([
+      applied("Kei", "Old.", "New."),
+      { id: "u", role: "user", content: "more" },
+      { ...applied("Kei", "New.", "New."), id: "b2" },
+    ]);
+    store.dispatch(
+      scenarioTurnUndoRequested({ chatId: "c1", messageId: "b-Kei" }),
+    );
+    await flush();
+    expect(summary()).toBe("New.");
+    expect(message("b-Kei").undone).toBeUndefined();
+    expect(message("b2").undone).toBeUndefined();
+  });
+
+  it("refuses while a turn for the chat is queued or running", async () => {
+    const { store, flush, message, summary } = arrange([
+      applied("Kei", "Old.", "New."),
+    ]);
+    store.dispatch(
+      requestQueued({
+        id: "scenario-c1-a0",
+        type: "forgeChat",
+        targetId: "a0",
+      }),
+    );
+    store.dispatch(
+      scenarioTurnUndoRequested({ chatId: "c1", messageId: "b-Kei" }),
+    );
+    await flush();
+    expect(summary()).toBe("New.");
+    expect(message("b-Kei").undone).toBeUndefined();
   });
 });

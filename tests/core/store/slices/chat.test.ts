@@ -12,6 +12,7 @@ import {
   forgeSegmentsSet,
   messageAppended,
   messageRemoved,
+  messageUndone,
   messagesPrunedAfter,
   refineCandidateMarked,
   keepKnownChats,
@@ -205,6 +206,26 @@ describe("chat slice", () => {
     expect(settled.chats[0].messages[0].forgeSegments).toEqual([
       { kind: "prose", text: "new" },
     ]);
+  });
+
+  it("messageUndone marks the reply and keeps its segments", () => {
+    const next = chatSliceReducer(
+      {
+        chats: [
+          blankChat({
+            id: "c1",
+            messages: [
+              { id: "m1", role: "assistant", content: "x", forgeSegments: [] },
+            ],
+          }),
+        ],
+        activeChatId: "c1",
+      },
+      messageUndone({ chatId: "c1", id: "m1" }),
+    );
+    const m = next.chats[0].messages[0];
+    expect(m.undone).toBe(true);
+    expect(m.forgeSegments).toEqual([]);
   });
 
   it("messageRemoved drops the matching message", () => {

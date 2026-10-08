@@ -133,6 +133,14 @@ export const chatSlice = createSlice({
         ),
       })),
 
+    messageUndone: (state, payload: { chatId: string; id: string }) =>
+      mapChat(state, payload.chatId, (c) => ({
+        ...c,
+        messages: c.messages.map((m) =>
+          m.id === payload.id ? { ...m, undone: true } : m,
+        ),
+      })),
+
     messagesPrunedAfter: (state, payload: { chatId: string; id: string }) =>
       mapChat(state, payload.chatId, (c) => {
         const idx = c.messages.findIndex((m) => m.id === payload.id);
@@ -167,6 +175,7 @@ export const {
   messageAppended,
   messageRemoved,
   forgeSegmentsSet,
+  messageUndone,
   messagesPrunedAfter,
   refineCandidateMarked,
 } = chatSlice.actions;
