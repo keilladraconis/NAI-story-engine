@@ -81,7 +81,13 @@ describe("the Scenario Plan prompt", () => {
       "If they asked you something, answer it.",
     );
     expect(SCENARIO_PLAN_PROMPT).toContain(
-      "Ask a question when the answer would change what gets built: one at most, and not in every reply.",
+      "When a question occurs to you, answer it yourself",
+    );
+    expect(SCENARIO_PLAN_PROMPT).toContain(
+      "one at most, and never in two replies running.",
+    );
+    expect(SCENARIO_PLAN_PROMPT).toContain(
+      "Your first sentence is never a verdict on the idea",
     );
     expect(SCENARIO_PLAN_PROMPT).toContain("Offer facts, not mood");
     expect(SCENARIO_PLAN_PROMPT).toContain(
