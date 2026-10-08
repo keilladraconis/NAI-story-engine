@@ -74,6 +74,19 @@ function lorebookRefused(error: unknown): string {
   return `the lorebook refused: ${error instanceof Error ? error.message : String(error)}`;
 }
 
+/** Every lorebook entry the World already holds: an entity's or a Thread's.
+ *  A new entity may not adopt one of these. */
+function boundEntryIds(state: RootState): Set<string> {
+  const ids = new Set<string>();
+  for (const owner of [
+    ...Object.values(state.world.entitiesById),
+    ...state.world.threads,
+  ]) {
+    if (owner.lorebookEntryId) ids.add(owner.lorebookEntryId);
+  }
+  return ids;
+}
+
 /** Make a live entity with its lorebook entry. A lorebook failure rejects the
  *  command and makes nothing. */
 async function createLive(
@@ -83,11 +96,15 @@ async function createLive(
   name: string,
   summary: string,
   chatId: string,
+  getState: () => RootState,
   dispatch: AppDispatch,
 ): Promise<ForgeActionRecord> {
   let bound: { entryId: string; created: boolean };
   try {
-    bound = await bindEntryFor({ name, categoryId: fieldId });
+    bound = await bindEntryFor(
+      { name, categoryId: fieldId },
+      boundEntryIds(getState()),
+    );
   } catch (error) {
     return {
       kind,
@@ -167,6 +184,7 @@ export async function executeForgeCommand(
         cmd.name,
         cmd.content,
         chatId,
+        getState,
         dispatch,
       );
     }
@@ -206,6 +224,7 @@ export async function executeForgeCommand(
         cmd.name,
         cmd.content,
         chatId,
+        getState,
         dispatch,
       );
     }

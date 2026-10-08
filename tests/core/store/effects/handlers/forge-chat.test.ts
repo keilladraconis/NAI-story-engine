@@ -1019,6 +1019,75 @@ describe("undoing a Build command", () => {
     expect(h.getState().world.entitiesById[rec.entityId!]).toBeUndefined();
   });
 
+  it("binds the same entry again when an adopted one is undone and rebuilt", async () => {
+    // Adoption files an uncategorised entry under the SE category, so the
+    // entry a rebuild meets is categorised and bound by nothing.
+    const mikki: ParsedCommand = {
+      kind: "CREATE",
+      elementType: "CHARACTER",
+      name: "Mikki",
+      content: "A fox.",
+    };
+    vi.mocked(api.v1.lorebook.entries).mockResolvedValueOnce([
+      { id: "e-old", displayName: "Mikki" },
+    ]);
+    const h = harness();
+    const first = await run(h, mikki);
+    await undoForgeAction(first, h.getState, h.dispatch);
+
+    vi.mocked(api.v1.lorebook.entries).mockResolvedValueOnce([
+      { id: "e-old", displayName: "Mikki", category: "se-characters" },
+    ]);
+    const second = await run(h, mikki);
+
+    expect(second.undo).toMatchObject({
+      op: "entityCreated",
+      entryCreated: false,
+    });
+    expect(
+      h.getState().world.entitiesById[second.entityId!].lorebookEntryId,
+    ).toBe("e-old");
+    expect(api.v1.lorebook.createEntry).not.toHaveBeenCalled();
+    expect(api.v1.lorebook.removeEntry).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "another entity",
+      { entities: [imported("Mikki the elder", "A fox.", "e-old")] },
+    ],
+    [
+      "a Thread",
+      {
+        threads: [
+          {
+            id: "t1",
+            title: "Mikki",
+            state: "",
+            entityIds: [],
+            lorebookEntryId: "e-old",
+            status: "open",
+          },
+        ],
+      },
+    ],
+  ])("makes a new entry when %s already binds the match", async (_by, seed) => {
+    vi.mocked(api.v1.lorebook.entries).mockResolvedValue([
+      { id: "e-old", displayName: "Mikki", category: "se-characters" },
+    ]);
+    const h = harness(seed);
+    const rec = await run(h, {
+      kind: "CREATE",
+      elementType: "CHARACTER",
+      name: "Mikki",
+      content: "A fox.",
+    });
+    expect(rec.undo).toMatchObject({ op: "entityCreated", entryCreated: true });
+    expect(h.getState().world.entitiesById[rec.entityId!].lorebookEntryId).toBe(
+      "e-new",
+    );
+  });
+
   it("restores a revised summary, unless it changed since", async () => {
     const h = harness({ entities: [imported("Kei", "Old.")] });
     const rec = await run(h, { kind: "REVISE", name: "Kei", content: "New." });

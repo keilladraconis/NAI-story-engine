@@ -5,22 +5,31 @@ import type { DulfsFieldID } from "../../../config/field-definitions";
 import { ensureCategory } from "./lorebook-sync";
 import { nameKey } from "./handlers/lorebook";
 
-/** Bind a lorebook entry for a new entity. An unmanaged entry (no category)
- *  with the same display name is adopted; otherwise an empty one is created,
- *  keyed on the name so it activates as soon as the name is written. */
-export async function bindEntryFor(entity: {
-  name: string;
-  categoryId: DulfsFieldID;
-}): Promise<{ entryId: string; created: boolean }> {
+/** Bind a lorebook entry for a new entity. An entry with the same display
+ *  name (compared case-insensitively) that nothing in `boundEntryIds` already
+ *  binds is adopted, wherever the writer keeps it: it is filed under the `SE:`
+ *  category only when it has no category of its own. Otherwise an empty entry
+ *  is created, keyed on the name so it activates as soon as the name is
+ *  written.
+ *
+ *  The match cannot be "no category": adopting an entry gives it one, so an
+ *  adopted entry that is unbound again (an undone CREATE) would never match a
+ *  second time and the rebuild would make an empty twin beside it. */
+export async function bindEntryFor(
+  entity: { name: string; categoryId: DulfsFieldID },
+  boundEntryIds: ReadonlySet<string>,
+): Promise<{ entryId: string; created: boolean }> {
   const category = await ensureCategory(entity.categoryId);
   const all = await api.v1.lorebook.entries();
   const existing = all.find(
     (e) =>
       (e.displayName ?? "").toLowerCase() === entity.name.toLowerCase() &&
-      !e.category,
+      !boundEntryIds.has(e.id),
   );
   if (existing) {
-    await api.v1.lorebook.updateEntry(existing.id, { category });
+    if (!existing.category) {
+      await api.v1.lorebook.updateEntry(existing.id, { category });
+    }
     return { entryId: existing.id, created: false };
   }
   const entryId = await api.v1.lorebook.createEntry({
