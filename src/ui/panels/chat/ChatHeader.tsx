@@ -56,7 +56,7 @@ export function ChatHeader(props: ChatHeaderProps) {
                 title={
                   m === "plan"
                     ? "Talk the scenario through. Builds nothing."
-                    : "Record what you've discussed as drafts and Threads."
+                    : "Record what you've discussed as entities and Threads. What it builds is real at once, and each turn can be undone."
                 }
                 onClick={() =>
                   store.dispatch(subModeChanged({ id: chat.id, subMode: m }))
