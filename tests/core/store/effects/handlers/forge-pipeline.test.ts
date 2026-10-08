@@ -1,5 +1,5 @@
-// End to end over the reported failure: a forge pass emits five CREATEs and a
-// CRITIQUE, and the writer sees no cards and a dead Commit button.
+// End to end over the reported failure: a forge pass emits five CREATEs, and
+// the writer sees no cards and a dead Commit button.
 //
 // The commands parse and execute — that much was measured. What this pins is
 // the rest of the path: the drafts reach the world slice, the chat's draft pool
@@ -23,8 +23,7 @@ const TEXT = `[CREATE CHARACTER "Cameron 'Cammie' Degrassi" | An 18-year-old hei
 [CREATE CHARACTER "Aurelia" | A seductive consumption goddess who manifests as everything Cammie lacks.]
 [CREATE SYSTEM "Divine Consumption Pact" | A supernatural agreement that transforms basic eating into cosmic claiming.]
 [CREATE SYSTEM "Reality Normalization Field" | An aura of magical realism that makes the impossible seem mundane.]
-[CREATE SITUATION "Abandoned Birthday" | Cammie sits alone at her own 18th birthday party in a rented water park.]
-[CRITIQUE | I have established the core characters but need to develop the specific locations.]`;
+[CREATE SITUATION "Abandoned Birthday" | Cammie sits alone at her own 18th birthday party in a rented water park.]`;
 
 /** A real world slice folded by the actions the handler dispatches. */
 function runPass(): { state: RootState; segments: ForgeSegment[] } {
@@ -92,7 +91,7 @@ describe("a forge pass, end to end", () => {
   it("records a segment per command, which is what the chat draws", () => {
     const { segments } = runPass();
     const actions = segments.filter((s) => s.kind === "action");
-    expect(actions.length).toBe(6);
+    expect(actions.length).toBe(5);
     expect(
       actions.every(
         (s) =>

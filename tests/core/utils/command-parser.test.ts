@@ -44,15 +44,6 @@ describe("parseCommands", () => {
     }
   });
 
-  it("parses a CRITIQUE block", () => {
-    const commands = parseCommands(`[CRITIQUE | Needs more factions.]`);
-    expect(commands).toHaveLength(1);
-    expect(commands[0].kind).toBe("CRITIQUE");
-    if (commands[0].kind === "CRITIQUE") {
-      expect(commands[0].text).toBe("Needs more factions.");
-    }
-  });
-
   it("parses a mixed command sequence", () => {
     const text = `[CREATE CHARACTER "Elara"]
 A knight.
@@ -60,13 +51,11 @@ A knight.
 A fortress.
 [LINK "Elara" → "Keep"]
 Home.
-[CRITIQUE | Missing factions.]
 [DONE]`;
     const commands = parseCommands(text);
     const kinds = commands.map((c) => c.kind);
     expect(kinds).toContain("CREATE");
     expect(kinds).toContain("LINK");
-    expect(kinds).toContain("CRITIQUE");
     expect(kinds).toContain("DONE");
   });
 

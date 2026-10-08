@@ -26,6 +26,7 @@ import {
   canonicalizeForgeCommands,
   TYPE_TO_FIELD,
   THREAD_REPAIR,
+  commandBody,
   type ParsedCommand,
 } from "../../../utils/crucible-command-parser";
 import type {
@@ -91,7 +92,7 @@ export function executeForgeCommand(
         ? cmd.oldName
         : cmd.kind === "THREAD"
           ? cmd.title
-          : cmd.kind === "CRITIQUE" || cmd.kind === "DONE"
+          : cmd.kind === "DONE"
             ? undefined
             : (cmd as { name?: string }).name;
     return {
@@ -346,9 +347,6 @@ export function executeForgeCommand(
       return { kind: "THREAD", status: "applied", name: cmd.title };
     }
 
-    case "CRITIQUE":
-      return { kind: "CRITIQUE", status: "applied", text: cmd.text };
-
     case "LINK":
     case "DONE":
       return { kind: "UNKNOWN", status: "applied" };
@@ -399,7 +397,10 @@ function buildForgeSegments(
       dispatch,
       { reviseOnly },
     );
-    segments.push({ kind: "action", action });
+    segments.push({
+      kind: "action",
+      action: { ...action, body: commandBody(tok.command) },
+    });
   }
   flush();
   return segments;

@@ -27,7 +27,6 @@ const TAG_EMOJI: Record<string, string> = {
   REVISE: "✏️",
   LINK: "🔗",
   DELETE: "🗑️",
-  CRITIQUE: "🔍",
   DONE: "✅",
 };
 

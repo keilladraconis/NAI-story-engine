@@ -4,7 +4,7 @@
  *
  * A turn is: the Scenario system prompt (with the register), the Foundation
  * and Setting, a context block code computes fresh each turn (TURN, [POOL],
- * [LIVE], [THREADS], [TOMBSTONES], [REJECTED LAST TURN], [PREVIOUS CRITIQUE]),
+ * [LIVE], [THREADS], [TOMBSTONES], [REJECTED LAST TURN]),
  * then the chat's own transcript. Nothing here is frozen at session start: the
  * chat is long-lived and the Foundation changes under it.
  *
@@ -31,7 +31,6 @@ import {
   SCENARIO_GROW_INSTRUCTION,
 } from "./prompts";
 import { DULFS_CATEGORY_LABELS } from "./category-detect";
-import { parseCommands } from "./crucible-command-parser";
 
 export type ScenarioTurn = "sketch" | "steer" | "grow";
 
@@ -54,7 +53,7 @@ function conversation(
 /** Which kind of turn the placeholder `assistantMessageId` is about to hold.
  *  Read from the transcript, so a retry after a prune asks the right thing.
  *
- *  It is a sketch until some reply has applied a command other than CRITIQUE:
+ *  It is a sketch until some reply has applied a command:
  *  a reply that only asked a question has built nothing, and the writer's
  *  answer to it is still the seed being settled. After that, a turn the writer
  *  spoke before is a steer, and any other a grow. */
@@ -67,10 +66,7 @@ export function scenarioTurn(
     (m) =>
       m.role === "assistant" &&
       (m.forgeSegments ?? []).some(
-        (s) =>
-          s.kind === "action" &&
-          s.action.status === "applied" &&
-          s.action.kind !== "CRITIQUE",
+        (s) => s.kind === "action" && s.action.status === "applied",
       ),
   );
   if (!sketched) return "sketch";
@@ -80,22 +76,6 @@ export function scenarioTurn(
 /** The Engine's replies, oldest first. */
 function replies(messages: ChatMessage[]): ChatMessage[] {
   return conversation(messages).filter((m) => m.role === "assistant");
-}
-
-/** The most recent critique, or null. Not only the last reply's: a reply that
- *  answered a question in prose wrote none, and a grow still needs one to
- *  answer. Parsed with the command parser, so it is found wherever in a reply
- *  it sits. */
-export function extractLastCritique(messages: ChatMessage[]): string | null {
-  const all = replies(messages);
-  for (let i = all.length - 1; i >= 0; i--) {
-    const critiques = parseCommands(all[i].content).filter(
-      (c) => c.kind === "CRITIQUE",
-    );
-    const last = critiques[critiques.length - 1];
-    if (last?.kind === "CRITIQUE") return last.text;
-  }
-  return null;
 }
 
 /** The commands the most recent reply wrote that were not applied, each with
@@ -186,7 +166,6 @@ export function buildScenarioTurnStrategy(
       .filter((b) => b.length > 0)
       .join("\n\n");
 
-    const critique = extractLastCritique(prior);
     // No truncation anywhere in this block: a summary cut short is a draft the
     // model revises from half its text.
     const blocks = [
@@ -196,7 +175,6 @@ export function buildScenarioTurnStrategy(
       formatThreads(state),
       formatTombstones(state, chat.id),
       formatRejections(prior),
-      critique ? `[PREVIOUS CRITIQUE]\n${critique}` : "",
     ].filter((b) => b.length > 0);
 
     const messages: Message[] = [

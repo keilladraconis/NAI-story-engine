@@ -3,7 +3,6 @@ import { useCreativeModel } from "../../helpers/creative-model";
 import {
   buildForgeCleanupStrategy,
   buildScenarioTurnStrategy,
-  extractLastCritique,
   formatRejections,
   scenarioTurn,
 } from "../../../src/core/utils/forge-chat-strategy";
@@ -69,7 +68,7 @@ const applied = (...kinds: string[]) => ({
     action: { kind, status: "applied", name: "X" },
   })),
 });
-const sketched = applied("CREATE", "CRITIQUE");
+const sketched = applied("CREATE");
 
 describe("which kind of turn this is", () => {
   it("is a sketch while no reply has been written", () => {
@@ -87,15 +86,6 @@ describe("which kind of turn this is", () => {
         forgeSegments: [{ kind: "prose", text: "Can these people walk away?" }],
       }),
       msg("u2", "user", "No, and comfort is the exception."),
-      msg("p", "assistant", ""),
-    ]);
-    expect(scenarioTurn(chat, "p")).toBe("sketch");
-  });
-  it("is still a sketch when the only reply applied nothing but a critique", () => {
-    const chat = chatOf([
-      msg("u", "user", "seed"),
-      msg("a", "assistant", "[CRITIQUE | nothing yet]", applied("CRITIQUE")),
-      msg("u2", "user", "go on"),
       msg("p", "assistant", ""),
     ]);
     expect(scenarioTurn(chat, "p")).toBe("sketch");
@@ -153,48 +143,14 @@ describe("which kind of turn this is", () => {
   });
 });
 
-const rejectedCleanup = msg("k", "assistant", "[CRITIQUE | from the scrub]", {
+const rejectedCleanup = msg("k", "assistant", '[REVISE "X" | from the scrub]', {
   messageKind: "cleanup",
   forgeSegments: [
     {
       kind: "action",
-      action: { kind: "CRITIQUE", status: "rejected", reason: "cleanup pass" },
+      action: { kind: "REVISE", status: "rejected", reason: "cleanup pass" },
     },
   ],
-});
-
-describe("the last critique", () => {
-  it("is found wherever it sits in the last reply", () => {
-    const messages = [
-      msg(
-        "a",
-        "assistant",
-        "prose\n[CRITIQUE | the lock has no witness]\nA question?",
-      ),
-    ];
-    expect(extractLastCritique(messages)).toBe("the lock has no witness");
-  });
-  it("is null when no reply has one", () => {
-    expect(
-      extractLastCritique([msg("a", "assistant", "just prose")]),
-    ).toBeNull();
-  });
-  it("is the most recent one when a prose-only reply came after it", () => {
-    const messages = [
-      msg("a", "assistant", "[CRITIQUE | older]"),
-      msg("a2", "assistant", "[CRITIQUE | the lock has no witness]"),
-      msg("u", "user", "what does Corin want?"),
-      msg("a3", "assistant", "He wants the water."),
-    ];
-    expect(extractLastCritique(messages)).toBe("the lock has no witness");
-  });
-  it("skips a reference scrub that came after it", () => {
-    const messages = [
-      msg("a", "assistant", "[CRITIQUE | the lock has no witness]"),
-      rejectedCleanup,
-    ];
-    expect(extractLastCritique(messages)).toBe("the lock has no witness");
-  });
 });
 
 describe("what the last turn had rejected", () => {
@@ -280,7 +236,7 @@ describe("a Scenario turn's messages", () => {
   it("gives the turn, the pool and the Threads' state, and ends on the grow instruction", async () => {
     const chat = chatOf([
       msg("u", "user", "seed"),
-      msg("a", "assistant", "sketch\n[CRITIQUE | no witness]", sketched),
+      msg("a", "assistant", "sketch", sketched),
       msg("p", "assistant", ""),
     ]);
     const built = await buildScenarioTurnStrategy(() => state, chat, "p")
@@ -290,7 +246,6 @@ describe("a Scenario turn's messages", () => {
     expect(text).toContain("TURN: GROW");
     expect(text).toContain("Hesper Vane");
     expect(text).toContain("- The Keys | Hesper Vane | She holds them.");
-    expect(text).toContain("[PREVIOUS CRITIQUE]\nno witness");
     expect(built.messages.at(-1)).toEqual({
       role: "user",
       content: SCENARIO_GROW_INSTRUCTION,

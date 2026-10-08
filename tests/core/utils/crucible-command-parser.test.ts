@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  commandBody,
   parseCommands,
   serializeForgeCommand,
   canonicalizeForgeCommands,
@@ -100,17 +101,6 @@ Former rivals turned reluctant allies.`;
     expect(commands[0]).toEqual({ kind: "DELETE", name: "Generic Guard" });
   });
 
-  it("parses a CRITIQUE command", () => {
-    const text = `[CRITIQUE | The world lacks factions. All characters are individuals without institutional backing.]`;
-
-    const commands = parseCommands(text);
-    expect(commands).toHaveLength(1);
-    expect(commands[0]).toEqual({
-      kind: "CRITIQUE",
-      text: "The world lacks factions. All characters are individuals without institutional backing.",
-    });
-  });
-
   it("parses DONE", () => {
     const commands = parseCommands("[DONE]");
     expect(commands).toHaveLength(1);
@@ -124,16 +114,14 @@ A disgraced knight.
 A ruined fortress.
 [LINK "Elara" → "The Shattered Keep"]
 Born here.
-[CRITIQUE | Missing factions.]
 [DONE]`;
 
     const commands = parseCommands(text);
-    expect(commands).toHaveLength(5);
+    expect(commands).toHaveLength(4);
     expect(commands.map((c) => c.kind)).toEqual([
       "CREATE",
       "CREATE",
       "LINK",
-      "CRITIQUE",
       "DONE",
     ]);
   });
@@ -279,9 +267,6 @@ describe("serializeForgeCommand", () => {
     expect(
       serializeForgeCommand({ kind: "RENAME", oldName: "A", newName: "B" }),
     ).toBe('[RENAME "A" → "B"]');
-    expect(serializeForgeCommand({ kind: "CRITIQUE", text: "thin" })).toBe(
-      "[CRITIQUE | thin]",
-    );
     expect(serializeForgeCommand({ kind: "DONE" })).toBe("[DONE]");
   });
 });
@@ -401,9 +386,13 @@ describe("describeForgeCommand", () => {
       status: "applied",
       elementType: "SYSTEM",
       name: "X",
+      body: [
+        { label: "Type", text: "SYSTEM" },
+        { label: "Summary", text: "d" },
+      ],
     });
   });
-  it("maps RENAME and CRITIQUE", () => {
+  it("maps RENAME", () => {
     expect(
       describeForgeCommand({ kind: "RENAME", oldName: "A", newName: "B" }),
     ).toEqual({
@@ -411,11 +400,6 @@ describe("describeForgeCommand", () => {
       status: "applied",
       name: "A",
       newName: "B",
-    });
-    expect(describeForgeCommand({ kind: "CRITIQUE", text: "hm" })).toEqual({
-      kind: "CRITIQUE",
-      status: "applied",
-      text: "hm",
     });
   });
 });
@@ -449,6 +433,10 @@ describe("parseForgeStream", () => {
             status: "applied",
             elementType: "SYSTEM",
             name: "X",
+            body: [
+              { label: "Type", text: "SYSTEM" },
+              { label: "Summary", text: "desc" },
+            ],
           },
         },
       ],
@@ -469,6 +457,10 @@ describe("parseForgeStream", () => {
           status: "applied",
           elementType: "CHARACTER",
           name: "Kei",
+          body: [
+            { label: "Type", text: "CHARACTER" },
+            { label: "Summary", text: "shy fox" },
+          ],
         },
       },
     ]);
@@ -582,5 +574,64 @@ describe("THREAD has exactly five segments", () => {
       };
       expect(parseCommands(serializeForgeCommand(cmd))).toEqual([cmd]);
     }
+  });
+});
+
+describe("CRITIQUE is no longer a command", () => {
+  it("reads a critique line as prose", () => {
+    const line = "[CRITIQUE | The lock has no one on the towpath.]";
+    expect(parseCommands(line)).toEqual([]);
+    expect(walkForgeLines(line)).toEqual([{ kind: "prose", text: line }]);
+  });
+});
+
+describe("commandBody", () => {
+  const one = (text: string) => commandBody(parseCommands(text)[0]);
+
+  it("gives a CREATE its type and summary", () => {
+    expect(
+      one('[CREATE CHARACTER "Hesper Vane" | Keeps Tolland Lock.]'),
+    ).toEqual([
+      { label: "Type", text: "CHARACTER" },
+      { label: "Summary", text: "Keeps Tolland Lock." },
+    ]);
+  });
+
+  it("gives a REVISE its summary", () => {
+    expect(one('[REVISE "Hesper Vane" | Keeps the last lock.]')).toEqual([
+      { label: "Summary", text: "Keeps the last lock." },
+    ]);
+  });
+
+  it("gives a THREAD its cast and each segment that is not empty", () => {
+    expect(
+      one(
+        '[THREAD "Half the House" | "Hesper Vane", "Corin Vane" | He sold his half. | | She floods the cut.]',
+      ),
+    ).toEqual([
+      { label: "Cast", text: "Hesper Vane, Corin Vane" },
+      { label: "State", text: "He sold his half." },
+      { label: "Wish", text: "She floods the cut." },
+    ]);
+  });
+
+  it("gives RENAME and DELETE nothing", () => {
+    expect(one('[DELETE "The Mill"]')).toEqual([]);
+    expect(one('[RENAME "Corin" → "Corin Vane"]')).toEqual([]);
+  });
+
+  it("is carried on a streamed action", () => {
+    const { segments } = parseForgeStream(
+      '[CREATE LOCATION "Tolland Lock House" | Damp plaster.]',
+    );
+    expect(segments[0]).toMatchObject({
+      kind: "action",
+      action: {
+        body: [
+          { label: "Type", text: "LOCATION" },
+          { label: "Summary", text: "Damp plaster." },
+        ],
+      },
+    });
   });
 });

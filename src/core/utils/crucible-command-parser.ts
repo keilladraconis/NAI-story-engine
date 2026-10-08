@@ -7,7 +7,6 @@
  *   [RENAME "<Old>" → "<New>"]                    — rename an element
  *   [DELETE "<Name>"]                             — remove element
  *   [THREAD "<Title>" | "<A>", "<B>" | state | latent | wish] — record how elements stand
- *   [CRITIQUE | text]                             — running self-assessment
  *   [DONE]                                        — signal pass complete
  *
  *   [LINK "<From>" → "<To>"]                      — legacy Crucible link (still parsed for back-compat)
@@ -16,7 +15,11 @@
  */
 
 import { DulfsFieldID, FieldID } from "../../config/field-definitions";
-import type { ForgeActionRecord, ForgeSegment } from "../chat-types/types";
+import type {
+  ForgeActionRecord,
+  ForgeSegment,
+  PillPart,
+} from "../chat-types/types";
 
 /** Map command type names to World Entry field IDs. */
 export const TYPE_TO_FIELD: Record<string, DulfsFieldID> = {
@@ -55,11 +58,6 @@ export interface DeleteCommand {
   name: string;
 }
 
-export interface CritiqueCommand {
-  kind: "CRITIQUE";
-  text: string;
-}
-
 export interface ThreadCommand {
   kind: "THREAD";
   title: string;
@@ -89,7 +87,6 @@ export type ParsedCommand =
   | DeleteCommand
   | RenameCommand
   | ThreadCommand
-  | CritiqueCommand
   | DoneCommand;
 
 // --- Tokenizer ---
@@ -108,7 +105,6 @@ const KNOWN_COMMAND_VERBS = new Set([
   "DELETE",
   "RENAME",
   "THREAD",
-  "CRITIQUE",
   "DONE",
 ]);
 
@@ -158,6 +154,33 @@ export interface ForgeStreamParse {
   pending: PendingTail;
 }
 
+/** What a command carried, as labelled parts for its pill. Empty segments are
+ *  left out; RENAME and DELETE carry nothing beyond their label. */
+export function commandBody(cmd: ParsedCommand): PillPart[] {
+  const parts = (pairs: [string, string][]): PillPart[] =>
+    pairs
+      .filter(([, text]) => text.trim() !== "")
+      .map(([label, text]) => ({ label, text: text.trim() }));
+  switch (cmd.kind) {
+    case "CREATE":
+      return parts([
+        ["Type", cmd.elementType.toUpperCase()],
+        ["Summary", cmd.content],
+      ]);
+    case "REVISE":
+      return parts([["Summary", cmd.content]]);
+    case "THREAD":
+      return parts([
+        ["Cast", cmd.memberNames.join(", ")],
+        ["State", cmd.state],
+        ["Private", cmd.latent],
+        ["Wish", cmd.wish],
+      ]);
+    default:
+      return [];
+  }
+}
+
 /** Map a parsed command to a provisional (status "applied") display record —
  *  no execution. DONE/LINK are filtered before this is called. */
 export function describeForgeCommand(cmd: ParsedCommand): ForgeActionRecord {
@@ -168,9 +191,15 @@ export function describeForgeCommand(cmd: ParsedCommand): ForgeActionRecord {
         status: "applied",
         elementType: cmd.elementType.toUpperCase(),
         name: cmd.name,
+        body: commandBody(cmd),
       };
     case "REVISE":
-      return { kind: "REVISE", status: "applied", name: cmd.name };
+      return {
+        kind: "REVISE",
+        status: "applied",
+        name: cmd.name,
+        body: commandBody(cmd),
+      };
     case "DELETE":
       return { kind: "DELETE", status: "applied", name: cmd.name };
     case "RENAME":
@@ -181,9 +210,12 @@ export function describeForgeCommand(cmd: ParsedCommand): ForgeActionRecord {
         newName: cmd.newName,
       };
     case "THREAD":
-      return { kind: "THREAD", status: "applied", name: cmd.title };
-    case "CRITIQUE":
-      return { kind: "CRITIQUE", status: "applied", text: cmd.text };
+      return {
+        kind: "THREAD",
+        status: "applied",
+        name: cmd.title,
+        body: commandBody(cmd),
+      };
     case "LINK":
     case "DONE":
       return { kind: "UNKNOWN", status: "applied" };
@@ -399,14 +431,6 @@ function parseCommandAt(lines: string[], i: number): ParsedCommandAt | null {
     }
   }
 
-  const critiqueMatch = line.match(/^\[\s*CRITIQUE\s*\|\s*(.+?)\]?\s*$/);
-  if (critiqueMatch) {
-    return {
-      command: { kind: "CRITIQUE", text: critiqueMatch[1].trim() },
-      consumed: 0,
-    };
-  }
-
   // Lenient: a bare element type with no CREATE keyword, with or without a
   // colon — the forge frequently emits [SYSTEM: "Name" | desc] instead of
   // [CREATE SYSTEM "Name" | desc]. Gated on the known element types.
@@ -476,8 +500,6 @@ export function serializeForgeCommand(cmd: ParsedCommand): string {
         .trimEnd();
       return `[THREAD "${cmd.title}" | ${members} |${tail}]`;
     }
-    case "CRITIQUE":
-      return `[CRITIQUE | ${cmd.text}]`;
     case "LINK":
       return `[LINK "${cmd.fromName}" → "${cmd.toName}" | ${cmd.description}]`;
     case "DONE":
@@ -537,7 +559,7 @@ function countContentLines(lines: string[], startIdx: number): number {
 /** Check if a line starts a new command. */
 function isCommandLine(line: string): boolean {
   if (
-    /^\[\s*(CREATE|REVISE|DESCRIPTION|LINK|DELETE|RENAME|THREAD|CRITIQUE|DONE)\b/.test(
+    /^\[\s*(CREATE|REVISE|DESCRIPTION|LINK|DELETE|RENAME|THREAD|DONE)\b/.test(
       line,
     )
   ) {

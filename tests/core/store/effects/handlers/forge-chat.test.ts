@@ -181,6 +181,7 @@ describe("forgeChatHandler.completion", () => {
           status: "rejected",
           name: "OldQuay",
           reason: "is live and cannot be changed from the chat",
+          body: [{ label: "Summary", text: "rewritten" }],
         },
       },
     ]);
@@ -216,6 +217,7 @@ describe("forgeChatHandler.completion", () => {
           status: "rejected",
           name: "OldQuay",
           reason: "is live and cannot be changed from the chat",
+          body: [],
         },
       },
     ]);
@@ -251,6 +253,7 @@ describe("forgeChatHandler.completion", () => {
           status: "rejected",
           name: "OldQuay",
           reason: "is live and cannot be changed from the chat",
+          body: [],
         },
       },
     ]);
@@ -504,6 +507,10 @@ describe("forgeChatHandler.completion — segments", () => {
         status: "applied",
         elementType: "SYSTEM",
         name: "Apartment Evolution",
+        body: [
+          { label: "Type", text: "SYSTEM" },
+          { label: "Summary", text: "progressive transformation" },
+        ],
       },
     });
   });
@@ -545,6 +552,7 @@ describe("forgeChatHandler.completion — segments", () => {
         status: "applied",
         elementType: "CHARACTER",
         name: "Ghost",
+        body: [{ label: "Summary", text: "flickers" }],
       },
     });
   });
@@ -574,6 +582,10 @@ describe("forgeCleanupHandler.completion — reviseOnly", () => {
           elementType: "SYSTEM",
           name: "New Thing",
           reason: "cleanup pass",
+          body: [
+            { label: "Type", text: "SYSTEM" },
+            { label: "Summary", text: "nope" },
+          ],
         },
       },
     ]);

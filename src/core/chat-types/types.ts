@@ -4,15 +4,14 @@ export type ChatLifecycle = "save" | "commit-discard";
 
 export type ChatMessageRole = "system" | "user" | "assistant";
 
+/** One labelled part of what a command carried, shown when its pill is opened. */
+export interface PillPart {
+  label: string;
+  text: string;
+}
+
 export interface ForgeActionRecord {
-  kind:
-    | "CREATE"
-    | "REVISE"
-    | "DELETE"
-    | "RENAME"
-    | "THREAD"
-    | "CRITIQUE"
-    | "UNKNOWN";
+  kind: "CREATE" | "REVISE" | "DELETE" | "RENAME" | "THREAD" | "UNKNOWN";
   status: "applied" | "rejected" | "unrecognized";
   /** CREATE element type, e.g. "SYSTEM". */
   elementType?: string;
@@ -20,10 +19,11 @@ export interface ForgeActionRecord {
   name?: string;
   /** RENAME target name. */
   newName?: string;
-  /** CRITIQUE body. */
-  text?: string;
   /** Rejection or unrecognized detail (reason, or the raw line). */
   reason?: string;
+  /** What the command carried, for display. Absent on records stored before
+   *  pills existed. */
+  body?: PillPart[];
 }
 
 export type ForgeSegment =
@@ -49,6 +49,9 @@ export interface ChatMessage {
   /** Ordered display projection of a forge turn (prose runs + action chips),
    *  built at completion. Display-only; `content` stays the raw canonical text. */
   forgeSegments?: ForgeSegment[];
+  /** Which Scenario mode wrote this assistant message. Absent on messages
+   *  from before the modes existed, which render as plain text. */
+  mode?: "plan" | "build";
 }
 
 export type ChatSeed =

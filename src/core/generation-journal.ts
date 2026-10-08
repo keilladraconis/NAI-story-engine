@@ -252,9 +252,6 @@ export function formatForgeDigest(): string {
             case "DELETE":
               lines.push(`  ✓ DELETE "${cmd.name}"`);
               break;
-            case "CRITIQUE":
-              lines.push(`  ✓ CRITIQUE (${cmd.text.length} chars)`);
-              break;
             case "THREAD":
               lines.push(
                 `  ✓ THREAD "${cmd.title}" [${cmd.memberNames.join(", ")}]${cmd.state ? ` — ${cmd.state}` : ""}`,
