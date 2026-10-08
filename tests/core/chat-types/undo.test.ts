@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  hasStandingCommands,
   isUndoable,
   latestUndoable,
   pruneBlocked,
@@ -64,5 +65,29 @@ describe("which Build reply can be undone", () => {
     expect(
       pruneBlocked([build("b1"), build("b2", { undone: true })], "b1"),
     ).toBe(false);
+  });
+});
+
+describe("hasStandingCommands", () => {
+  it("is true for an applied command with an undo record", () => {
+    expect(hasStandingCommands(build("b1"))).toBe(true);
+  });
+  it("is false for an applied command with no undo record", () => {
+    expect(
+      hasStandingCommands(
+        build("b1", {
+          forgeSegments: [
+            {
+              kind: "action",
+              action: { kind: "DELETE", status: "applied", name: "K" },
+            },
+          ],
+        }),
+      ),
+    ).toBe(false);
+  });
+  it("is false once undone, and for a Plan message", () => {
+    expect(hasStandingCommands(build("b1", { undone: true }))).toBe(false);
+    expect(hasStandingCommands({ ...build("b1"), mode: "plan" })).toBe(false);
   });
 });

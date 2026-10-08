@@ -29,6 +29,10 @@ describe("a Build reply in the chat view", () => {
     expect(message).toContain("latestUndoable");
     expect(message).toMatch(/display:\s*canUndo\s*\?\s*"flex"\s*:\s*"none"/);
   });
+  it("hides Edit while the commands stand, by display, not by removing it", () => {
+    expect(message).toContain("hasStandingCommands");
+    expect(message).toMatch(/display:\s*canEdit\s*\?\s*"flex"\s*:\s*"none"/);
+  });
   it("shows no separate block of entity cards", () => {
     expect(message).not.toContain("inlineEntityIdsFor");
     expect(message).not.toContain("EntityCard");

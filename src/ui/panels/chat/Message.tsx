@@ -10,14 +10,17 @@ import {
   scenarioTurnUndoRequested,
 } from "../../../core/store";
 import type { RootState } from "../../../core/store";
-import type { ChatMessage, Chat } from "../../../core/chat-types/types";
-import { latestUndoable } from "../../../core/chat-types/undo";
+import type { ChatMessage } from "../../../core/chat-types/types";
+import {
+  hasStandingCommands,
+  latestUndoable,
+} from "../../../core/chat-types/undo";
 import { ConfirmButton } from "../../components/ConfirmButton";
 import { BuildPills } from "./BuildPills";
 import { buildPills } from "../../../core/chat-types/pills";
 import { Edit, RotateCw, RotateCcw, X, Check } from "nai:icons/feather";
 
-type MessageProps = { chatId: string; chat: Chat; message: ChatMessage };
+type MessageProps = { chatId: string; message: ChatMessage };
 
 const ICON = 14;
 // Separation between the ordinary actions and Delete, so a mis-aimed tap at the
@@ -162,15 +165,18 @@ export function Message(props: MessageProps) {
     ),
   );
   // Editing drops a reply's settled segments, and with them the record of how
-  // to undo it. A reply whose commands still stand is not offered for edit.
-  const canEdit = !(
-    isBuild &&
-    !undone &&
-    (segments ?? []).some(
-      (s) => s.kind === "action" && s.action.status === "applied",
-    )
-  );
+  // to undo it. Edit stays hidden on every reply whose commands still stand,
+  // not only the latest: editing an older one would erase the records it needs
+  // once the later turns are undone.
+  const standing = useSlice((s) => {
+    const m = readMessage(s, chatId, message.id);
+    return !!m && hasStandingCommands(m);
+  });
+  const canEdit = !standing;
   const pills = isBuild ? buildPills(content, segments, generating) : [];
+  // Pills are keyed by position, so the key changes with the list's shape:
+  // settling the segments or a different pill count collapses everything.
+  const pillsKey = `${message.id}|${segments ? "s" : "p"}|${pills.length}`;
   const [editing, setEditing] = useState(false);
   const [collapsed, setCollapsed] = useState(true);
   // Retry and Delete destroy data with no undo, so both are ConfirmButtons,
@@ -311,7 +317,7 @@ export function Message(props: MessageProps) {
             <div style={{ display: isBuild ? "none" : "block" }}>
               {content || "…"}
             </div>
-            <BuildPills pills={pills} hidden={!isBuild} resetKey={message.id} />
+            <BuildPills pills={pills} hidden={!isBuild} resetKey={pillsKey} />
           </div>
         )}
       </div>

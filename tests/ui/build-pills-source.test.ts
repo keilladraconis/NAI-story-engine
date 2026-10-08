@@ -34,7 +34,16 @@ describe("BuildPills", () => {
   });
 
   it("mounts a card the first time its pill is opened, then only hides it", () => {
-    expect(pills).toMatch(/seen\[i\]/);
+    expect(pills).toContain("mounted={!!seen[i]}");
+    expect(pills).toMatch(
+      /mounted && target\?\.kind === "entity" \? \(\s*<EntityCard/,
+    );
+    expect(pills).toMatch(
+      /mounted && target\?\.kind === "thread" \? \(\s*<ThreadItem/,
+    );
+    expect(pills).toMatch(
+      /style=\{\{ display: exists \? "block" : "none", marginTop: SP\.xs \}\}/,
+    );
     expect(pills).toMatch(/display:\s*isOpen\s*\?\s*"block"\s*:\s*"none"/);
   });
 
@@ -56,7 +65,7 @@ describe("BuildPills", () => {
 describe("Message", () => {
   it("mounts both the text and the pills, and shows one", () => {
     expect(message).toMatch(
-      /<BuildPills[\s\S]*?hidden=\{!isBuild\}[\s\S]*?resetKey=\{message\.id\}/,
+      /<BuildPills[\s\S]*?hidden=\{!isBuild\}[\s\S]*?resetKey=\{pillsKey\}/,
     );
     expect(message).toMatch(/display:\s*isBuild\s*\?\s*"none"\s*:\s*"block"/);
   });

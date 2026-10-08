@@ -1,7 +1,8 @@
 import type { ChatMessage } from "./types";
 
-/** A Build reply that applied at least one command and still stands. */
-export function isUndoable(m: ChatMessage): boolean {
+/** A Build reply with at least one applied command that carries an undo
+ *  record, and has not been undone: its commands still stand. */
+export function hasStandingCommands(m: ChatMessage): boolean {
   return (
     m.role === "assistant" &&
     m.mode === "build" &&
@@ -13,12 +14,18 @@ export function isUndoable(m: ChatMessage): boolean {
   );
 }
 
+/** A Build reply that applied at least one command and still stands. */
+export const isUndoable = hasStandingCommands;
+
 /** Undo goes backwards one turn at a time: only the latest standing Build
  *  reply may be undone, since later turns may have built on earlier ones. */
 export function latestUndoable(
   messages: ChatMessage[],
 ): ChatMessage | undefined {
-  return [...messages].reverse().find(isUndoable);
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (isUndoable(messages[i])) return messages[i];
+  }
+  return undefined;
 }
 
 /** True when removing everything after `fromId` would drop a Build reply

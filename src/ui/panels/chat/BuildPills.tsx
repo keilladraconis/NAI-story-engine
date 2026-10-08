@@ -43,6 +43,16 @@ function PillBody(props: { pill: Pill; mounted: boolean }) {
           <ThreadItem threadId={target.id} />
         ) : null}
       </div>
+      <div
+        style={{
+          display:
+            target && !exists && pill.body.length === 0 ? "block" : "none",
+          marginTop: SP.xs,
+          opacity: 0.6,
+        }}
+      >
+        No longer in the World.
+      </div>
       {pill.body.map((part, j) => (
         <div
           key={j}
@@ -79,9 +89,11 @@ function PillBody(props: { pill: Pill; mounted: boolean }) {
  *  or changed something opens into the World's own card for it. The card is
  *  mounted the first time its pill is opened (`seen`) and only hidden after:
  *  swapping elements leaves stale ones behind in this renderer. The open and
- *  seen sets are held with the `resetKey` they belong to, so an instance
- *  reused for another message (the message list is keyed by index and pages)
- *  shows nothing open in that same render, without an effect to reset it. */
+ *  seen sets are held by pill position with the `resetKey` they belong to.
+ *  The key changes when the message does (the message list is keyed by index
+ *  and pages) and when the list's shape does (provisional pills settling, a
+ *  different count), so everything collapses and unmounts in that same render,
+ *  without an effect to reset it. */
 export function BuildPills(props: {
   pills: Pill[];
   resetKey: string;
