@@ -257,12 +257,20 @@ export function registerGenerationEngineEffects(
 
     const handler = getHandler(target.type);
     let generationSucceeded = false;
-    // Set while a continuation call is in flight. If that call throws we still
-    // have to retire its runtime entry — it is the request the runtime holds as
-    // active, so leaving it behind strands every surface that reads runtime on
-    // "still generating". Cleared after the cancellation check below, which
-    // needs to see the cancelled task before it disappears.
-    let inFlightContTaskId: string | undefined;
+    // The continuation task the runtime still holds for this target. Starting
+    // one replaces the parent as the active request, so once a reply has been
+    // continued this is the only thing saying the target has work in flight.
+    // It is therefore kept until the completion handler has settled — a handler
+    // that awaits (the Scenario Build applying its commands) would otherwise
+    // run with nothing queued or active — and each one is retired only when the
+    // next takes over. A call that threw or was cancelled is retired after the
+    // cancellation check below, which needs to see the cancelled task first.
+    let liveContTaskId: string | undefined;
+    const retireContinuation = (): void => {
+      if (!liveContTaskId) return;
+      dispatch(requestCompleted({ requestId: liveContTaskId }));
+      liveContTaskId = undefined;
+    };
 
     const onStream = (choices: GenerationChoice[], _final: boolean) => {
       const text = choices[0]?.text || "";
@@ -361,7 +369,10 @@ export function registerGenerationEngineEffects(
 
           // Register in runtime so onTaskStarted → requestActivated can track it
           // and UI buttons (stateProjection) see a live request of the same type.
+          // The previous continuation goes only now, so the target is never
+          // without a request between two calls.
           dispatch(requestQueued({ id: contTaskId, ...queueEntry }));
+          retireContinuation();
 
           const soFar = accumulatedText.startsWith(prefillText)
             ? accumulatedText
@@ -372,7 +383,7 @@ export function registerGenerationEngineEffects(
           ];
 
           const lengthBefore = accumulatedText.length;
-          inFlightContTaskId = contTaskId;
+          liveContTaskId = contTaskId;
           const contResult = await genX.generate(
             continuationMessages,
             { ...apiParams, taskId: contTaskId },
@@ -380,9 +391,6 @@ export function registerGenerationEngineEffects(
             "background",
             await api.v1.createCancellationSignal(),
           );
-          inFlightContTaskId = undefined;
-
-          dispatch(requestCompleted({ requestId: contTaskId }));
           finishReason = contResult.choices?.[0]?.finish_reason;
           calls++;
 
@@ -412,10 +420,9 @@ export function registerGenerationEngineEffects(
       api.v1.log(`[effects] Generation was cancelled for ${requestId}`);
       generationSucceeded = false;
     }
-    if (inFlightContTaskId) {
-      dispatch(requestCompleted({ requestId: inFlightContTaskId }));
-      inFlightContTaskId = undefined;
-    }
+    // A generation that failed or was cancelled has nothing to apply: its
+    // continuation is retired before the handler runs, as it always was.
+    if (!generationSucceeded) retireContinuation();
 
     // Trim leading whitespace from model output (prevents double-space artifacts after prefill)
     accumulatedText = accumulatedText.replace(/^\s+/, "");
@@ -432,6 +439,8 @@ export function registerGenerationEngineEffects(
       });
     } catch (e) {
       api.v1.log(`[effects] Completion handler error for ${requestId}:`, e);
+    } finally {
+      retireContinuation();
     }
 
     // Record to generation journal
