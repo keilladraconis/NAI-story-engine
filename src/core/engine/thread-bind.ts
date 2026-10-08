@@ -28,6 +28,7 @@ import {
 } from "../store/effects/lorebook-sync";
 import {
   entityDeleted,
+  entityEdited,
   entityRestored,
   threadCreated,
   threadDeleted,
@@ -358,6 +359,17 @@ export function registerThreadConditionEffects(
   // to announce it.
   subscribeEffect(matchesAction(entityRestored), () => {
     for (const thread of getState().world.threads) settle(thread.id);
+  });
+
+  // A renamed entity changes the aliases its Threads watch for, with no
+  // thread action to announce it. Only the Threads it is in are settled. The
+  // aliases are read from the member's entry first, so this picks the new
+  // name up when the entry was renamed before the entity (a Scenario Build
+  // RENAME and its undo both do it in that order).
+  subscribeEffect(matchesAction(entityEdited), (action) => {
+    for (const thread of getState().world.threads) {
+      if (thread.entityIds.includes(action.payload.entityId)) settle(thread.id);
+    }
   });
 
   subscribeEffect(matchesAction(threadDeleted), (action) => {

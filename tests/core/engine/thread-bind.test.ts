@@ -15,6 +15,7 @@ import type {
 } from "../../../src/core/store/types";
 import {
   initialWorldState,
+  entityEdited,
   threadCreated,
   threadDeleted,
   threadLedgerUpdated,
@@ -254,6 +255,46 @@ describe("a Thread's lorebook entry", () => {
     expect(
       JSON.stringify(lorebook.read(entryId)?.advancedConditions),
     ).toContain("the drone-keeper");
+  });
+
+  it("follows a member's rename, and only in the Threads that member is in", async () => {
+    const store = storeOf(
+      [...cast(), entity("c", "Odile"), entity("d", "Maren")],
+      [],
+    );
+    store.dispatch(threadCreated({ thread: thread() }));
+    store.dispatch(
+      threadCreated({
+        thread: thread({ id: "t2", title: "Elsewhere", entityIds: ["c", "d"] }),
+      }),
+    );
+    await settle();
+    const [mine, other] = store
+      .getState()
+      .world.threads.map((t) => t.lorebookEntryId as string);
+    const before = lorebook.updates().length;
+
+    // As a Build RENAME does it: the entry first, then the entity.
+    lorebook.seed({
+      id: "lb",
+      displayName: "Pell Arden",
+      keys: ["pell arden"],
+      text: "",
+    } as LorebookEntry);
+    store.dispatch(
+      entityEdited({ entityId: "b", name: "Pell Arden", summary: "" }),
+    );
+    await settle();
+
+    const condition = JSON.stringify(lorebook.read(mine)?.advancedConditions);
+    expect(condition).toContain("pell arden");
+    expect(condition).not.toContain('"pell"');
+    expect(
+      lorebook
+        .updates()
+        .slice(before)
+        .some((u) => u.id === other),
+    ).toBe(false);
   });
 
   it("overwrites a hand edit of the entry text: the Thread's state is the authority", async () => {
