@@ -225,6 +225,11 @@ export async function executeForgeCommand(
           reason: REASON.notBuiltHere,
         };
       }
+      const threadIds = getState()
+        .world.threads.filter((t) => t.entityIds.includes(target.id))
+        .map((t) => t.id);
+      // The entry goes first: a refused removal must leave the entity in
+      // place, and the dispatch after it is synchronous.
       let entry: LorebookEntry | null;
       try {
         entry = target.lorebookEntryId
@@ -239,9 +244,6 @@ export async function executeForgeCommand(
           reason: lorebookRefused(error),
         };
       }
-      const threadIds = getState()
-        .world.threads.filter((t) => t.entityIds.includes(target.id))
-        .map((t) => t.id);
       dispatch(entityDeleted({ entityId: target.id }));
       return {
         kind: "DELETE",

@@ -89,6 +89,7 @@ beforeEach(() => {
   vi.mocked(api.v1.lorebook.createEntry).mockResolvedValue("e-new");
   vi.mocked(api.v1.lorebook.updateEntry).mockResolvedValue(undefined);
   vi.mocked(api.v1.lorebook.removeEntry).mockResolvedValue(undefined);
+  vi.mocked(api.v1.lorebook.entry).mockResolvedValue(null);
 });
 
 describe("forgeChatHandler.streaming", () => {
@@ -840,5 +841,106 @@ describe("a Build command writes for real", () => {
       threadId: t.id,
       undo: { op: "threadCreated", threadId: t.id },
     });
+  });
+
+  it("RENAME is rejected, and the entity keeps its name, when the lorebook refuses", async () => {
+    vi.mocked(api.v1.lorebook.entry).mockResolvedValue({
+      id: "e1",
+      displayName: "Kei",
+      keys: ["kei"],
+    });
+    vi.mocked(api.v1.lorebook.updateEntry).mockRejectedValue(new Error("nope"));
+    const { getState, dispatch } = harness({
+      entities: [imported("Kei", "S.", "e1")],
+    });
+    const rec = await executeForgeCommand(
+      { kind: "RENAME", oldName: "Kei", newName: "Kay" },
+      "c1",
+      "m1",
+      getState,
+      dispatch,
+    );
+    expect(rec.status).toBe("rejected");
+    expect(rec.reason).toContain("nope");
+    expect(Object.values(getState().world.entitiesById)[0].name).toBe("Kei");
+  });
+
+  it("DELETE is rejected, and the entity stays, when the lorebook refuses", async () => {
+    vi.mocked(api.v1.lorebook.entry).mockResolvedValue({
+      id: "e1",
+      displayName: "Kei",
+    });
+    vi.mocked(api.v1.lorebook.removeEntry).mockRejectedValue(new Error("nope"));
+    const built = { ...imported("Kei", "S.", "e1"), sourceChatId: "c0" };
+    const { getState, dispatch } = harness({ entities: [built] });
+    const rec = await executeForgeCommand(
+      { kind: "DELETE", name: "Kei" },
+      "c1",
+      "m1",
+      getState,
+      dispatch,
+    );
+    expect(rec.status).toBe("rejected");
+    expect(getState().world.entitiesById[built.id]).toBeDefined();
+  });
+
+  it("CREATE binds an unmanaged entry of the same name and records that it did not make it", async () => {
+    vi.mocked(api.v1.lorebook.entries).mockResolvedValue([
+      { id: "e-old", displayName: "mikki" },
+    ]);
+    const { getState, dispatch } = harness();
+    const rec = await executeForgeCommand(
+      createMikki,
+      "c1",
+      "m1",
+      getState,
+      dispatch,
+    );
+    expect(Object.values(getState().world.entitiesById)[0]).toMatchObject({
+      lorebookEntryId: "e-old",
+    });
+    expect(rec.undo).toMatchObject({
+      op: "entityCreated",
+      entryCreated: false,
+    });
+    expect(api.v1.lorebook.createEntry).not.toHaveBeenCalled();
+  });
+
+  it("DELETE of a built entity with no entry is applied and records entry: null", async () => {
+    const built = { ...imported("Kei", "S."), sourceChatId: "c0" };
+    const { getState, dispatch } = harness({ entities: [built] });
+    const rec = await executeForgeCommand(
+      { kind: "DELETE", name: "Kei" },
+      "c1",
+      "m1",
+      getState,
+      dispatch,
+    );
+    expect(rec.status).toBe("applied");
+    expect(api.v1.lorebook.removeEntry).not.toHaveBeenCalled();
+    expect(rec.undo).toMatchObject({ op: "entityDeleted", entry: null });
+  });
+
+  it("two commands in one reply run in order", async () => {
+    const { getState, dispatch: real } = harness();
+    const dispatch = vi.fn(real) as unknown as AppDispatch;
+    await forgeChatHandler.completion({
+      target: { type: "forgeChat", chatId: "c1", messageId: "m1" },
+      getState,
+      dispatch,
+      accumulatedText:
+        '[CREATE CHARACTER "Mikki" | A fox.]\n[REVISE "Mikki" | A red fox.]',
+      generationSucceeded: true,
+    } as CompletionContext<ForgeChatTarget>);
+    expect(Object.values(getState().world.entitiesById)[0].summary).toBe(
+      "A red fox.",
+    );
+    const actions = segmentsFromCompletion(
+      vi.mocked(dispatch).mock.calls as unknown as unknown[][],
+    ).filter((seg) => seg.kind === "action");
+    expect(actions.map((seg) => seg.action.status)).toEqual([
+      "applied",
+      "applied",
+    ]);
   });
 });

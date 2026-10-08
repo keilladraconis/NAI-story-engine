@@ -16,6 +16,10 @@ export interface PillPart {
  *  `handlers/forge-chat.ts`. A Thread's three texts are positional
  *  (shown, private, wished) so this type names neither private field. */
 export type ForgeUndo =
+  // `entryCreated: false` means Build adopted an entry that existed before. It
+  // was uncategorised (the adoption rule guarantees that) and Build touched
+  // neither its text nor its keys, so the reverse leaves the entry in the
+  // lorebook and only unbinds it.
   | { op: "entityCreated"; entityId: string; entryCreated: boolean }
   | { op: "summary"; entityId: string; before: string; wrote: string }
   | { op: "name"; entityId: string; before: string; wrote: string }
