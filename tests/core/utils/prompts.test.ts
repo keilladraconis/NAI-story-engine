@@ -18,7 +18,10 @@ describe("Forge cleanup prompt", () => {
   it("cleanup prompt is REVISE-only, no CREATE, no CRITIQUE", () => {
     expect(FORGE_CLEANUP_PROMPT).toMatch(/REVISE/);
     expect(FORGE_CLEANUP_PROMPT).not.toMatch(/\bCREATE\b/);
-    expect(FORGE_CLEANUP_PROMPT).not.toMatch(/\bCRITIQUE\b/);
+    expect(FORGE_CLEANUP_PROMPT).not.toMatch(/critique/i);
+    expect(FORGE_CLEANUP_PROMPT).toContain(
+      "Emit nothing except REVISE. No new entities, no deletions, no renames, no threads. Be conservative",
+    );
   });
 });
 
@@ -78,6 +81,18 @@ describe("the Scenario Plan prompt", () => {
     }
   });
 
+  it("says a missing list is an empty one, and writes no bracketed line", () => {
+    expect(SCENARIO_PLAN_PROMPT).toContain(
+      "\n\nThe context block lists what has been built so far under [POOL], [LIVE] and [THREADS]; a list that is missing is empty. Refer to what is there by name, and do not read it back. Bracketed lines in the conversation are the builder's record of what was built; write none yourself.\n\n",
+    );
+  });
+
+  it("is neutral about pressure when no register is set", () => {
+    expect(SCENARIO_PLAN_REGISTERS.unset).toBe(
+      "REGISTER, not yet set: You do not know how much pressure this world is under. Add no danger the writer has not asked for.",
+    );
+  });
+
   it("has a Xialong chat style", () => {
     expect(XIALONG_STYLE.scenarioPlan).toMatch(/^\[ Style: .*chat.* \]$/);
   });
@@ -94,6 +109,21 @@ describe("the Scenario Build prompt", () => {
   it("builds only what the conversation supports", () => {
     expect(SCENARIO_BUILD_PROMPT).toContain(
       "Build only what the conversation supports.",
+    );
+  });
+
+  it("says a missing list is an empty one", () => {
+    expect(SCENARIO_BUILD_PROMPT).toContain(
+      "The context block above the conversation lists the drafts under [POOL], the cast under [LIVE], and [THREADS]. A list that is missing is empty. The writer's last message says what to build.",
+    );
+  });
+
+  it("gives an example whose conversation raised what its private segment holds", () => {
+    expect(SCENARIO_BUILD_PROMPT).toContain(
+      "\nEXAMPLE. The conversation settled on Hesper Vane, a lock-keeper on a dying canal; her brother Corin, who has already sold his half of the lock house to the barge company and has not told her he has been paid; and that the writer wants her to end up flooding the cut to stop them. Nothing is built yet.\n",
+    );
+    expect(SCENARIO_BUILD_PROMPT).toContain(
+      "Corin Vane has not told Hesper Vane that the company has already paid him.",
     );
   });
 

@@ -44,12 +44,12 @@ When the material is thin, find the fork: the one decision about this world that
 When it has a shape but no texture, add one specific thing: a person, a place, a habit, a debt.
 When it is developed, follow an implication through to something the writer has not thought of.
 
-The context block lists what has been built so far under [POOL], [LIVE] and [THREADS]. Refer to those by name, and do not read them back.
+The context block lists what has been built so far under [POOL], [LIVE] and [THREADS]; a list that is missing is empty. Refer to what is there by name, and do not read it back. Bracketed lines in the conversation are the builder's record of what was built; write none yourself.
 
 Offer something concrete, then ask the one question whose answer would change the most. Two to four sentences. No lists. Talk like a collaborator, think like a writer.`;
 
 export const SCENARIO_PLAN_REGISTERS: Record<RegisterKey, string> = {
-  unset: `REGISTER, not yet set: You do not know how much pressure this world is under. Add no danger the writer has not asked for. If the conversation has not shown whether these people can walk away, that is the question to ask.`,
+  unset: `REGISTER, not yet set: You do not know how much pressure this world is under. Add no danger the writer has not asked for.`,
   Cozy: `REGISTER, Cozy: Comfort is the default and no one is in peril. What keeps this world turning is warmth, routine and lived-in texture, so offer the regular, the habit, the corner of the room. Never add conflict or danger the writer has not asked for.`,
   Grounded: `REGISTER, Grounded: Pressure at the scale of a life: money, time, obligation, a relationship being worn down. Every obstacle has a way through, and no one is ruined by it.`,
   Gritty: `REGISTER, Gritty: Stakes that last. Offer binds that set two things someone values against each other, where walking away is possible and costs something real. Ground each in a person, not a spectacle.`,
@@ -63,7 +63,7 @@ export function buildScenarioPlanPrompt(level: RegisterKey): string {
 
 export const SCENARIO_BUILD_PROMPT = `You are the Scenario Engine's builder. A writer and a collaborator have been talking about a story. You record what they settled on as the conditions the story can grow from: pressures, the people and places under them, and how things stand between them. You never record a plot, an arc, a goal or an ending. Another model will continue this story from a blank page, and it acts on whatever it is shown: told that something will happen, it writes it happening at once, or as already done. So everything you record says only what is so when the story opens.
 
-The context block above the conversation lists the drafts under [POOL], the cast under [LIVE], and [THREADS]. The writer's last message says what to build.
+The context block above the conversation lists the drafts under [POOL], the cast under [LIVE], and [THREADS]. A list that is missing is empty. The writer's last message says what to build.
 
 Think out loud first, in plain sentences, answering in order:
 1. What did the conversation settle? Name each person, place, pressure and standing between people that the writer raised or agreed to. Leave out what the collaborator offered and the writer did not take up.
@@ -85,7 +85,7 @@ A SITUATION is a pressure. Its summary reads "what is happening; what keeps it f
 A THREAD names one to four elements and always has all five segments. state is how things stand now, and it is shown to the story model. private is what is true now and hidden, owed or unspoken; the story model never sees it. wish is what the writer wants to come about; the story model never sees it. Leave private or wish empty between its bars when there is none. A THREAD whose title is already under [THREADS] rewrites that Thread's state, private and wish: a segment left empty keeps what is stored, and the cast does not change.
 Only drafts under [POOL] may be revised, renamed or deleted. Never recreate a name under [TOMBSTONES]. If [REJECTED LAST TURN] is present, correct each command as its line says; where the line says a thing cannot be done, do not write that command again.
 
-EXAMPLE. The conversation settled on Hesper Vane, a lock-keeper on a dying canal; her brother Corin, who has already sold his half of the lock house to the barge company; and that the writer wants her to end up flooding the cut to stop them. Nothing is built yet.
+EXAMPLE. The conversation settled on Hesper Vane, a lock-keeper on a dying canal; her brother Corin, who has already sold his half of the lock house to the barge company and has not told her he has been paid; and that the writer wants her to end up flooding the cut to stop them. Nothing is built yet.
 Settled: Hesper Vane, Corin Vane, the lock house, and the company buying up the cut. None of it is under [POOL]. Corin's sale has happened, so it is fact. The flooding is to come: what is true now is that Hesper alone holds the sluice keys, so that is recorded and the flooding goes in the wish.
 [CREATE SITUATION "The Company's Offer" | The barge company is buying the lock houses along the cut to close it and take the water for its mills; every keeper who sells makes the next refusal cost more.]
 [CREATE CHARACTER "Hesper Vane" | Keeps Tolland Lock as her mother did. Rope-scarred palms, and a ring of sluice keys on her belt that she counts by touch.]
@@ -475,7 +475,7 @@ One or more drafts were just removed from the session. Your only job: emit [REVI
 Command vocabulary:
   [REVISE "<Name>" | updated description] — rewrite a draft so it no longer refers to any discarded entity
 
-Emit nothing except REVISE. No new entities, no deletions, no renames, no threads, no critique. Be conservative — restructure references rather than gut existing summaries.
+Emit nothing except REVISE. No new entities, no deletions, no renames, no threads. Be conservative — restructure references rather than gut existing summaries.
 
 If no remaining drafts reference any discarded entity, emit nothing.`;
 
