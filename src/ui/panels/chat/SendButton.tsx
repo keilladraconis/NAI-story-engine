@@ -13,12 +13,7 @@ import { Zap } from "nai:icons/feather";
 
 // Chat-family request types (mirrors SeBrainstormInput.isChatBusyType).
 function isChatBusyType(t: string | undefined): boolean {
-  return (
-    t === "chat" ||
-    t === "chatRefine" ||
-    t === "forgeChat" ||
-    t === "forgeCleanup"
-  );
+  return t === "chat" || t === "chatRefine" || t === "forgeChat";
 }
 
 function isBusy(s: RootState): boolean {

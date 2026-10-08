@@ -67,7 +67,6 @@ export const scenarioSpec: ChatTypeSpec<ScenarioMode> = {
   headerControls(_chat: Chat, _ctx: SpecCtx) {
     return [
       { id: "mode", kind: "modeToggle" },
-      { id: "scrub", kind: "scrubIndicator" },
       { id: "new", kind: "newChatButton" },
       { id: "sessions", kind: "sessionsButton" },
     ];
@@ -86,16 +85,14 @@ export const scenarioSpec: ChatTypeSpec<ScenarioMode> = {
   },
 
   handleSend(chat, content, ctx) {
-    // Refuse while any turn for this chat, or a reference scrub, is queued or
+    // Refuse while any turn for this chat is queued or
     // running: a second send would only stack another empty assistant turn.
     const rt = ctx.getState().runtime;
     const busy = [rt.activeRequest, ...rt.queue].some(
       (r) =>
         !!r &&
         r.status !== "cancelled" &&
-        (r.type === "forgeChat" ||
-          r.type === "forgeCleanup" ||
-          r.id.startsWith(`chat-${chat.id}-`)),
+        (r.type === "forgeChat" || r.id.startsWith(`chat-${chat.id}-`)),
     );
     if (busy) return true;
 

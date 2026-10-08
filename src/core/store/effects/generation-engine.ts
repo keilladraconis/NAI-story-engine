@@ -66,8 +66,6 @@ export function targetToQueueEntry(target: GenerationStrategy["target"]): {
       return { type: "bootstrap", targetId: "bootstrap" };
     case "forgeChat":
       return { type: "forgeChat", targetId: target.messageId };
-    case "forgeCleanup":
-      return { type: "forgeCleanup", targetId: target.messageId };
   }
   // Exhaustiveness, checked by the compiler rather than asserted in a comment.
   // The previous version threw here and called itself unreachable; it was not,
@@ -177,8 +175,6 @@ export function cacheLabel(target: GenerationStrategy["target"]) {
       return `chat-refine:${target.fieldId}`;
     case "forgeChat":
       return `forge-chat:${target.messageId}`;
-    case "forgeCleanup":
-      return `forge-cleanup:${target.messageId}`;
   }
 }
 

@@ -2,9 +2,9 @@ import { describe, it, expect, expectTypeOf } from "vitest";
 import type { ChatMessage } from "../../../src/core/chat-types/types";
 
 describe("ChatMessage.messageKind", () => {
-  it("is an optional 'cleanup' | 'refineSource' tag", () => {
+  it("is an optional 'refineSource' tag", () => {
     type K = NonNullable<ChatMessage["messageKind"]>;
-    expectTypeOf<K>().toEqualTypeOf<"cleanup" | "refineSource">();
+    expectTypeOf<K>().toEqualTypeOf<"refineSource">();
   });
 
   it("messages without messageKind are valid", () => {

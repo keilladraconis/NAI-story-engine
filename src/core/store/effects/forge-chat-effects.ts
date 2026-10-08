@@ -2,8 +2,7 @@
  * Forge Chat Effects — Signal handlers for the Scenario chat.
  *
  * Four signals, each with a single handler:
- *   1. forgeChatContinueRequested  → queue a Build turn: lead with any pending
- *                                     reference scrub, append an assistant
+ *   1. forgeChatContinueRequested  → queue a Build turn: append an assistant
  *                                     placeholder, submit a forgeChat generation.
  *                                     The request says whether the send was
  *                                     directed (typed) or empty.
@@ -12,9 +11,8 @@
  *                                     writes is applied.
  *      Both do all of it before they yield, so the queue is what refuses a
  *      second send.
- *   2. entityDiscardRequested      → user-initiated draft discard. Tombstone with
- *                                     reason="user", delete the entity, and (if
- *                                     other drafts remain) defer a reference scrub.
+ *   2. entityDiscardRequested      → user-initiated draft discard: delete the
+ *                                     entity.
  *   3. Cast / Cast All / Discard All → promote or drop drafts. The chat outlives
  *                                     them; none of these ends it.
  *
@@ -29,23 +27,15 @@ import { messageAdded, chatDeleted } from "../slices/chat";
 import { requestQueued } from "../slices/runtime";
 import { generationSubmitted } from "../slices/ui";
 import {
-  tombstoneAdded,
-  tombstonesClearedForChat,
-  scrubQueued,
-  scrubCleared,
-} from "../slices/forge";
-import {
   entityDeleted,
   entityLorebookEntryBound,
   draftsReleasedFromChat,
 } from "../slices/world";
-import { DULFS_CATEGORY_LABELS } from "../../utils/category-detect";
 import { ensureCategory } from "./lorebook-sync";
 import { nameKey } from "./handlers/lorebook";
 import {
   buildScenarioBuildStrategy,
   buildScenarioPlanStrategy,
-  buildForgeCleanupStrategy,
 } from "../../utils/forge-chat-strategy";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -65,18 +55,6 @@ export {
   scenarioPlanRequested,
   type ForgeChatContinueRequestedPayload,
 };
-
-export interface ForgeScrubNowRequestedPayload {
-  chatId: string;
-}
-const FORGE_SCRUB_NOW_REQUESTED = "forgeChat/scrubNowRequested";
-export const forgeScrubNowRequested = (
-  payload: ForgeScrubNowRequestedPayload,
-) => ({
-  type: FORGE_SCRUB_NOW_REQUESTED as typeof FORGE_SCRUB_NOW_REQUESTED,
-  payload,
-});
-forgeScrubNowRequested.type = FORGE_SCRUB_NOW_REQUESTED;
 
 export interface EntityDiscardRequestedPayload {
   entityId: string;
@@ -138,8 +116,8 @@ function poolFor(state: RootState, chatId: string): WorldEntity[] {
   );
 }
 
-/** True if a Scenario generation for this chat (a Build turn, a Plan turn or a
- *  reference scrub) is already queued or in flight. Scenario sends guard on this
+/** True if a Scenario generation for this chat (a Build turn or a Plan
+ *  turn) is already queued or in flight. Scenario sends guard on this
  *  so a second one is a no-op rather than another stacked empty assistant turn.
  *  A Plan turn is an ordinary chat request, told apart by its id. */
 function scenarioRequestPending(state: RootState, chatId: string): boolean {
@@ -147,62 +125,8 @@ function scenarioRequestPending(state: RootState, chatId: string): boolean {
     (r) =>
       !!r &&
       r.status !== "cancelled" &&
-      (r.type === "forgeChat" ||
-        r.type === "forgeCleanup" ||
-        r.id.startsWith(`chat-${chatId}-`)),
+      (r.type === "forgeChat" || r.id.startsWith(`chat-${chatId}-`)),
   );
-}
-
-/**
- * Runs the deferred reference-scrub for a chat if one is pending: submit one
- * forgeCleanup turn over the discarded names (only if drafts remain to scrub),
- * then clear the pending list. Shared by the lead-off of a Scenario turn and the
- * on-demand scrub control.
- */
-function runPendingScrub(
-  latest: () => RootState,
-  dispatch: AppDispatch,
-  chatId: string,
-): void {
-  const pending = latest().forge.pendingScrubByChatId[chatId] ?? [];
-  if (pending.length === 0) return;
-  if (poolFor(latest(), chatId).length > 0) {
-    const chat = findChat(latest(), chatId);
-    if (chat) {
-      const cleanupId = api.v1.uuid();
-      dispatch(
-        messageAdded({
-          chatId,
-          message: {
-            id: cleanupId,
-            role: "assistant",
-            content: "",
-            messageKind: "cleanup",
-            // A scrub writes commands, so it renders as pills like the Build
-            // replies around it. `messageKind` still keeps it out of the
-            // conversation a later turn is shown.
-            mode: "build",
-          },
-        }),
-      );
-      const cleanupChat = findChat(latest(), chatId)!;
-      const cleanupStrategy = buildForgeCleanupStrategy(
-        latest,
-        cleanupChat,
-        cleanupId,
-        pending,
-      );
-      dispatch(
-        requestQueued({
-          id: cleanupStrategy.requestId,
-          type: "forgeCleanup",
-          targetId: cleanupId,
-        }),
-      );
-      dispatch(generationSubmitted(cleanupStrategy));
-    }
-  }
-  dispatch(scrubCleared({ chatId }));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -214,14 +138,6 @@ export function registerForgeChatEffects(
   dispatch: AppDispatch,
   _getState: () => RootState,
 ): void {
-  // ─── Scrub Now (run the deferred reference-cleanup on demand) ───────────────
-  subscribeEffect(
-    matchesAction(forgeScrubNowRequested),
-    async (action, { getState: latest }) => {
-      runPendingScrub(latest, dispatch, action.payload.chatId);
-    },
-  );
-
   // ─── A Build turn ───────────────────────────────────────────────────────────
   subscribeEffect(
     matchesAction(forgeChatContinueRequested),
@@ -231,10 +147,6 @@ export function registerForgeChatEffects(
       // No-op if a turn is already queued or running, so repeated sends cannot
       // stack empty turns and background generations.
       if (scenarioRequestPending(latest(), chatId)) return;
-
-      // Lead with the deferred reference scrub, if any. Queued first, so it
-      // has scrubbed the pool before this turn's JIT factory builds context.
-      runPendingScrub(latest, dispatch, chatId);
 
       const assistantId = api.v1.uuid();
       dispatch(
@@ -304,20 +216,18 @@ export function registerForgeChatEffects(
     },
   );
 
-  // ─── Chat deleted (release its drafts, forget its bookkeeping) ──────────────
+  // ─── Chat deleted (release its drafts) ──────────────────────────────────────
   // Deleting the chat is the only way a Scenario ends. Its drafts are hidden
   // from the World because the chat shows them, so without this they would be
-  // unreachable; the tombstones and pending scrub belong to the chat alone.
+  // unreachable.
   subscribeEffect(
     matchesAction(chatDeleted),
     async (action, { getState: latest }) => {
       const chatId = action.payload.id;
       // The reducer refuses to delete the last chat. A chat still here was not
-      // deleted, and keeps its drafts and its bookkeeping.
+      // deleted, and keeps its drafts.
       if (latest().chat.chats.some((c) => c.id === chatId)) return;
       dispatch(draftsReleasedFromChat({ chatId }));
-      dispatch(tombstonesClearedForChat({ chatId }));
-      dispatch(scrubCleared({ chatId }));
     },
   );
 
@@ -330,38 +240,7 @@ export function registerForgeChatEffects(
       const entity = state.world.entitiesById[entityId];
       if (!entity || entity.lifecycle !== "draft") return;
 
-      // Manual ("+ Add Entity") drafts belong to no forge session — just delete
-      // them. Tombstone + pending-scrub are forge-session concepts, so skip them.
-      if (!entity.sourceChatId) {
-        dispatch(entityDeleted({ entityId }));
-        return;
-      }
-
-      const chatId = entity.sourceChatId;
-      dispatch(
-        tombstoneAdded({
-          chatId,
-          tombstone: {
-            name: entity.name,
-            category: DULFS_CATEGORY_LABELS[entity.categoryId] ?? "Entity",
-            reason: "user",
-          },
-        }),
-      );
       dispatch(entityDeleted({ entityId }));
-
-      // Defer the reference scrub rather than forging on every discard: flag
-      // the name so the next Continue Forging leads with one cleanup turn. Only
-      // worth scrubbing if other drafts remain that could mention it.
-      const otherDraftsRemain = Object.values(latest().world.entitiesById).some(
-        (e) =>
-          e.id !== entityId &&
-          e.lifecycle === "draft" &&
-          e.sourceChatId === chatId,
-      );
-      if (otherDraftsRemain) {
-        dispatch(scrubQueued({ chatId, names: [entity.name] }));
-      }
     },
   );
 
@@ -416,27 +295,15 @@ export function registerForgeChatEffects(
     },
   );
 
-  // ─── Discard All (tombstone + delete every draft) ───────────────────────────
+  // ─── Discard All (delete every draft) ───────────────────────────
   subscribeEffect(
     matchesAction(forgeDiscardAllRequested),
     async (action, { getState: latest }) => {
       const { chatId } = action.payload;
       const drafts = poolFor(latest(), chatId);
       for (const entity of drafts) {
-        dispatch(
-          tombstoneAdded({
-            chatId,
-            tombstone: {
-              name: entity.name,
-              category: DULFS_CATEGORY_LABELS[entity.categoryId] ?? "Entity",
-              reason: "user",
-            },
-          }),
-        );
         dispatch(entityDeleted({ entityId: entity.id }));
       }
-      // Every draft is gone, so there is nothing left to scrub.
-      dispatch(scrubCleared({ chatId }));
     },
   );
 }

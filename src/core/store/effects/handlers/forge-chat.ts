@@ -19,7 +19,6 @@ import {
   messageRemoved,
   forgeSegmentsSet,
 } from "../../slices/chat";
-import { tombstoneAdded } from "../../slices/forge";
 import { WorldEntity, ThreadDraft, RootState, AppDispatch } from "../../types";
 import {
   walkForgeLines,
@@ -35,16 +34,11 @@ import type {
 } from "../../../chat-types/types";
 import { SCENARIO_BUILD_PREFILL } from "../../../utils/prompts";
 import { stripThinkingTags } from "../../../utils/tag-parser";
-import { DULFS_CATEGORY_LABELS } from "../../../utils/category-detect";
 import { DulfsFieldID, FieldID } from "../../../../config/field-definitions";
 
 type ForgeChatTarget = Extract<
   GenerationStrategy["target"],
   { type: "forgeChat" }
->;
-type ForgeCleanupTarget = Extract<
-  GenerationStrategy["target"],
-  { type: "forgeCleanup" }
 >;
 
 function findEntityByName(
@@ -56,18 +50,11 @@ function findEntityByName(
   );
 }
 
-/** True if `name` was discarded earlier in this session — never resurrect it. */
-function isTombstoned(state: RootState, chatId: string, name: string): boolean {
-  const tombs = state.forge.tombstonesByChatId[chatId] ?? [];
-  return tombs.some((t) => t.name.toLowerCase() === name.toLowerCase());
-}
-
 /** Why a command was not applied. The next turn's context shows the model
  *  each of these beside the command it refused, so each reads as the repair:
  *  what to write instead, or that the thing cannot be done. */
 const REASON = {
   exists: "already exists; REVISE it instead",
-  discarded: "was discarded; do not recreate it",
   noSummary: "needs a summary after the bar",
   unknownType:
     "unknown type; use CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION or TOPIC",
@@ -77,35 +64,14 @@ const REASON = {
   concluded: "is concluded and cannot be rewritten",
 } as const;
 
-/** Execute a single parsed command and return its outcome record. With
- *  reviseOnly (cleanup pass), any non-REVISE command is rejected unexecuted. */
+/** Execute a single parsed command and return its outcome record. */
 export function executeForgeCommand(
   cmd: ParsedCommand,
   chatId: string,
   assistantMessageId: string,
   getState: () => RootState,
   dispatch: AppDispatch,
-  opts: { reviseOnly: boolean },
 ): ForgeActionRecord {
-  if (opts.reviseOnly && cmd.kind !== "REVISE") {
-    const name =
-      cmd.kind === "RENAME"
-        ? cmd.oldName
-        : cmd.kind === "THREAD"
-          ? cmd.title
-          : cmd.kind === "DONE"
-            ? undefined
-            : (cmd as { name?: string }).name;
-    return {
-      kind: cmd.kind === "LINK" || cmd.kind === "DONE" ? "UNKNOWN" : cmd.kind,
-      status: "rejected",
-      elementType:
-        cmd.kind === "CREATE" ? cmd.elementType.toUpperCase() : undefined,
-      name,
-      reason: "cleanup pass",
-    };
-  }
-
   switch (cmd.kind) {
     case "CREATE": {
       const elementType = cmd.elementType.toUpperCase();
@@ -135,15 +101,6 @@ export function executeForgeCommand(
           elementType,
           name: cmd.name,
           reason: REASON.exists,
-        };
-      }
-      if (isTombstoned(getState(), chatId, cmd.name)) {
-        return {
-          kind: "CREATE",
-          status: "rejected",
-          elementType,
-          name: cmd.name,
-          reason: REASON.discarded,
         };
       }
       const entity: WorldEntity = {
@@ -188,14 +145,6 @@ export function executeForgeCommand(
         return { kind: "REVISE", status: "applied", name: cmd.name };
       }
       // Find-or-create: the model routinely revises something it never created.
-      if (isTombstoned(getState(), chatId, cmd.name)) {
-        return {
-          kind: "REVISE",
-          status: "rejected",
-          name: cmd.name,
-          reason: REASON.discarded,
-        };
-      }
       const created: WorldEntity = {
         id: api.v1.uuid(),
         categoryId: FieldID.DramatisPersonae,
@@ -233,16 +182,6 @@ export function executeForgeCommand(
         };
       }
       dispatch(entityDeleted({ entityId: target.id }));
-      dispatch(
-        tombstoneAdded({
-          chatId,
-          tombstone: {
-            name: target.name,
-            category: DULFS_CATEGORY_LABELS[target.categoryId] ?? "Entity",
-            reason: "model",
-          },
-        }),
-      );
       return { kind: "DELETE", status: "applied", name: target.name };
     }
 
@@ -362,7 +301,6 @@ function buildForgeSegments(
   messageId: string,
   getState: () => RootState,
   dispatch: AppDispatch,
-  reviseOnly: boolean,
 ): ForgeSegment[] {
   const segments: ForgeSegment[] = [];
   let prose: string[] = [];
@@ -389,7 +327,6 @@ function buildForgeSegments(
       messageId,
       getState,
       dispatch,
-      { reviseOnly },
     );
     segments.push({
       kind: "action",
@@ -440,54 +377,6 @@ export const forgeChatHandler: GenerationHandlers<ForgeChatTarget> = {
       ctx.target.messageId,
       ctx.getState,
       ctx.dispatch,
-      false,
-    );
-    ctx.dispatch(
-      forgeSegmentsSet({
-        chatId: ctx.target.chatId,
-        id: ctx.target.messageId,
-        segments,
-      }),
-    );
-  },
-};
-
-export const forgeCleanupHandler: GenerationHandlers<ForgeCleanupTarget> = {
-  streaming(ctx: StreamingContext<ForgeCleanupTarget>, newText: string): void {
-    ctx.dispatch(
-      messageAppended({
-        chatId: ctx.target.chatId,
-        id: ctx.target.messageId,
-        content: newText,
-      }),
-    );
-  },
-
-  async completion(ctx: CompletionContext<ForgeCleanupTarget>): Promise<void> {
-    if (!ctx.accumulatedText) {
-      // Same as the phase turn: a cancelled/empty cleanup leaves no husk.
-      ctx.dispatch(
-        messageRemoved({ chatId: ctx.target.chatId, id: ctx.target.messageId }),
-      );
-      return;
-    }
-    const cleaned = stripThinkingTags(ctx.accumulatedText);
-    ctx.dispatch(
-      messageUpdated({
-        chatId: ctx.target.chatId,
-        id: ctx.target.messageId,
-        content: canonicalizeForgeCommands(cleaned),
-      }),
-    );
-    if (!ctx.generationSucceeded) return;
-
-    const segments = buildForgeSegments(
-      cleaned,
-      ctx.target.chatId,
-      ctx.target.messageId,
-      ctx.getState,
-      ctx.dispatch,
-      true,
     );
     ctx.dispatch(
       forgeSegmentsSet({

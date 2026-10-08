@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   forgeChatHandler,
-  forgeCleanupHandler,
   executeForgeCommand,
 } from "../../../../../src/core/store/effects/handlers/forge-chat";
 import type { CompletionContext } from "../../../../../src/core/store/effects/generation-handlers";
@@ -30,12 +29,6 @@ function segmentsFromCompletion(calls: any[][]): ForgeSegment[] {
 }
 
 type ForgeChatTarget = { type: "forgeChat"; chatId: string; messageId: string };
-type ForgeCleanupTarget = {
-  type: "forgeCleanup";
-  chatId: string;
-  messageId: string;
-  discardedNames: string[];
-};
 
 function makeEntity(over: Partial<WorldEntity>): WorldEntity {
   return {
@@ -48,18 +41,11 @@ function makeEntity(over: Partial<WorldEntity>): WorldEntity {
   } as WorldEntity;
 }
 
-function makeState(
-  entities: WorldEntity[] = [],
-  tombstonesByChatId: Record<
-    string,
-    { name: string; category: string; reason: "user" | "model" }[]
-  > = {},
-): RootState {
+function makeState(entities: WorldEntity[] = []): RootState {
   const entitiesById: Record<string, WorldEntity> = {};
   for (const e of entities) entitiesById[e.id] = e;
   return {
     world: { threads: [], entitiesById, entityIds: entities.map((e) => e.id) },
-    forge: { tombstonesByChatId, pendingScrubByChatId: {} },
   } as unknown as RootState;
 }
 
@@ -279,47 +265,6 @@ describe("forgeChatHandler.completion", () => {
     expect(forged![0].payload.entity.sourceChatId).toBe("c1");
   });
 
-  it("REVISE on a tombstoned name does NOT recreate it", async () => {
-    const dispatch = vi.fn();
-    const ctx: CompletionContext<ForgeChatTarget> = {
-      target: { type: "forgeChat", chatId: "c1", messageId: "m1" },
-      getState: () =>
-        makeState([], {
-          c1: [{ name: "Vesper", category: "Character", reason: "user" }],
-        }),
-      dispatch,
-      accumulatedText: '[REVISE "Vesper" | back from the dead]',
-      generationSucceeded: true,
-    };
-    await forgeChatHandler.completion(ctx);
-    expect(
-      dispatch.mock.calls.some(([a]) => a.type === "world/entityForged"),
-    ).toBe(false);
-    expect(
-      dispatch.mock.calls.some(
-        ([a]) => a.type === "world/entitySummaryUpdated",
-      ),
-    ).toBe(false);
-  });
-
-  it("CREATE on a tombstoned name does NOT recreate it", async () => {
-    const dispatch = vi.fn();
-    const ctx: CompletionContext<ForgeChatTarget> = {
-      target: { type: "forgeChat", chatId: "c1", messageId: "m1" },
-      getState: () =>
-        makeState([], {
-          c1: [{ name: "Vesper", category: "Character", reason: "user" }],
-        }),
-      dispatch,
-      accumulatedText: '[CREATE CHARACTER "Vesper" | resurrected]',
-      generationSucceeded: true,
-    };
-    await forgeChatHandler.completion(ctx);
-    expect(
-      dispatch.mock.calls.some(([a]) => a.type === "world/entityForged"),
-    ).toBe(false);
-  });
-
   it("permits REVISE on a draft entity", async () => {
     const dispatch = vi.fn();
     const draft = makeEntity({
@@ -385,7 +330,7 @@ describe("forgeChatHandler.completion", () => {
     expect(updated![0].payload.lastAffectingMessageId).toBe("m-99");
   });
 
-  it("DELETE on a draft adds a tombstone with reason=model", async () => {
+  it("DELETE on a draft deletes it", async () => {
     const dispatch = vi.fn();
     const draft = makeEntity({
       id: "d1",
@@ -406,13 +351,6 @@ describe("forgeChatHandler.completion", () => {
       ([a]) => a.type === "world/entityDeleted",
     );
     expect(deleted).toBeDefined();
-    const tombstone = dispatch.mock.calls.find(
-      ([a]) => a.type === "forge/tombstoneAdded",
-    );
-    expect(tombstone).toBeDefined();
-    expect(tombstone![0].payload.chatId).toBe("c1");
-    expect(tombstone![0].payload.tombstone.name).toBe("Felix");
-    expect(tombstone![0].payload.tombstone.reason).toBe("model");
   });
 
   it("removes the empty placeholder turn on empty accumulatedText", async () => {
@@ -430,57 +368,6 @@ describe("forgeChatHandler.completion", () => {
     );
     expect(removed).toBeDefined();
     expect(removed![0].payload).toEqual({ chatId: "c1", id: "m1" });
-  });
-});
-
-describe("forgeCleanupHandler.completion", () => {
-  it("executes REVISE on drafts", async () => {
-    const dispatch = vi.fn();
-    const draft = makeEntity({
-      id: "d2",
-      name: "Marsh",
-      lifecycle: "draft",
-      summary: "dock worker, brother of Vesper",
-      sourceChatId: "c1",
-    });
-    const ctx: CompletionContext<ForgeCleanupTarget> = {
-      target: {
-        type: "forgeCleanup",
-        chatId: "c1",
-        messageId: "m-clean",
-        discardedNames: ["Vesper"],
-      },
-      getState: () => makeState([draft]),
-      dispatch,
-      accumulatedText: '[REVISE "Marsh" | dock worker, no family in the city]',
-      generationSucceeded: true,
-    };
-    await forgeCleanupHandler.completion(ctx);
-    const updated = dispatch.mock.calls.find(
-      ([a]) => a.type === "world/entitySummaryUpdated",
-    );
-    expect(updated).toBeDefined();
-    expect(updated![0].payload.summary).toContain("no family");
-  });
-
-  it("ignores non-REVISE commands (e.g., CREATE)", async () => {
-    const dispatch = vi.fn();
-    const ctx: CompletionContext<ForgeCleanupTarget> = {
-      target: {
-        type: "forgeCleanup",
-        chatId: "c1",
-        messageId: "m-clean",
-        discardedNames: ["Vesper"],
-      },
-      getState: () => makeState(),
-      dispatch,
-      accumulatedText: '[CREATE CHARACTER "Newbie" | bad]',
-      generationSucceeded: true,
-    };
-    await forgeCleanupHandler.completion(ctx);
-    expect(
-      dispatch.mock.calls.some(([a]) => a.type === "world/entityForged"),
-    ).toBe(false);
   });
 });
 
@@ -556,43 +443,6 @@ describe("forgeChatHandler.completion — segments", () => {
         body: [{ label: "Summary", text: "flickers" }],
       },
     });
-  });
-});
-
-describe("forgeCleanupHandler.completion — reviseOnly", () => {
-  it("rejects a CREATE with reason 'cleanup pass'", async () => {
-    const dispatch = vi.fn();
-    await forgeCleanupHandler.completion({
-      target: {
-        type: "forgeCleanup",
-        chatId: "c1",
-        messageId: "m1",
-        discardedNames: [],
-      },
-      getState: () => makeState(),
-      dispatch,
-      accumulatedText: '[CREATE SYSTEM "New Thing" | nope]',
-      generationSucceeded: true,
-    } as CompletionContext<ForgeCleanupTarget>);
-    expect(segmentsFromCompletion(dispatch.mock.calls)).toEqual([
-      {
-        kind: "action",
-        action: {
-          kind: "CREATE",
-          status: "rejected",
-          elementType: "SYSTEM",
-          name: "New Thing",
-          reason: "cleanup pass",
-          body: [
-            { label: "Type", text: "SYSTEM" },
-            { label: "Summary", text: "nope" },
-          ],
-        },
-      },
-    ]);
-    expect(
-      dispatch.mock.calls.filter(([a]) => a.type === "world/entityForged"),
-    ).toHaveLength(0);
   });
 });
 
@@ -678,7 +528,6 @@ describe("a THREAD command, applied", () => {
         },
         entityIds: ["h", "c"],
       },
-      forge: { tombstonesByChatId: {} },
     }) as unknown as RootState;
   const cmd = {
     kind: "THREAD" as const,
@@ -696,9 +545,6 @@ describe("a THREAD command, applied", () => {
       "msg",
       () => state,
       dispatch,
-      {
-        reviseOnly: false,
-      },
     );
     return { dispatch, record };
   };
@@ -810,19 +656,15 @@ describe("a THREAD command, applied", () => {
 describe("a rejection says how to repair it", () => {
   const draft = makeEntity({ id: "d", name: "Vesper" });
   const live = makeEntity({ id: "l", name: "Ilsa", lifecycle: "live" });
-  const tombs = {
-    c1: [{ name: "Gone", category: "Character", reason: "user" as const }],
-  };
   const reasonFor = (command: ParsedCommand): string | undefined => {
     const dispatch = vi.fn();
-    const state = makeState([draft, live], tombs);
+    const state = makeState([draft, live]);
     const record = executeForgeCommand(
       command,
       "c1",
       "m1",
       () => state,
       dispatch,
-      { reviseOnly: false },
     );
     expect(record.status).toBe("rejected");
     expect(dispatch).not.toHaveBeenCalled();
@@ -845,7 +687,6 @@ describe("a rejection says how to repair it", () => {
   });
   const LIVE = "is live and cannot be changed from the chat";
   const NOT_FOUND = "not found; name a draft under [POOL], spelled exactly";
-  const DISCARDED = "was discarded; do not recreate it";
   const NO_SUMMARY = "needs a summary after the bar";
 
   it.each<[string, ParsedCommand, string]>([
@@ -854,8 +695,6 @@ describe("a rejection says how to repair it", () => {
       create("Vesper"),
       "already exists; REVISE it instead",
     ],
-    ["CREATE of a discarded name", create("Gone"), DISCARDED],
-    ["REVISE of a discarded name", revise("Gone"), DISCARDED],
     ["CREATE with no summary", create("New", " "), NO_SUMMARY],
     ["REVISE with no summary", revise("Vesper", " "), NO_SUMMARY],
     [

@@ -1,12 +1,11 @@
 /**
- * Scenario turn strategy — the per-turn message factory for the Scenario chat,
- * plus the post-discard reference scrubber.
+ * Scenario turn strategy — the per-turn message factory for the Scenario chat.
  *
  * Two kinds of turn share one chat. A Plan turn is a conversation: the Plan
  * prompt, the Foundation and Setting, what is built so far, and the transcript;
  * it targets the ordinary chat handler and applies nothing. A Build turn is the
  * Build prompt, the same premise, a context block code computes fresh each turn
- * ([POOL], [LIVE], [THREADS], [TOMBSTONES], [REJECTED LAST TURN]), then the
+ * ([POOL], [LIVE], [THREADS], [REJECTED LAST TURN]), then the
  * transcript; its reply is thinking and commands. Neither turn is shown the
  * thinking of an earlier Build reply (`scenarioConversation`).
  *
@@ -20,11 +19,7 @@ import type {
   RootState,
   WorldEntity,
 } from "../store/types";
-import {
-  buildStoryEnginePrefix,
-  formatFoundationBlock,
-  formatSettingBlock,
-} from "./context-builder";
+import { formatFoundationBlock, formatSettingBlock } from "./context-builder";
 import { buildModelParams, isXialongMode } from "./config";
 import {
   parseCommands,
@@ -34,7 +29,6 @@ import {
   buildScenarioBuildPrompt,
   buildScenarioPlanPrompt,
   normalizeRegisterKey,
-  FORGE_CLEANUP_PROMPT,
   SCENARIO_BUILD_INSTRUCTION,
   SCENARIO_BUILD_PREFILL,
   XIALONG_STYLE,
@@ -42,18 +36,14 @@ import {
 import { DULFS_CATEGORY_LABELS } from "./category-detect";
 
 /** The conversation as the Scenario model should see it: the chat's messages
- *  without the placeholder about to be filled, without reference scrubs, and
- *  without anything empty. A scrub is bookkeeping queued ahead of a turn, so it
- *  is neither a reply nor the last thing said. */
+ *  without the placeholder about to be filled and without anything
+ *  empty. */
 function conversation(
   messages: ChatMessage[],
   placeholderId?: string,
 ): ChatMessage[] {
   return messages.filter(
-    (m) =>
-      m.id !== placeholderId &&
-      m.messageKind !== "cleanup" &&
-      m.content.trim() !== "",
+    (m) => m.id !== placeholderId && m.content.trim() !== "",
   );
 }
 
@@ -146,15 +136,6 @@ function formatThreads(state: RootState): string {
   return ["[THREADS] (title | cast | state)", ...lines].join("\n");
 }
 
-function formatTombstones(state: RootState, chatId: string): string {
-  const tombs = state.forge.tombstonesByChatId[chatId] ?? [];
-  if (tombs.length === 0) return "";
-  return [
-    "[TOMBSTONES] (discarded; do not recreate)",
-    ...tombs.map((t) => `- ${t.name} (${t.category})`),
-  ].join("\n");
-}
-
 // --- Strategies ---
 
 async function premiseOf(state: RootState): Promise<Message[]> {
@@ -179,8 +160,7 @@ export function buildScenarioBuildStrategy(
 ): GenerationStrategy {
   const factory = async () => {
     const state = getState();
-    // The chat as it stands now: a scrub queued ahead of this turn, or a
-    // message pruned while it waited, changed it after the strategy was built.
+    // The chat as it stands now: a message pruned while it waited changed it after the strategy was built.
     const chat =
       state.chat.chats.find((c) => c.id === queuedChat.id) ?? queuedChat;
     const prior = conversation(chat.messages, assistantMessageId);
@@ -204,7 +184,6 @@ export function buildScenarioBuildStrategy(
         formatPool(state, chat.id),
         formatLive(state),
         formatThreads(state),
-        formatTombstones(state, chat.id),
         formatRejections(prior),
       ]),
       ...scenarioConversation(chat.messages, assistantMessageId),
@@ -308,74 +287,4 @@ export function buildScenarioPlanStrategy(
     minResponseLength: 4,
     continuation: { maxCalls: 5 },
   };
-}
-
-export function buildForgeCleanupStrategy(
-  getState: () => RootState,
-  chat: Chat,
-  assistantMessageId: string,
-  discardedNames: string[],
-): GenerationStrategy {
-  const factory = async () => {
-    const prefix = await buildStoryEnginePrefix(getState);
-    const state = getState();
-
-    const system: Message = { role: "system", content: FORGE_CLEANUP_PROMPT };
-
-    const pool = formatPool(state, chat.id);
-    const contextBlock: Message[] = pool
-      ? [{ role: "assistant", content: pool }]
-      : [];
-
-    const userInstruction: Message = {
-      role: "user",
-      content: buildCleanupUserInstruction(discardedNames),
-    };
-
-    const messages: Message[] = [
-      ...prefix,
-      system,
-      ...contextBlock,
-      userInstruction,
-    ];
-
-    return {
-      messages,
-      params: await buildModelParams(
-        {
-          max_tokens: 400,
-          temperature: 0.6,
-          min_p: 0.05,
-        },
-        "instruct",
-      ),
-    };
-  };
-
-  return {
-    requestId: `forge-cleanup-${chat.id}-${assistantMessageId}`,
-    messageFactory: factory,
-    target: {
-      type: "forgeCleanup",
-      chatId: chat.id,
-      messageId: assistantMessageId,
-      discardedNames,
-    },
-    prefillBehavior: "trim",
-    assistantPrefill: "[",
-    // Cut off by the token cap, a scrub stops mid-command: the bracket never
-    // closes and the last REVISE is lost, so it continues. The engine folds
-    // the "[" prefill into the continuation turn, so the model resumes from
-    // all it has written.
-    continuation: { maxCalls: 4 },
-  };
-}
-
-function buildCleanupUserInstruction(discardedNames: string[]): string {
-  if (discardedNames.length === 1) {
-    const name = discardedNames[0];
-    return `Discarded entity: "${name}". Emit REVISE commands for any draft in the pool that references "${name}" — by name, nickname, partial name, or indirect role-reference. If no draft references it, emit nothing.`;
-  }
-  const formattedList = discardedNames.map((n) => `"${n}"`).join(", ");
-  return `Discarded entities: ${formattedList}. Emit REVISE commands for any draft in the pool that references any of those entities — by name, nickname, partial name, or indirect role-reference. If none reference them, emit nothing.`;
 }

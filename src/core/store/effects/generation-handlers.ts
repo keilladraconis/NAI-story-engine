@@ -12,7 +12,7 @@ import {
 } from "./handlers/summary";
 import { bootstrapHandler } from "./handlers/bootstrap";
 import { chatHandler, chatRefineHandler } from "./handlers/chat";
-import { forgeChatHandler, forgeCleanupHandler } from "./handlers/forge-chat";
+import { forgeChatHandler } from "./handlers/forge-chat";
 
 // Target type union from GenerationStrategy
 export type TargetType = GenerationStrategy["target"]["type"];
@@ -62,10 +62,6 @@ export type ForgeChatTarget = Extract<
   GenerationStrategy["target"],
   { type: "forgeChat" }
 >;
-export type ForgeCleanupTarget = Extract<
-  GenerationStrategy["target"],
-  { type: "forgeCleanup" }
->;
 
 export interface StreamingContext<T = GenerationStrategy["target"]> {
   target: T;
@@ -102,7 +98,6 @@ export const GENERATION_HANDLERS: {
   lorebookContent: GenerationHandlers<LorebookContentTarget>;
   lorebookKeys: GenerationHandlers<LorebookKeysTarget>;
   forgeChat: GenerationHandlers<ForgeChatTarget>;
-  forgeCleanup: GenerationHandlers<ForgeCleanupTarget>;
   foundation: GenerationHandlers<FoundationTarget>;
   entitySummary: GenerationHandlers<EntitySummaryTarget>;
   entitySummaryBind: GenerationHandlers<EntitySummaryBindTarget>;
@@ -115,7 +110,6 @@ export const GENERATION_HANDLERS: {
   lorebookContent: lorebookContentHandler,
   lorebookKeys: lorebookKeysHandler,
   forgeChat: forgeChatHandler,
-  forgeCleanup: forgeCleanupHandler,
   foundation: foundationHandler,
   entitySummary: entitySummaryHandler,
   entitySummaryBind: entitySummaryBindHandler,

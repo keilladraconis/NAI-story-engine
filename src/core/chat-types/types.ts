@@ -39,15 +39,14 @@ export interface ChatMessage {
   /** Marks an assistant message as a candidate rewrite inside a refine chat. */
   refineCandidate?: boolean;
   /**
-   * Optional tag for non-conversational messages. Renderers may treat tagged
-   * messages distinctly (e.g., cleanup-turn confirmations, parser-rejection
-   * warnings). Plain conversational turns leave this undefined.
+   * Optional tag for non-conversational messages. Plain conversational turns
+   * leave this undefined.
    *
    * "refineSource" marks the seeded field-snapshot message in a refine chat:
    * while present, the refine rewrites that snapshot; deleting it switches the
    * refine to a fresh field generation.
    */
-  messageKind?: "cleanup" | "refineSource";
+  messageKind?: "refineSource";
   /** Ordered display projection of a forge turn (prose runs + action chips),
    *  built at completion. Display-only; `content` stays the raw canonical text. */
   forgeSegments?: ForgeSegment[];
@@ -87,12 +86,7 @@ export interface HeaderControl {
   id: string;
   /** Tag identifying which header control this is, so ChatHeader knows how to render. */
   kind:
-    | "sessionsButton"
-    | "newChatButton"
-    | "label"
-    | "backButton"
-    | "scrubIndicator"
-    | "modeToggle";
+    "sessionsButton" | "newChatButton" | "label" | "backButton" | "modeToggle";
 }
 
 export interface SpecCtx {

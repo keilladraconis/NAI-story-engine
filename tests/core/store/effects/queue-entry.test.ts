@@ -39,16 +39,6 @@ const TARGETS: { target: Target; type: string; targetId: string }[] = [
     type: "forgeChat",
     targetId: "m",
   },
-  {
-    target: {
-      type: "forgeCleanup",
-      chatId: "c",
-      messageId: "m",
-      discardedNames: [],
-    },
-    type: "forgeCleanup",
-    targetId: "m",
-  },
   { target: { type: "list", fieldId: "f" }, type: "list", targetId: "f" },
   {
     target: { type: "lorebookContent", entryId: "e" },

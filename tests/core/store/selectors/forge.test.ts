@@ -74,10 +74,6 @@ function forgeState(opts: { drafts?: number }): RootState {
       refineChat: null,
     },
     world: { threads: [], entitiesById, entityIds: Object.keys(entitiesById) },
-    forge: {
-      tombstonesByChatId: {},
-      pendingScrubByChatId: {},
-    },
   } as unknown as RootState;
 }
 

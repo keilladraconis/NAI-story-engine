@@ -8,10 +8,7 @@ import {
   createEntitySummaryFromLorebookFactory,
   createThreadSummaryFactory,
 } from "../../../src/core/utils/summary-strategy";
-import {
-  buildForgeCleanupStrategy,
-  buildScenarioBuildStrategy,
-} from "../../../src/core/utils/forge-chat-strategy";
+import { buildScenarioBuildStrategy } from "../../../src/core/utils/forge-chat-strategy";
 import type { RootState } from "../../../src/core/store";
 import type { Chat } from "../../../src/core/chat-types/types";
 import { useCreativeModel } from "../../helpers/creative-model";
@@ -54,7 +51,6 @@ function makeState(): RootState {
       worldExpanded: null,
     },
     story: { fields: {} },
-    forge: { tombstonesByChatId: {} },
   } as unknown as RootState;
 }
 
@@ -149,14 +145,6 @@ describe("extraction callsites stay on the instruct model", () => {
     )();
     expect(params?.model).toBe("glm-4-6");
     expect(styleBlocks(messages)).toEqual([]);
-  });
-
-  it("runs forge cleanup on GLM", async () => {
-    const strategy = buildForgeCleanupStrategy(getState, forgeChat, "asst-1", [
-      "Vesper",
-    ]);
-    const { params } = await strategy.messageFactory!();
-    expect(params?.model).toBe("glm-4-6");
   });
 
   it("runs a Scenario turn on GLM, with no style block", async () => {

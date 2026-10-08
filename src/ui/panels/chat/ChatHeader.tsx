@@ -34,10 +34,6 @@ export function ChatHeader(props: ChatHeaderProps) {
     const c = activeSavedChat(s.chat);
     return c ? `${c.id}|${c.title}|${c.type}|${c.subMode ?? ""}` : "";
   });
-  const scrubbing = useSlice((s) => {
-    const c = activeSavedChat(s.chat);
-    return !!c && (s.forge.pendingScrubByChatId[c.id]?.length ?? 0) > 0;
-  });
   if (!stamp) return null;
   const chat = activeSavedChat(store.getState().chat)!;
   const spec = getChatTypeSpec(chat.type);
@@ -116,15 +112,6 @@ export function ChatHeader(props: ChatHeaderProps) {
             <Folder size={ICON} />
           </button>
         );
-      case "scrubIndicator":
-        return scrubbing ? (
-          <span
-            key={c.id}
-            style={{ fontSize: "0.7em", fontStyle: "italic", opacity: 0.6 }}
-          >
-            scrubbing…
-          </span>
-        ) : null;
       default:
         // label (title already rendered)
         return null;

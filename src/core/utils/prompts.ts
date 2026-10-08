@@ -481,17 +481,6 @@ This text is shown to the model writing the story whenever the members are on th
 
 Return the sentences and nothing else.`;
 
-export const FORGE_CLEANUP_PROMPT = `You are performing a focused cleanup pass after one or more draft entities were discarded.
-
-One or more drafts were just removed from the session. Your only job: emit [REVISE] commands for every remaining draft that references any discarded entity by name, nickname, partial name, or indirect role-reference (e.g., "her sister", "the governess", "the dock worker").
-
-Command vocabulary:
-  [REVISE "<Name>" | updated description] — rewrite a draft so it no longer refers to any discarded entity
-
-Emit nothing except REVISE. No new entities, no deletions, no renames, no threads. Be conservative — restructure references rather than gut existing summaries.
-
-If no remaining drafts reference any discarded entity, emit nothing.`;
-
 /**
  * Per-strategy style guidance blocks for Xialong v1.
  * Injected as a user message immediately before assistant prefill to signal

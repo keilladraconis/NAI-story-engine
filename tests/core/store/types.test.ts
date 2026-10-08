@@ -14,34 +14,16 @@ describe("GenerationStrategy.target union", () => {
       messageId: string;
     }>();
   });
-
-  it("includes forgeCleanup target with chatId, messageId, discardedNames", () => {
-    type T = GenerationStrategy["target"];
-    type ForgeCleanup = Extract<T, { type: "forgeCleanup" }>;
-    expectTypeOf<ForgeCleanup>().toEqualTypeOf<{
-      type: "forgeCleanup";
-      chatId: string;
-      messageId: string;
-      discardedNames: string[];
-    }>();
-  });
 });
 
 describe("GenerationRequest.type union", () => {
-  it("includes forgeChat and forgeCleanup as valid request types", () => {
+  it("includes forgeChat as a valid request type", () => {
     const fc: GenerationRequest = {
       id: "x",
       type: "forgeChat",
       targetId: "y",
       status: "queued",
     };
-    const fcl: GenerationRequest = {
-      id: "x",
-      type: "forgeCleanup",
-      targetId: "y",
-      status: "queued",
-    };
     expectTypeOf(fc.type).toEqualTypeOf<GenerationRequest["type"]>();
-    expectTypeOf(fcl.type).toEqualTypeOf<GenerationRequest["type"]>();
   });
 });

@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { useCreativeModel } from "../../helpers/creative-model";
 import {
-  buildForgeCleanupStrategy,
   buildScenarioBuildStrategy,
   buildScenarioPlanStrategy,
   formatRejections,
@@ -10,7 +9,6 @@ import {
 import type { Chat, ChatMessage } from "../../../src/core/chat-types/types";
 import type { RootState } from "../../../src/core/store/types";
 import {
-  FORGE_CLEANUP_PROMPT,
   SCENARIO_BUILD_INSTRUCTION,
   SCENARIO_BUILD_PREFILL,
   XIALONG_STYLE,
@@ -47,7 +45,6 @@ function makeState(over: Partial<RootState> = {}): RootState {
       worldExpanded: null,
     },
     runtime: {} as RootState["runtime"],
-    forge: { tombstonesByChatId: {} },
     ...over,
   } as RootState;
 }
@@ -69,16 +66,6 @@ const chatOf = (messages: ChatMessage[]): Chat => ({
   title: "Scenario 1",
   messages,
   seed: { kind: "blank" },
-});
-
-const rejectedCleanup = msg("k", "assistant", '[REVISE "X" | from the scrub]', {
-  messageKind: "cleanup",
-  forgeSegments: [
-    {
-      kind: "action",
-      action: { kind: "REVISE", status: "rejected", reason: "cleanup pass" },
-    },
-  ],
 });
 
 describe("what the last turn had rejected", () => {
@@ -118,9 +105,6 @@ describe("what the last turn had rejected", () => {
       formatRejections([msg("a", "assistant", "x", { forgeSegments: [] })]),
     ).toBe("");
   });
-  it("reports the last turn's, not those of a reference scrub that came after it", () => {
-    expect(formatRejections([withRejection, rejectedCleanup])).toBe(expected);
-  });
 });
 
 describe("the conversation a Scenario turn is shown", () => {
@@ -156,11 +140,10 @@ describe("the conversation a Scenario turn is shown", () => {
     ]);
   });
 
-  it("drops the placeholder, scrubs and empty messages", () => {
+  it("drops the placeholder and empty messages", () => {
     const out = scenarioConversation(
       [
         msg("u1", "user", "A lock-keeper."),
-        msg("s1", "assistant", '[REVISE "X" | y]', { messageKind: "cleanup" }),
         msg("e1", "assistant", "  "),
         msg("p1", "assistant", "", { mode: "build" }),
       ],
@@ -356,13 +339,12 @@ describe("a Plan turn", () => {
     });
   });
 
-  it("sees what Build wrote as commands, never its thinking, tombstones or rejections", async () => {
+  it("sees what Build wrote as commands, never its thinking or rejections", async () => {
     const text = JSON.stringify(
       await run(buildScenarioPlanStrategy(state, chat, "p1")),
     );
     expect(text).toContain("Hesper Vane");
     expect(text).not.toContain("the flooding is to come");
-    expect(text).not.toContain("[TOMBSTONES]");
     expect(text).not.toContain("[REJECTED LAST TURN]");
   });
 
@@ -388,109 +370,6 @@ describe("a Plan turn", () => {
       });
       expect(built.params?.stop).toEqual(["</think>", "\n[ Style"]);
     });
-  });
-});
-
-describe("buildForgeCleanupStrategy", () => {
-  it("produces a strategy with forgeCleanup target carrying discardedNames", () => {
-    const chat: Chat = {
-      id: "fc-1",
-      type: "scenario",
-      title: "Scenario 1",
-      messages: [],
-      seed: { kind: "blank" },
-    };
-    const getState = () => makeState();
-    const strat = buildForgeCleanupStrategy(getState, chat, "asst-cleanup", [
-      "Vesper",
-    ]);
-    expect(strat.target).toEqual({
-      type: "forgeCleanup",
-      chatId: "fc-1",
-      messageId: "asst-cleanup",
-      discardedNames: ["Vesper"],
-    });
-    expect(strat.requestId).toContain("fc-1");
-  });
-
-  it("uses FORGE_CLEANUP_PROMPT as system message", async () => {
-    const chat: Chat = {
-      id: "fc-1",
-      type: "scenario",
-      title: "Scenario 1",
-      messages: [],
-      seed: { kind: "blank" },
-    };
-    const getState = () => makeState();
-    const strat = buildForgeCleanupStrategy(getState, chat, "asst-cleanup", [
-      "Vesper",
-    ]);
-    const built = await strat.messageFactory!();
-    expect(
-      built.messages.some(
-        (m) => m.role === "system" && m.content === FORGE_CLEANUP_PROMPT,
-      ),
-    ).toBe(true);
-  });
-
-  it("includes a user message naming the discarded entity for a single discard", async () => {
-    const chat: Chat = {
-      id: "fc-1",
-      type: "scenario",
-      title: "Scenario 1",
-      messages: [],
-      seed: { kind: "blank" },
-    };
-    const getState = () => makeState();
-    const strat = buildForgeCleanupStrategy(getState, chat, "asst-cleanup", [
-      "Vesper",
-    ]);
-    const built = await strat.messageFactory!();
-    const userTurn = built.messages.find((m) => m.role === "user");
-    expect(userTurn).toBeDefined();
-    expect(userTurn!.content).toContain("Discarded entity:");
-    expect(userTurn!.content).toContain('"Vesper"');
-  });
-
-  it("pluralizes the user message when multiple entities were discarded", async () => {
-    const chat: Chat = {
-      id: "fc-1",
-      type: "scenario",
-      title: "Scenario 1",
-      messages: [],
-      seed: { kind: "blank" },
-    };
-    const getState = () => makeState();
-    const strat = buildForgeCleanupStrategy(getState, chat, "asst-cleanup", [
-      "Vesper",
-      "Hollow",
-      "Echo",
-    ]);
-    const built = await strat.messageFactory!();
-    const userTurn = built.messages.find((m) => m.role === "user");
-    expect(userTurn).toBeDefined();
-    expect(userTurn!.content).toContain("Discarded entities:");
-    expect(userTurn!.content).toContain('"Vesper"');
-    expect(userTurn!.content).toContain('"Hollow"');
-    expect(userTurn!.content).toContain('"Echo"');
-    expect(userTurn!.content).toContain("any of those entities");
-  });
-
-  it("uses a tight max_tokens budget (~400)", async () => {
-    const chat: Chat = {
-      id: "fc-1",
-      type: "scenario",
-      title: "Scenario 1",
-      messages: [],
-      seed: { kind: "blank" },
-    };
-    const getState = () => makeState();
-    const strat = buildForgeCleanupStrategy(getState, chat, "asst-cleanup", [
-      "Vesper",
-    ]);
-    const built = await strat.messageFactory!();
-    expect(built.params?.max_tokens).toBeLessThanOrEqual(512);
-    expect(built.params?.max_tokens).toBeGreaterThanOrEqual(256);
   });
 });
 

@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import {
-  FORGE_CLEANUP_PROMPT,
   LOREBOOK_GENERATE_PROMPT,
   normalizeRegisterKey,
   INTENSITY_LEVEL_LABELS,
@@ -13,17 +12,6 @@ import {
   buildScenarioBuildPrompt,
   buildScenarioPlanPrompt,
 } from "../../../src/core/utils/prompts";
-
-describe("Forge cleanup prompt", () => {
-  it("cleanup prompt is REVISE-only, no CREATE, no CRITIQUE", () => {
-    expect(FORGE_CLEANUP_PROMPT).toMatch(/REVISE/);
-    expect(FORGE_CLEANUP_PROMPT).not.toMatch(/\bCREATE\b/);
-    expect(FORGE_CLEANUP_PROMPT).not.toMatch(/critique/i);
-    expect(FORGE_CLEANUP_PROMPT).toContain(
-      "Emit nothing except REVISE. No new entities, no deletions, no renames, no threads. Be conservative",
-    );
-  });
-});
 
 describe("register keys", () => {
   it("normalizeRegisterKey maps levels case-insensitively and falls back to unset", () => {

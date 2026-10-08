@@ -7,7 +7,6 @@ import { initialWorldState } from "../../src/core/store/slices/world";
 import { initialFoundationState } from "../../src/core/store/slices/foundation";
 import { initialUIState } from "../../src/core/store/slices/ui";
 import { initialRuntimeState } from "../../src/core/store/slices/runtime";
-import { initialForgeState } from "../../src/core/store/slices/forge";
 import { initialEngineState } from "../../src/core/store/slices/engine";
 import { STORAGE_KEYS } from "../../src/core/keys";
 import type { RootState, WorldEntity } from "../../src/core/store/types";
@@ -53,7 +52,6 @@ function baseState(entityIds: string[] = []): RootState {
     foundation: initialFoundationState,
     ui: initialUIState,
     runtime: initialRuntimeState,
-    forge: initialForgeState,
     chat: { chats: [], activeChatId: null },
     engine: initialEngineState,
   } as RootState;

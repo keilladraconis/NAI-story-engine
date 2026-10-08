@@ -1,6 +1,6 @@
 // Two-button [Cast drafts]/[Discard drafts] bar for a Scenario chat, mirroring
 // RefineCommitBar. Casts or discards every draft of this Scenario chat. Neither
-// ends the session. Cast is enabled only with ≥1 draft; Discard tombstones +
+// ends the session. Cast is enabled only with ≥1 draft; Discard
 // deletes every draft. The active chat is resolved at click time.
 
 import { useSlice } from "../../bridge";
