@@ -88,8 +88,12 @@ const TALKS = {
 // is the fire, the Catalogue, or the leaving.
 const FIRE = /Quillane Fire|burn\w*\b[^.\n]*\bdown\b/i;
 const CATALOGUE = /Vessarine Catalogue/i;
-const LEAVING = /\b(leav\w*|left|depart\w*)\b[^.\n]*Orrowmere/i;
+const LEAVING = /\b(leav\w*|left|depart\w*)\b[^.\n]{0,20}\b(for|to)\s+Orrowmere/i;
 
+// What this does not send that the shipped Build turn does: no Foundation or
+// Setting, no [POOL]/[LIVE]/[THREADS] block (every fixture starts from an empty
+// world), and no continuation. Its numbers describe a first Build on an empty
+// story.
 const messages = (talk) => [
   { role: "system", content: `${SCENARIO_BUILD_PROMPT}\n\n${REGISTER}` },
   ...talk,
@@ -145,14 +149,14 @@ const read = (text) => {
 // names, so a name the talk lacks says nothing.
 const NAMED_TYPES = new Set(["CHARACTER", "LOCATION", "FACTION"]);
 const unasked = (created, conversation) => {
-  const talk = conversation.toLowerCase();
+  const talk = new Set(conversation.toLowerCase().split(/[^a-z]+/));
   return created.filter(
     (c) =>
       NAMED_TYPES.has(c.type) &&
       !c.name
         .toLowerCase()
         .split(/[^a-z]+/)
-        .some((w) => w.length >= 4 && talk.includes(w)),
+        .some((w) => w.length >= 4 && talk.has(w)),
   ).length;
 };
 // --- unasked:end ---

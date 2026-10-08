@@ -164,6 +164,47 @@ describe("tools/scenario-probe.naiscript reads replies as the product does", () 
     expect(holds("ToCome")(sketch("The Furnace", "Maud", "", ""))).toBe(false);
   });
 
+  const BOTH = "The Vessarine Catalogue; the post at Orrowmere.";
+
+  it.each([
+    "Osric has already left for Orrowmere.",
+    "He departs to Orrowmere in spring.",
+  ])("fails a leaving written in a shown or private segment: %s", (said) => {
+    expect(
+      holds("TwoWishes")(
+        read(
+          `[THREAD "The Telescope" | "Ada" | ${said} | | ${BOTH}]\n[CREATE CHARACTER "Ada" | Runs the plates.]`,
+        ),
+      ),
+    ).toBe(false);
+    expect(holds("TwoWishes")(sketch("The Telescope", "Ada", said, BOTH))).toBe(
+      false,
+    );
+  });
+
+  it("passes a state that merely mentions letters from Orrowmere", () => {
+    expect(
+      holds("TwoWishes")(
+        read(
+          `[CREATE CHARACTER "Ada" | Runs the plates.]\n[THREAD "The Telescope" | "Ada" | Osric has left unanswered two letters from Orrowmere. | | ${BOTH}]`,
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  it.each([
+    [
+      "a LOCATION",
+      `[CREATE LOCATION "The Post at Orrowmere" | A chair at the coast.]\n[THREAD "The Telescope" | "Ada" | Ada keeps the plates. | | ${BOTH}]`,
+    ],
+    [
+      "a THREAD title",
+      `[CREATE CHARACTER "Ada" | Runs the plates.]\n[THREAD "The Post at Orrowmere" | "Ada" | Ada keeps the plates. | | ${BOTH}]`,
+    ],
+  ])("passes %s named for the post at Orrowmere", (_w, text) => {
+    expect(holds("TwoWishes")(read(text))).toBe(true);
+  });
+
   it("fails either of two things to come copied into the private segment", () => {
     const both = "The Vessarine Catalogue; the post at Orrowmere.";
     expect(holds("TwoWishes")(sketch("The Telescope", "Ada", "", both))).toBe(
@@ -221,6 +262,15 @@ describe("the probe's over-building count", () => {
         talk,
       ),
     ).toBe(2);
+  });
+
+  it("matches whole words, not fragments of other words", () => {
+    expect(unasked([{ type: "CHARACTER", name: "Furn Halloway" }], talk)).toBe(
+      1,
+    );
+    expect(
+      unasked([{ type: "LOCATION", name: "The Furnace House" }], talk),
+    ).toBe(0);
   });
 
   it("never counts a SITUATION, SYSTEM or TOPIC, whose names are always coined", () => {
