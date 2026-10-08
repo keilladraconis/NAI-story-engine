@@ -66,11 +66,26 @@ describe("the Scenario Plan prompt", () => {
 
   it("works backwards from an ending and proposes none", () => {
     expect(SCENARIO_PLAN_PROMPT).toContain(
-      "what must already be true on the first page for that to be possible?",
+      "what must already be true on the first page for that to be possible:",
     );
     expect(SCENARIO_PLAN_PROMPT).toContain(
       "Do not propose plots, scenes in sequence or endings of your own.",
     );
+  });
+
+  it("lets a statement stand, and asks only when it must", () => {
+    expect(SCENARIO_PLAN_PROMPT).toContain(
+      "What the writer states is settled.",
+    );
+    expect(SCENARIO_PLAN_PROMPT).toContain(
+      "Ask a question only when the scenario cannot go further without the writer's answer, and then ask one.",
+    );
+    expect(SCENARIO_PLAN_PROMPT).toContain(
+      "When there is enough to build from, say so in a few words and stop.",
+    );
+    // No instruction to praise, and none to end every reply on a question.
+    expect(SCENARIO_PLAN_PROMPT).not.toMatch(/enthusiastic/);
+    expect(SCENARIO_PLAN_PROMPT).not.toMatch(/then ask the one question/);
   });
 
   it("has a register for every intensity and for none", () => {
