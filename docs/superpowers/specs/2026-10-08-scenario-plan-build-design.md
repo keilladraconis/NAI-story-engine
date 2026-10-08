@@ -62,7 +62,7 @@ The set is `CREATE`, `REVISE`, `RENAME`, `DELETE`, `THREAD`. `CRITIQUE` is remov
 - `SCENARIO_PROMPT`, `SCENARIO_REGISTERS`, `buildScenarioPrompt`, including the uncommitted small-sketch edit of 2026-10-07.
 - The unset-register YES/NO chain.
 
-Internal names keep "forge" for the command mechanism. A Build turn is the existing `forgeChat` request. A Plan turn runs through the ordinary chat strategy (`chat-strategy.ts`), as refine chats do.
+Internal names keep "forge" for the command mechanism. A Build turn is the existing `forgeChat` request. A Plan turn has its own message factory (its context is not the story prefix) but targets the ordinary `chat` request, so the ordinary chat handler commits it and nothing reads it for commands.
 
 ## Pills
 
@@ -144,6 +144,6 @@ Not measured by any test: Plan's voice, and whether Xialong avoids the tropes GL
 ## Known limits
 
 - The scope rule and "think first" are prompt instructions. They hold as well as the probe shows.
-- Thinking shares Build's output allowance with the commands; a long think can truncate the commands. Build's `max_tokens` starts at 2048 and is tuned from probe runs.
+- Thinking shares Build's output allowance with the commands. Build asks for 1024 tokens per call and continues up to four times, since a generation is refused until the bucket holds `max_tokens`; a long think costs a continuation, not the commands.
 - A new story plans on GLM until the writer sets the Creative model to Xialong.
 - Carried over, unchanged: retry of a Build turn does not undo what the first attempt applied; Scenario Threads get live lorebook entries before drafts are cast; the long-chat lockup is unmeasured; `npm run build` must be run outside the sandbox.
