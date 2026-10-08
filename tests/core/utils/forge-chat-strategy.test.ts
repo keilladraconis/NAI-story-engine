@@ -421,3 +421,67 @@ describe("buildForgeCleanupStrategy", () => {
     expect(built.params?.max_tokens).toBeGreaterThanOrEqual(256);
   });
 });
+
+describe("what a Scenario turn reads from the store", () => {
+  const queued = chatOf([
+    msg("u1", "user", "seed"),
+    msg("p1", "assistant", "", { mode: "plan" }),
+  ]);
+  const withThread = (chat: Chat): RootState =>
+    makeState({
+      world: {
+        entitiesById: {
+          h: {
+            id: "h",
+            name: "Hesper Vane",
+            summary: "Keeps the lock.",
+            categoryId: "dramatisPersonae",
+            lifecycle: "draft",
+            sourceChatId: "c1",
+          },
+        },
+        entityIds: ["h"],
+        threads: [
+          {
+            id: "t",
+            title: "The Keys",
+            state: "She holds them.",
+            latent: "ZZ-LATENT",
+            wish: "ZZ-WISH",
+            entityIds: ["h"],
+            status: "open",
+          },
+        ],
+      },
+      chat: { chats: [chat], activeChatId: "c1", refineChat: null },
+    } as never);
+
+  const factories = {
+    Build: async (get: () => RootState, chat: Chat) =>
+      run(buildScenarioBuildStrategy(get, chat, "p1")),
+    Plan: async (get: () => RootState, chat: Chat) =>
+      run(await buildScenarioPlanStrategy(get, chat, "p1")),
+  };
+
+  for (const [name, build] of Object.entries(factories)) {
+    it(`${name} reads a Thread's private halves from the transcript only, never the store`, async () => {
+      const text = JSON.stringify(
+        await build(() => withThread(queued), queued),
+      );
+      expect(text).toContain("The Keys");
+      expect(text).toContain("She holds them.");
+      expect(text).not.toContain("ZZ-LATENT");
+      expect(text).not.toContain("ZZ-WISH");
+    });
+
+    it(`${name} reads the chat as it stands when built, not as it was queued`, async () => {
+      const now = chatOf([
+        ...queued.messages.slice(0, 1),
+        msg("u2", "user", "ZZ-ADDED-LATER"),
+        queued.messages[1],
+      ]);
+      const text = JSON.stringify(await build(() => withThread(now), queued));
+      expect(text).toContain("ZZ-ADDED-LATER");
+    });
+  }
+});
