@@ -561,6 +561,57 @@ describe("scenarioPlanRequested effect", () => {
     expect(dispatch).toHaveBeenCalled();
   });
 
+  const planPlaceholders = (calls: { type: string; payload?: any }[]) =>
+    calls.filter(
+      (a) =>
+        a.type === "chat/messageAdded" && a.payload.message.mode === "plan",
+    );
+
+  it("a second Plan request during the first's strategy build adds one placeholder", async () => {
+    const { dispatch, fire } = makeHarness(makeState([withUser()]));
+    await Promise.all([
+      fire(scenarioPlanRequested({ chatId: "fc-1" })),
+      fire(scenarioPlanRequested({ chatId: "fc-1" })),
+    ]);
+    const calls = dispatch.mock.calls.map(([a]) => a);
+    expect(planPlaceholders(calls)).toHaveLength(1);
+    expect(
+      calls.filter(
+        (a) => a.type === "runtime/requestQueued" && a.payload.type === "chat",
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("a Build request during a Plan turn's strategy build is refused", async () => {
+    const { dispatch, fire } = makeHarness(makeState([withUser()]));
+    await Promise.all([
+      fire(scenarioPlanRequested({ chatId: "fc-1" })),
+      fire(forgeChatContinueRequested({ chatId: "fc-1" })),
+    ]);
+    const calls = dispatch.mock.calls.map(([a]) => a);
+    expect(
+      calls.filter(
+        (a) =>
+          a.type === "chat/messageAdded" && a.payload.message.mode === "build",
+      ),
+    ).toHaveLength(0);
+    expect(
+      calls.filter(
+        (a) =>
+          a.type === "runtime/requestQueued" && a.payload.type === "forgeChat",
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("a Plan turn can be requested again once the first has been queued", async () => {
+    const { dispatch, fire } = makeHarness(makeState([withUser()]));
+    await fire(scenarioPlanRequested({ chatId: "fc-1" }));
+    await fire(scenarioPlanRequested({ chatId: "fc-1" }));
+    expect(planPlaceholders(dispatch.mock.calls.map(([a]) => a))).toHaveLength(
+      2,
+    );
+  });
+
   it("a Plan reply with a command line applies nothing", async () => {
     const store = createStore(
       combineReducers({

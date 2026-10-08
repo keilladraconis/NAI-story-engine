@@ -207,6 +207,11 @@ export function registerForgeChatEffects(
   dispatch: AppDispatch,
   _getState: () => RootState,
 ): void {
+  // Chats whose Plan turn is between its request and its queue entry. Building
+  // the strategy is awaited and nothing is in the queue meanwhile, so without
+  // this a repeat arriving in that gap would stack a second turn.
+  const planning = new Set<string>();
+
   // ─── Scrub Now (run the deferred reference-cleanup on demand) ───────────────
   subscribeEffect(
     matchesAction(forgeScrubNowRequested),
@@ -221,6 +226,7 @@ export function registerForgeChatEffects(
     async (action, { getState: latest }) => {
       const { chatId } = action.payload;
       if (!findChat(latest(), chatId)) return;
+      if (planning.has(chatId)) return;
       // No-op if a turn is already queued or running, so repeated sends cannot
       // stack empty turns and background generations.
       if (scenarioRequestPending(latest(), chatId)) return;
@@ -261,37 +267,43 @@ export function registerForgeChatEffects(
     matchesAction(scenarioPlanRequested),
     async (action, { getState: latest }) => {
       const { chatId } = action.payload;
-      if (!findChat(latest(), chatId)) return;
-      if (scenarioRequestPending(latest(), chatId)) return;
-
-      const assistantId = api.v1.uuid();
-      dispatch(
-        messageAdded({
-          chatId,
-          message: {
-            id: assistantId,
-            role: "assistant",
-            content: "",
-            mode: "plan",
-          },
-        }),
-      );
       const chat = findChat(latest(), chatId);
       if (!chat) return;
+      if (planning.has(chatId)) return;
+      if (scenarioRequestPending(latest(), chatId)) return;
 
-      const strategy = await buildScenarioPlanStrategy(
-        latest,
-        chat,
-        assistantId,
-      );
-      dispatch(
-        requestQueued({
-          id: strategy.requestId,
-          type: "chat",
-          targetId: assistantId,
-        }),
-      );
-      dispatch(generationSubmitted(strategy));
+      planning.add(chatId);
+      try {
+        // Built before the placeholder exists, so a failed build leaves
+        // nothing behind. The factory re-reads the chat when it runs.
+        const assistantId = api.v1.uuid();
+        const strategy = await buildScenarioPlanStrategy(
+          latest,
+          chat,
+          assistantId,
+        );
+        dispatch(
+          messageAdded({
+            chatId,
+            message: {
+              id: assistantId,
+              role: "assistant",
+              content: "",
+              mode: "plan",
+            },
+          }),
+        );
+        dispatch(
+          requestQueued({
+            id: strategy.requestId,
+            type: "chat",
+            targetId: assistantId,
+          }),
+        );
+        dispatch(generationSubmitted(strategy));
+      } finally {
+        planning.delete(chatId);
+      }
     },
   );
 
