@@ -423,6 +423,7 @@ describe("retrying a Scenario turn", () => {
     // target and no forge action; the forge path queues a `forgeChat` one.
     expect(seen).toContain(forgeChatContinueRequested.type);
     expect(targets).not.toContain("chat");
+    expect(targets).toContain("forgeChat");
   });
 
   // The placeholder itself (and its `mode`) is made by the forge-chat effects,

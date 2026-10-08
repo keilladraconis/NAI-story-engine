@@ -305,7 +305,11 @@ export function Message(props: MessageProps) {
               </div>
               <div style={{ marginLeft: DESTRUCTIVE_GAP, display: "flex" }}>
                 <ConfirmButton
-                  title="Delete"
+                  title={
+                    standing
+                      ? "Delete this reply. What it built stays in the World and can no longer be undone from here."
+                      : "Delete"
+                  }
                   size={ICON}
                   resetKey={message.id}
                   onConfirm={() =>

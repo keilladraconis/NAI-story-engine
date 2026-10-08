@@ -53,8 +53,9 @@ export async function migrateLorebookCategories(): Promise<void> {
 /**
  * Collapse duplicate "SE: " categories into one.
  *
- * Cast All used to race itself into creating a fresh category per draft (see
- * `ensureCategory`), so existing stories carry the leftovers. The first
+ * Concurrent `ensureCategory` calls used to race into creating a fresh
+ * category each (see `inFlightCategories`), so existing stories carry the
+ * leftovers. The first
  * category with a given name wins — every entry filed under a duplicate moves
  * to it, then the emptied duplicate is removed. Only "SE: " categories are
  * touched; the user's own categories are never merged, even if same-named.
@@ -94,9 +95,8 @@ async function mergeDuplicateCategories(): Promise<void> {
  *
  * `ensureCategory` looks the category up and creates it only if missing, but
  * there is an `await` between the two — and its callers run concurrently
- * (store effects are fire-and-forget, and Cast All dispatches one per draft).
- * Without this, every draft in a category would look first, all miss, and all
- * create their own copy. Sharing the pending promise collapses a burst into a
+ * (store effects are fire-and-forget). Without this, every caller for one
+ * category would look first, all miss, and all create their own copy. Sharing the pending promise collapses a burst into a
  * single find-or-create. The entry is dropped once it settles, so later calls
  * re-read the lorebook instead of trusting a cached id the user may have since
  * deleted.

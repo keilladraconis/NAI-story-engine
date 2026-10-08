@@ -152,7 +152,8 @@ export function buildScenarioBuildStrategy(
 ): GenerationStrategy {
   const factory = async () => {
     const state = getState();
-    // The chat as it stands now: a message pruned while it waited changed it after the strategy was built.
+    // The chat as it stands now: a message added or pruned while the request
+    // waited changed it after the strategy was built.
     const chat =
       state.chat.chats.find((c) => c.id === queuedChat.id) ?? queuedChat;
     const prior = conversation(chat.messages, assistantMessageId);

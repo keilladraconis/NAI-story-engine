@@ -16,9 +16,9 @@ export const initialWorldState: WorldState = {
  *
  *  A lorebook entry belongs to at most one entity — two entities over the same
  *  entry would generate into it twice and show it twice in the World. The bind
- *  actions are the only way to break that (Cast and the Forge attach an entry to
- *  an entity that exists), and the Import wizard can fire one twice from a single
- *  mobile tap, so both bind reducers drop entries that are already spoken for. */
+ *  actions are the only way to break that, and the Import wizard's Bind mints a
+ *  fresh entity id per click, so both bind reducers drop entries that are
+ *  already spoken for. */
 function boundEntryIds(state: WorldState): Set<string> {
   const ids = new Set<string>();
   for (const id of state.entityIds) {
@@ -129,7 +129,7 @@ export const worldSlice = createSlice({
 
     // Attach a freshly-created lorebook entry to an existing draft entity,
     // promoting it to "live" without touching other fields. Setting
-    // lifecycle here means every caller (Cast, SeEntityEditPane Save,
+    // lifecycle here means every caller (the edit pane's Save and its
     // Generate Content/Keys) gets correct draft→live promotion without
     // having to dispatch a second action.
     entityLorebookEntryBound: (

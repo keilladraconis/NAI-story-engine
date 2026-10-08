@@ -6,7 +6,7 @@ import { saveWorldRecord } from "../persistence/story-store";
 const AUTOSAVE_DELAY_MS = 2000;
 
 /** Slices whose actions mean "persist something". `ui` and `runtime` are
- *  ephemeral; `forge` has never been written and stays in memory.
+ *  ephemeral.
  *
  *  One destination now. Everything Story Engine records is story-scoped: the
  *  World is the writer's notebook about the story, not a projection of the

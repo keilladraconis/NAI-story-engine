@@ -27,8 +27,8 @@ export function scenarioMode(chat: Chat): ScenarioMode {
 
 /** The one chat a story is built in, in two modes. Plan is a conversation on
  *  the creative model and applies nothing. Build reads that conversation and
- *  writes commands, applied to draft entities and Threads when the turn
- *  completes (handlers/forge-chat.ts). The mode in force when the writer sends
+ *  writes commands, applied to the World when the turn completes: live
+ *  entities with their lorebook entries, and Threads (handlers/forge-chat.ts). The mode in force when the writer sends
  *  decides the turn. */
 export const scenarioSpec: ChatTypeSpec<ScenarioMode> = {
   id: "scenario",

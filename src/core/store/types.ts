@@ -152,15 +152,18 @@ export interface Thread {
 export type ThreadDraft = Omit<Thread, "status" | "latent" | "wish"> &
   Partial<Pick<Thread, "status" | "latent" | "wish">>;
 
+/** "draft": made by the World's "+ Add Entity" and not yet saved, so it has no
+ *  lorebook entry. "live": bound to one. A Scenario Build CREATE is live at
+ *  once; a draft becomes live when the edit pane saves it. */
 export type EntityLifecycle = "draft" | "live";
 
 export interface WorldEntity {
   id: string;
   categoryId: DulfsFieldID; // Character, Location, etc. — metadata
-  lorebookEntryId?: string; // lorebook entry created on Cast (live only)
+  lorebookEntryId?: string; // the entry a live entity is bound to; a draft has none
   name: string;
   summary: string; // SE-internal only — editable in SeEntityEditPane, never synced to lorebook
-  lifecycle: EntityLifecycle; // "draft" = no lorebook entry yet; "live" = lorebook-bound
+  lifecycle: EntityLifecycle;
   sourceChatId?: string; // set when a Scenario chat built this entity; what permits a Build DELETE
 }
 
