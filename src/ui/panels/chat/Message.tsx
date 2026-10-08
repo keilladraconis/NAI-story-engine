@@ -13,6 +13,9 @@ import type { ChatMessage, Chat } from "../../../core/chat-types/types";
 import { getChatTypeSpec } from "../../../core/chat-types";
 import { EntityCard } from "../world/EntityCard";
 import { ConfirmButton } from "../../components/ConfirmButton";
+import { BuildPills } from "./BuildPills";
+import { pillsFor } from "../../../core/chat-types/pills";
+import { parseForgeStream } from "../../../core/utils/crucible-command-parser";
 import { Edit, RotateCw, X, Check } from "nai:icons/feather";
 
 type MessageProps = { chatId: string; chat: Chat; message: ChatMessage };
@@ -28,6 +31,16 @@ function readContent(s: RootState, chatId: string, msg: ChatMessage): string {
       .find((c) => c.id === chatId)
       ?.messages.find((m) => m.id === msg.id)?.content ?? msg.content
   );
+}
+
+function readMessage(
+  s: RootState,
+  chatId: string,
+  id: string,
+): ChatMessage | undefined {
+  return s.chat.chats
+    .find((c) => c.id === chatId)
+    ?.messages.find((m) => m.id === id);
 }
 
 const BUBBLE = {
@@ -126,6 +139,26 @@ export function Message(props: MessageProps) {
   // committed store value once streaming clears the buffer on completion.
   const live = useStream(message.id);
   const content = live ?? committed;
+  // Read from the store, not the prop: the segments arrive when the turn
+  // completes, after this row was last handed its message. Both selectors
+  // return what the store holds (a stable reference or a primitive).
+  const mode = useSlice((s) => readMessage(s, chatId, message.id)?.mode);
+  const segments = useSlice(
+    (s) => readMessage(s, chatId, message.id)?.forgeSegments,
+  );
+  const isBuild = message.role === "assistant" && mode === "build";
+  // Settled segments once the turn has completed; until then a provisional
+  // parse of the text so far, whose unfinished tail is thinking too.
+  const stream = isBuild && !segments ? parseForgeStream(content) : null;
+  const pills = !isBuild
+    ? []
+    : segments
+      ? pillsFor(segments)
+      : pillsFor(
+          stream!.segments,
+          stream!.pending.kind === "prose" ? stream!.pending.text : "",
+          true,
+        );
   // Draft-entity ids for this turn (Scenario chats), rendered as inline cards
   // below the bubble. Other chats have no `inlineEntityIdsFor`, so this is
   // inert. Must return a primitive string from useSlice — a fresh array would
@@ -215,7 +248,13 @@ export function Message(props: MessageProps) {
               }}
             >
               <span style={{ flex: 1, fontSize: "0.72em", opacity: 0.55 }}>
-                {isUser ? "You" : "Assistant"}
+                {isUser
+                  ? "You"
+                  : mode === "build"
+                    ? "Build"
+                    : mode === "plan"
+                      ? "Plan"
+                      : "Assistant"}
               </span>
               <div style={{ display: "flex", gap: SP.xs }}>
                 <button
@@ -253,7 +292,10 @@ export function Message(props: MessageProps) {
                 />
               </div>
             </div>
-            <div>{content || "…"}</div>
+            <div style={{ display: isBuild ? "none" : "block" }}>
+              {content || "…"}
+            </div>
+            <BuildPills pills={pills} hidden={!isBuild} resetKey={message.id} />
             {inlineIds.length > 0 && (
               <div
                 style={{

@@ -611,8 +611,22 @@ describe("commandBody", () => {
     ).toEqual([
       { label: "Cast", text: "Hesper Vane, Corin Vane" },
       { label: "State", text: "He sold his half." },
-      { label: "Wish", text: "She floods the cut." },
+      { label: "Wish", text: "She floods the cut.", unseen: true },
     ]);
+  });
+
+  it("marks only a THREAD's private and wish parts unseen", () => {
+    const body = one(
+      '[THREAD "Half the House" | "Hesper Vane", "Corin Vane" | He sold his half. | She has not told him. | She floods the cut.]',
+    );
+    expect(body).toEqual([
+      { label: "Cast", text: "Hesper Vane, Corin Vane" },
+      { label: "State", text: "He sold his half." },
+      { label: "Private", text: "She has not told him.", unseen: true },
+      { label: "Wish", text: "She floods the cut.", unseen: true },
+    ]);
+    expect("unseen" in body[0]).toBe(false);
+    expect("unseen" in body[1]).toBe(false);
   });
 
   it("gives RENAME and DELETE nothing", () => {

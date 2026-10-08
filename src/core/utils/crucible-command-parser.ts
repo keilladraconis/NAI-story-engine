@@ -157,10 +157,14 @@ export interface ForgeStreamParse {
 /** What a command carried, as labelled parts for its pill. Empty segments are
  *  left out; RENAME and DELETE carry nothing beyond their label. */
 export function commandBody(cmd: ParsedCommand): PillPart[] {
-  const parts = (pairs: [string, string][]): PillPart[] =>
+  const parts = (pairs: [string, string, true?][]): PillPart[] =>
     pairs
       .filter(([, text]) => text.trim() !== "")
-      .map(([label, text]) => ({ label, text: text.trim() }));
+      .map(([label, text, unseen]) => ({
+        label,
+        text: text.trim(),
+        ...(unseen ? { unseen } : {}),
+      }));
   switch (cmd.kind) {
     case "CREATE":
       return parts([
@@ -173,8 +177,8 @@ export function commandBody(cmd: ParsedCommand): PillPart[] {
       return parts([
         ["Cast", cmd.memberNames.join(", ")],
         ["State", cmd.state],
-        ["Private", cmd.latent],
-        ["Wish", cmd.wish],
+        ["Private", cmd.latent, true],
+        ["Wish", cmd.wish, true],
       ]);
     default:
       return [];

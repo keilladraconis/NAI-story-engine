@@ -8,6 +8,8 @@ export type ChatMessageRole = "system" | "user" | "assistant";
 export interface PillPart {
   label: string;
   text: string;
+  /** True when the story model is never shown this part. */
+  unseen?: boolean;
 }
 
 export interface ForgeActionRecord {
