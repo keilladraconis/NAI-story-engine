@@ -12,6 +12,7 @@ import type { RootState } from "../../../src/core/store/types";
 import {
   FORGE_CLEANUP_PROMPT,
   SCENARIO_BUILD_INSTRUCTION,
+  SCENARIO_BUILD_PREFILL,
   XIALONG_STYLE,
   buildScenarioBuildPrompt,
   buildScenarioPlanPrompt,
@@ -228,12 +229,24 @@ describe("a Build turn", () => {
     });
   });
 
+  it("starts the reply on its thinking, and keeps that opening", async () => {
+    const state = stateOf(chat);
+    const strategy = buildScenarioBuildStrategy(() => state, chat, "p1");
+    const messages = await run(strategy);
+    expect(messages[messages.length - 1]).toEqual({
+      role: "assistant",
+      content: SCENARIO_BUILD_PREFILL,
+    });
+    expect(strategy.prefillBehavior).toBe("keep");
+    expect(strategy.assistantPrefill).toBe(SCENARIO_BUILD_PREFILL);
+  });
+
   it("stands an empty send on the fixed instruction", async () => {
     const state = stateOf(chat);
     const messages = await run(
       buildScenarioBuildStrategy(() => state, chat, "p1"),
     );
-    expect(messages[messages.length - 1]).toEqual({
+    expect(messages[messages.length - 2]).toEqual({
       role: "user",
       content: SCENARIO_BUILD_INSTRUCTION,
     });
@@ -249,7 +262,7 @@ describe("a Build turn", () => {
     const messages = await run(
       buildScenarioBuildStrategy(() => state, directed, "p1"),
     );
-    expect(messages[messages.length - 1]).toEqual({
+    expect(messages[messages.length - 2]).toEqual({
       role: "user",
       content: "Just the two of them for now.",
     });
@@ -267,7 +280,7 @@ describe("a Build turn", () => {
       const messages = await run(
         buildScenarioBuildStrategy(() => state, tailIsUser, "p1", directed),
       );
-      return messages[messages.length - 1];
+      return messages[messages.length - 2];
     };
     const instruction = { role: "user", content: SCENARIO_BUILD_INSTRUCTION };
     const own = { role: "user", content: "A lock-keeper on a dying canal." };
@@ -286,7 +299,7 @@ describe("a Build turn", () => {
       const messages = await run(
         buildScenarioBuildStrategy(() => state, chat, "p1", true),
       );
-      expect(messages[messages.length - 1]).toEqual({
+      expect(messages[messages.length - 2]).toEqual({
         role: "assistant",
         content: "What does she owe her brother?",
       });

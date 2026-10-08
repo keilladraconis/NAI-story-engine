@@ -6,10 +6,10 @@ const message = readFileSync("src/ui/panels/chat/Message.tsx", "utf8");
 
 describe("BuildPills", () => {
   it("mounts every body and toggles its display", () => {
-    expect(pills).toMatch(
-      /display:\s*open\[i\]\s*&&\s*pill\.body\.length\s*>\s*0\s*\?\s*"block"\s*:\s*"none"/,
-    );
-    expect(pills).not.toMatch(/open\[i\]\s*&&\s*</);
+    expect(pills).toMatch(/display:\s*isOpen\s*\?\s*"block"\s*:\s*"none"/);
+    expect(pills).not.toMatch(/isOpen\s*&&\s*</);
+    // A pill opens in place: the body sits inside the pill's own border.
+    expect(pills).toMatch(/width:\s*isOpen\s*\?\s*"100%"\s*:\s*"auto"/);
   });
 
   it("has nothing open when its instance is reused for another message", () => {
@@ -24,7 +24,7 @@ describe("BuildPills", () => {
 
   it("opens a pill against the current key, never a reused instance's", () => {
     expect(pills).toMatch(
-      /setHeld\(\(h\) => \{\s*const was = h\.key === props\.resetKey \? h\.open : NONE;\s*return \{ key: props\.resetKey, open: \{ \.\.\.was, \[i\]: !was\[i\] \} \};/,
+      /setHeld\(\(h\) => \{\s*const was = h\.key === props\.resetKey \? h\.open : NONE;\s*return \{\s*key: props\.resetKey,\s*open: \{ \.\.\.was, \[i\]: !was\[i\] \},\s*\};/,
     );
   });
 

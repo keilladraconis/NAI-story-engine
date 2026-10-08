@@ -99,6 +99,13 @@ Settled: Hesper Vane, Corin Vane, the lock house, and the company buying up the 
 [CREATE LOCATION "Tolland Lock House" | Damp plaster and coal smoke; one kitchen and two owners. The sluice wheel stands in the yard where anyone on the towpath can see who turns it.]
 [THREAD "Half the House" | "Hesper Vane", "Corin Vane" | Corin Vane has sold his half of Tolland Lock House to the barge company. Hesper Vane holds the only set of sluice keys. | Corin Vane has not told Hesper Vane that the company has already paid him. | Hesper Vane floods the cut to stop the company.]`;
 
+/** What a Build reply is made to open with. GLM asked to think first often
+ *  goes straight to commands, most of all once the transcript shows earlier
+ *  Build replies as commands alone; started on this word it has to say what
+ *  was settled before it writes one. Kept on the reply, so the writer can read
+ *  the thinking it begins. */
+export const SCENARIO_BUILD_PREFILL = "Settled:";
+
 export const SCENARIO_BUILD_REGISTERS: Record<RegisterKey, string> = {
   unset: `REGISTER, not yet set: Record things at the pressure the conversation implies, with three pressures at most in the whole scenario. Add no danger the writer has not asked for.`,
   Cozy: `REGISTER, Cozy: Two pressures at most in the whole scenario, and none is required. A pressure here is friction of preference or circumstance: two people who want the same quiet corner, a habit that no longer fits. Nothing threatens anyone, nobody is malicious, and nothing is lost for good.`,

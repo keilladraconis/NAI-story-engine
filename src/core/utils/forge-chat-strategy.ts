@@ -36,6 +36,7 @@ import {
   normalizeRegisterKey,
   FORGE_CLEANUP_PROMPT,
   SCENARIO_BUILD_INSTRUCTION,
+  SCENARIO_BUILD_PREFILL,
   XIALONG_STYLE,
 } from "./prompts";
 import { DULFS_CATEGORY_LABELS } from "./category-detect";
@@ -210,6 +211,7 @@ export function buildScenarioBuildStrategy(
       ...(directs
         ? []
         : [{ role: "user" as const, content: SCENARIO_BUILD_INSTRUCTION }]),
+      { role: "assistant", content: SCENARIO_BUILD_PREFILL },
     ];
 
     return {
@@ -234,9 +236,11 @@ export function buildScenarioBuildStrategy(
       chatId: queuedChat.id,
       messageId: assistantMessageId,
     },
-    prefillBehavior: "trim",
-    // No prefill: a reply opens with thinking. Cut off by the token cap it
-    // stops mid-command and the last action is lost, so it continues.
+    // The reply is started on its thinking and keeps that opening word.
+    prefillBehavior: "keep",
+    assistantPrefill: SCENARIO_BUILD_PREFILL,
+    // Cut off by the token cap it stops mid-command and the last action is
+    // lost, so it continues.
     continuation: { maxCalls: 4 },
   };
 }

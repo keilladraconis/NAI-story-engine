@@ -33,6 +33,7 @@ import type {
   ForgeActionRecord,
   ForgeSegment,
 } from "../../../chat-types/types";
+import { SCENARIO_BUILD_PREFILL } from "../../../utils/prompts";
 import { stripThinkingTags } from "../../../utils/tag-parser";
 import { DULFS_CATEGORY_LABELS } from "../../../utils/category-detect";
 import { DulfsFieldID, FieldID } from "../../../../config/field-definitions";
@@ -411,9 +412,13 @@ export const forgeChatHandler: GenerationHandlers<ForgeChatTarget> = {
   },
 
   async completion(ctx: CompletionContext<ForgeChatTarget>): Promise<void> {
-    if (!ctx.accumulatedText) {
-      // Cancelled or returned nothing before any tokens streamed: drop the empty
-      // placeholder turn instead of leaving a blank bubble behind.
+    if (
+      !ctx.accumulatedText ||
+      ctx.accumulatedText.trim() === SCENARIO_BUILD_PREFILL
+    ) {
+      // Cancelled or returned nothing before any tokens streamed (the kept
+      // prefill is not a reply): drop the empty placeholder turn instead of
+      // leaving a blank bubble behind.
       ctx.dispatch(
         messageRemoved({ chatId: ctx.target.chatId, id: ctx.target.messageId }),
       );

@@ -324,7 +324,7 @@ describe("whether a Build turn was directed", () => {
       .map(([a]) => a)
       .find((a) => a.type === "ui/generationSubmitted");
     const { messages } = await submitted.payload.messageFactory();
-    return messages[messages.length - 1] as Message;
+    return messages[messages.length - 2] as Message;
   };
 
   it("carries an empty send to the strategy as not directed", async () => {
