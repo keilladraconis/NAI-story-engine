@@ -95,9 +95,12 @@ export const chatSlice = createSlice({
     ) =>
       mapChat(state, payload.chatId, (c) => ({
         ...c,
-        messages: c.messages.map((m) =>
-          m.id === payload.id ? { ...m, content: payload.content } : m,
-        ),
+        // An edit invalidates the settled segments: they describe the old text.
+        messages: c.messages.map((m) => {
+          if (m.id !== payload.id) return m;
+          const { forgeSegments: _settled, ...rest } = m;
+          return { ...rest, content: payload.content };
+        }),
       })),
 
     messageAppended: (

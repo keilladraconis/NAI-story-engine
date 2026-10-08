@@ -9,6 +9,7 @@ import {
   subModeChanged,
   messageAdded,
   messageUpdated,
+  forgeSegmentsSet,
   messageAppended,
   messageRemoved,
   messagesPrunedAfter,
@@ -152,6 +153,45 @@ describe("chat slice", () => {
       messageUpdated({ chatId: "a", id: "m1", content: "right" }),
     );
     expect(next.chats[0].messages[0].content).toBe("right");
+  });
+
+  it("messageUpdated drops the settled segments of an edited message", () => {
+    const other = { id: "m2", role: "assistant" as const, content: "y" };
+    const start = {
+      chats: [
+        blankChat({
+          id: "a",
+          messages: [
+            {
+              id: "m1",
+              role: "assistant" as const,
+              content: "old",
+              forgeSegments: [{ kind: "prose" as const, text: "old" }],
+            },
+            other,
+          ],
+        }),
+      ],
+      activeChatId: "a",
+    };
+    const edited = chatSliceReducer(
+      start,
+      messageUpdated({ chatId: "a", id: "m1", content: "new" }),
+    );
+    expect(edited.chats[0].messages[0].content).toBe("new");
+    expect("forgeSegments" in edited.chats[0].messages[0]).toBe(false);
+    expect(edited.chats[0].messages[1]).toBe(other);
+    const settled = chatSliceReducer(
+      edited,
+      forgeSegmentsSet({
+        chatId: "a",
+        id: "m1",
+        segments: [{ kind: "prose", text: "new" }],
+      }),
+    );
+    expect(settled.chats[0].messages[0].forgeSegments).toEqual([
+      { kind: "prose", text: "new" },
+    ]);
   });
 
   it("messageRemoved drops the matching message", () => {

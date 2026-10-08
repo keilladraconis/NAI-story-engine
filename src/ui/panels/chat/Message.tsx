@@ -14,8 +14,7 @@ import { getChatTypeSpec } from "../../../core/chat-types";
 import { EntityCard } from "../world/EntityCard";
 import { ConfirmButton } from "../../components/ConfirmButton";
 import { BuildPills } from "./BuildPills";
-import { pillsFor } from "../../../core/chat-types/pills";
-import { parseForgeStream } from "../../../core/utils/crucible-command-parser";
+import { buildPills } from "../../../core/chat-types/pills";
 import { Edit, RotateCw, X, Check } from "nai:icons/feather";
 
 type MessageProps = { chatId: string; chat: Chat; message: ChatMessage };
@@ -147,18 +146,15 @@ export function Message(props: MessageProps) {
     (s) => readMessage(s, chatId, message.id)?.forgeSegments,
   );
   const isBuild = message.role === "assistant" && mode === "build";
-  // Settled segments once the turn has completed; until then a provisional
-  // parse of the text so far, whose unfinished tail is thinking too.
-  const stream = isBuild && !segments ? parseForgeStream(content) : null;
-  const pills = !isBuild
-    ? []
-    : segments
-      ? pillsFor(segments)
-      : pillsFor(
-          stream!.segments,
-          stream!.pending.kind === "prose" ? stream!.pending.text : "",
-          true,
-        );
+  // True only while this message is being generated: its request is the
+  // active one or queued, and not cancelled. A failed, cancelled or edited
+  // reply is not "thinking…".
+  const generating = useSlice((s) =>
+    [s.runtime.activeRequest, ...s.runtime.queue].some(
+      (r) => !!r && r.status !== "cancelled" && r.targetId === message.id,
+    ),
+  );
+  const pills = isBuild ? buildPills(content, segments, generating) : [];
   // Draft-entity ids for this turn (Scenario chats), rendered as inline cards
   // below the bubble. Other chats have no `inlineEntityIdsFor`, so this is
   // inert. Must return a primitive string from useSlice — a fresh array would

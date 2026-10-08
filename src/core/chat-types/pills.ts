@@ -1,3 +1,4 @@
+import { parseForgeStream } from "../utils/crucible-command-parser";
 import type { ForgeActionRecord, ForgeSegment, PillPart } from "./types";
 
 /** One pill of a Build reply: a command, or a run of the model's thinking. */
@@ -73,4 +74,21 @@ export function pillsFor(
     }
   }
   return pills;
+}
+
+/** The pills for one Build message. Settled segments win; without them the
+ *  content is parsed provisionally, and only a reply being `generating` reads
+ *  as still arriving (a failed, cancelled or edited one does not). */
+export function buildPills(
+  content: string,
+  segments: ForgeSegment[] | undefined,
+  generating: boolean,
+): Pill[] {
+  if (segments) return pillsFor(segments);
+  const { segments: parsed, pending } = parseForgeStream(content);
+  return pillsFor(
+    parsed,
+    pending.kind === "prose" ? pending.text : "",
+    generating,
+  );
 }

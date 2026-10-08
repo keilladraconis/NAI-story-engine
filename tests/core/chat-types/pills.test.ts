@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { pillLabel, pillsFor } from "../../../src/core/chat-types/pills";
+import {
+  buildPills,
+  pillLabel,
+  pillsFor,
+} from "../../../src/core/chat-types/pills";
 import type {
   ForgeActionRecord,
   ForgeSegment,
@@ -108,5 +112,35 @@ describe("pillsFor", () => {
     expect(pillsFor([], "", true).map((p) => p.label)).toEqual(["thinking…"]);
     expect(pillsFor([], "So", true).map((p) => p.label)).toEqual(["thinking…"]);
     expect(pillsFor([prose("So.")], "", false)[0].label).toBe("thinking");
+  });
+});
+
+describe("buildPills", () => {
+  const settled = [prose("Settled."), act({ name: "A" })];
+
+  it("prefers settled segments over the content", () => {
+    const pills = buildPills('[CREATE CHARACTER "B" | x]', settled, false);
+    expect(pills.map((p) => p.label)).toEqual(["thinking", 'create | "A"']);
+  });
+
+  it("reads thinking… for an all-thinking reply that is being generated", () => {
+    expect(buildPills("So far", undefined, true).map((p) => p.label)).toEqual([
+      "thinking…",
+    ]);
+  });
+
+  it("reads thinking for the same reply once it is not being generated", () => {
+    expect(buildPills("So far", undefined, false).map((p) => p.label)).toEqual([
+      "thinking",
+    ]);
+  });
+
+  it("parses a command out of content when nothing settled it", () => {
+    const pills = buildPills(
+      'Hm.\n[CREATE CHARACTER "Jimmy" | A boy.]',
+      undefined,
+      false,
+    );
+    expect(pills.map((p) => p.label)).toContain('create | "Jimmy"');
   });
 });
