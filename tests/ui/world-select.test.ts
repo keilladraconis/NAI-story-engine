@@ -29,15 +29,15 @@ const thread = (id: string, entityIds: string[]): Thread => ({
 });
 
 describe("selectWorldBody", () => {
-  it("loose = live + manual-draft, unthreaded; forge drafts hidden", () => {
+  it("lists live entities, manual drafts and Scenario-built entities", () => {
     const entitiesById = {
       a: ent("a"),
       b: ent("b", { lifecycle: "draft" }), // manual draft (no sourceChatId) → visible
-      c: ent("c", { lifecycle: "draft", sourceChatId: "chat1" }), // forge draft → hidden
+      c: ent("c", { sourceChatId: "chat1" }), // built by a Scenario chat → listed
     };
     const { threads, loose } = selectWorldBody(entitiesById, []);
     expect(threads).toEqual([]);
-    expect(loose.map((e) => e.id).sort()).toEqual(["a", "b"]);
+    expect(loose.map((e) => e.id).sort()).toEqual(["a", "b", "c"]);
   });
 
   it("lists an entity in the World even when a thread casts it", () => {

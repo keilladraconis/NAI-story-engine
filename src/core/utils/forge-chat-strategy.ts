@@ -5,7 +5,7 @@
  * prompt, the Foundation and Setting, what is built so far, and the transcript;
  * it targets the ordinary chat handler and applies nothing. A Build turn is the
  * Build prompt, the same premise, a context block code computes fresh each turn
- * ([POOL], [LIVE], [THREADS], [REJECTED LAST TURN]), then the
+ * ([WORLD], [THREADS], [REJECTED LAST TURN]), then the
  * transcript; its reply is thinking and commands. Neither turn is shown the
  * thinking of an earlier Build reply (`scenarioConversation`).
  *
@@ -98,28 +98,20 @@ export function formatRejections(messages: ChatMessage[]): string {
 
 function formatEntityLine(e: WorldEntity): string {
   const label = DULFS_CATEGORY_LABELS[e.categoryId] ?? "Entity";
-  return `- ${e.name} (${label})${e.summary ? ` — ${e.summary}` : ""}`;
+  const mark = e.sourceChatId ? "* " : "";
+  return `- ${mark}${e.name} (${label})${e.summary ? ` — ${e.summary}` : ""}`;
 }
 
-function formatPool(state: RootState, chatId: string): string {
-  const drafts = Object.values(state.world.entitiesById).filter(
-    (e) => e.lifecycle === "draft" && e.sourceChatId === chatId,
-  );
-  if (drafts.length === 0) return "";
+/** Everything in the World. Build may revise or rename any of it, and delete
+ *  only what a Scenario chat built, which the star marks. */
+export function formatWorld(state: RootState): string {
+  const all = state.world.entityIds
+    .map((id) => state.world.entitiesById[id])
+    .filter((e): e is WorldEntity => !!e);
+  if (all.length === 0) return "";
   return [
-    "[POOL] (drafts you may modify)",
-    ...drafts.map(formatEntityLine),
-  ].join("\n");
-}
-
-function formatLive(state: RootState): string {
-  const live = Object.values(state.world.entitiesById).filter(
-    (e) => e.lifecycle === "live",
-  );
-  if (live.length === 0) return "";
-  return [
-    "[LIVE] (read-only; never modify or delete)",
-    ...live.map(formatEntityLine),
+    "[WORLD] (* = built here; only these may be deleted)",
+    ...all.map(formatEntityLine),
   ].join("\n");
 }
 
@@ -181,8 +173,7 @@ export function buildScenarioBuildStrategy(
       // No truncation anywhere in this block: a summary cut short is a draft
       // the model revises from half its text.
       ...contextBlock([
-        formatPool(state, chat.id),
-        formatLive(state),
+        formatWorld(state),
         formatThreads(state),
         formatRejections(prior),
       ]),
@@ -250,11 +241,7 @@ export function buildScenarioPlanStrategy(
         ),
       },
       ...(await premiseOf(state)),
-      ...contextBlock([
-        formatPool(state, chat.id),
-        formatLive(state),
-        formatThreads(state),
-      ]),
+      ...contextBlock([formatWorld(state), formatThreads(state)]),
       ...scenarioConversation(chat.messages, assistantMessageId),
       ...(xialong
         ? [{ role: "assistant" as const, content: XIALONG_STYLE.scenarioPlan }]

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { parseCommands } from "../../src/core/utils/crucible-command-parser";
 import {
   SCENARIO_BUILD_INSTRUCTION,
+  SCENARIO_BUILD_PREFILL,
   SCENARIO_BUILD_PROMPT,
   SCENARIO_BUILD_REGISTERS,
 } from "../../src/core/utils/prompts";
@@ -17,6 +18,7 @@ describe("tools/scenario-probe.naiscript measures the shipped prompt", () => {
     ["SCENARIO_BUILD_PROMPT", SCENARIO_BUILD_PROMPT],
     ["REGISTER", SCENARIO_BUILD_REGISTERS.Gritty],
     ["SCENARIO_BUILD_INSTRUCTION", SCENARIO_BUILD_INSTRUCTION],
+    ["SCENARIO_BUILD_PREFILL", SCENARIO_BUILD_PREFILL],
   ])("carries %s verbatim", (name, prompt) => {
     expect(probe).toContain(`const ${name} = ${JSON.stringify(prompt)};`);
   });

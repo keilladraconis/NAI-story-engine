@@ -2,7 +2,6 @@
 // SeWorldSection._selectBody and SeEntityCard's status logic, but store-only
 // (no async lorebook reads this slice). Unit-tested headless — no icon imports.
 
-import { isForgeDraft } from "../../../core/store/selectors/forge";
 import { isRequestActive } from "../../../core/store/selectors/runtime";
 import {
   entitySummaryRequestId,
@@ -21,15 +20,12 @@ import type { RootState, WorldEntity, Thread } from "../../../core/store";
  *  `thread-condition.ts`), not a place entities live. Casting Ada in "the succession" should not remove Ada from the
  *  World. So `loose` is now simply the entities the World lists; the name is
  *  kept because every caller reads it positionally and the meaning it carries —
- *  "what the World shows" — is the one it always should have had.
- *
- *  Forge drafts stay hidden: they render as inline cards inside their forge
- *  chat, and showing them here would list them twice. */
+ *  "what the World shows" — is the one it always should have had. */
 export function selectWorldBody(
   entitiesById: Record<string, WorldEntity>,
   threads: Thread[],
 ): { threads: Thread[]; loose: WorldEntity[] } {
-  const loose = Object.values(entitiesById).filter((e) => !isForgeDraft(e));
+  const loose = Object.values(entitiesById);
   return { threads, loose };
 }
 

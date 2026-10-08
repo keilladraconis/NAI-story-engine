@@ -4,6 +4,7 @@ import {
   buildScenarioBuildStrategy,
   buildScenarioPlanStrategy,
   formatRejections,
+  formatWorld,
   scenarioConversation,
 } from "../../../src/core/utils/forge-chat-strategy";
 import type { Chat, ChatMessage } from "../../../src/core/chat-types/types";
@@ -373,6 +374,45 @@ describe("a Plan turn", () => {
   });
 });
 
+describe("the [WORLD] block", () => {
+  it("lists every entity by category, marking those Build may delete", () => {
+    const state = makeState({
+      world: {
+        threads: [],
+        entityIds: ["a", "b"],
+        entitiesById: {
+          a: {
+            id: "a",
+            categoryId: "dramatisPersonae",
+            name: "Mikki",
+            summary: "A fox.",
+            lifecycle: "live",
+            sourceChatId: "c9",
+          },
+          b: {
+            id: "b",
+            categoryId: "dramatisPersonae",
+            name: "Kei",
+            summary: "",
+            lifecycle: "live",
+          },
+        },
+      },
+    } as never);
+    expect(formatWorld(state)).toBe(
+      [
+        "[WORLD] (* = built here; only these may be deleted)",
+        "- * Mikki (Character) — A fox.",
+        "- Kei (Character)",
+      ].join("\n"),
+    );
+  });
+
+  it("is empty when the World is", () => {
+    expect(formatWorld(makeState({} as never))).toBe("");
+  });
+});
+
 describe("what a Scenario turn reads from the store", () => {
   const queued = chatOf([
     msg("u1", "user", "seed"),
@@ -387,7 +427,7 @@ describe("what a Scenario turn reads from the store", () => {
             name: "Hesper Vane",
             summary: "Keeps the lock.",
             categoryId: "dramatisPersonae",
-            lifecycle: "draft",
+            lifecycle: "live",
             sourceChatId: "c1",
           },
         },
@@ -415,6 +455,15 @@ describe("what a Scenario turn reads from the store", () => {
   };
 
   for (const [name, build] of Object.entries(factories)) {
+    it(`${name} shows the World and the Threads in one context block, with no pool`, async () => {
+      const text = JSON.stringify(
+        await build(() => withThread(queued), queued),
+      );
+      expect(text).toContain("[WORLD]");
+      expect(text).toContain("[THREADS]");
+      expect(text).not.toMatch(/\[POOL\]|\[LIVE\]/);
+    });
+
     it(`${name} reads a Thread's private halves from the transcript only, never the store`, async () => {
       const text = JSON.stringify(
         await build(() => withThread(queued), queued),

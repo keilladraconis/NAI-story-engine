@@ -3,9 +3,6 @@ import { registerForgeChatEffects } from "../../../../src/core/store/effects/for
 import {
   forgeChatContinueRequested,
   entityDiscardRequested,
-  entityCastRequested,
-  forgeCastAllRequested,
-  forgeDiscardAllRequested,
   scenarioPlanRequested,
 } from "../../../../src/core/store/effects/forge-chat-effects";
 import { chatHandler } from "../../../../src/core/store/effects/handlers/chat";
@@ -219,127 +216,6 @@ describe("whether a Build turn was directed", () => {
     expect(await lastMessage({ chatId: "fc-1", directed: true })).toEqual({
       role: "user",
       content: "a lock-keeper",
-    });
-  });
-});
-
-describe("entityCastRequested effect", () => {
-  it("noops for live entities", async () => {
-    const live = makeEntity({
-      id: "d1",
-      sourceChatId: "fc-1",
-      lifecycle: "live",
-    });
-    const state = makeState([makeChat()], [live]);
-    const { dispatch, fire } = makeHarness(state);
-    await fire(entityCastRequested({ entityId: "d1" }));
-    expect(dispatch.mock.calls).toEqual([]);
-  });
-
-  it("noops for unknown entities", async () => {
-    const state = makeState([makeChat()], []);
-    const { dispatch, fire } = makeHarness(state);
-    await fire(entityCastRequested({ entityId: "nope" }));
-    expect(dispatch.mock.calls).toEqual([]);
-  });
-});
-
-describe("forgeCastAllRequested effect", () => {
-  it("casts every draft of the chat and leaves the chat in place", async () => {
-    const chat = makeChat();
-    const d1 = makeEntity({
-      id: "d1",
-      sourceChatId: "fc-1",
-      lifecycle: "draft",
-    });
-    const d2 = makeEntity({
-      id: "d2",
-      sourceChatId: "fc-1",
-      lifecycle: "draft",
-    });
-    const live = makeEntity({
-      id: "L",
-      sourceChatId: "fc-1",
-      lifecycle: "live",
-    });
-    const otherChat = makeEntity({
-      id: "X",
-      sourceChatId: "fc-OTHER",
-      lifecycle: "draft",
-    });
-    const state = makeState([chat], [d1, d2, live, otherChat]);
-    const { dispatch, fire } = makeHarness(state);
-    await fire(forgeCastAllRequested({ chatId: "fc-1" }));
-    const castIds = dispatch.mock.calls
-      .filter(([a]) => a.type === entityCastRequested.type)
-      .map(([a]) => (a.payload as { entityId: string }).entityId)
-      .sort();
-    expect(castIds).toEqual(["d1", "d2"]);
-    // Casting does not end the chat; it outlives any one batch of drafts.
-    expect(
-      dispatch.mock.calls.some(([a]) => a.type === "chat/chatDeleted"),
-    ).toBe(false);
-  });
-});
-
-describe("forgeDiscardAllRequested effect", () => {
-  it("deletes every draft and leaves the chat in place", async () => {
-    const chat = makeChat();
-    const d1 = makeEntity({
-      id: "d1",
-      name: "Vesper",
-      sourceChatId: "fc-1",
-      lifecycle: "draft",
-    });
-    const d2 = makeEntity({
-      id: "d2",
-      name: "Hollow",
-      sourceChatId: "fc-1",
-      lifecycle: "draft",
-    });
-    const state = makeState([chat], [d1, d2]);
-    const { dispatch, fire } = makeHarness(state);
-    await fire(forgeDiscardAllRequested({ chatId: "fc-1" }));
-
-    const deletes = dispatch.mock.calls.filter(
-      ([a]) => a.type === "world/entityDeleted",
-    );
-    expect(deletes).toHaveLength(2);
-    // The chat stays: the chat is the story's, not the batch's.
-    expect(
-      dispatch.mock.calls.some(([a]) => a.type === "chat/chatDeleted"),
-    ).toBe(false);
-  });
-
-  it("leaves the chat in place when there are no drafts to discard", async () => {
-    const chat = makeChat();
-    const state = makeState([chat], []);
-    const { dispatch, fire } = makeHarness(state);
-    await fire(forgeDiscardAllRequested({ chatId: "fc-1" }));
-    expect(
-      dispatch.mock.calls.some(([a]) => a.type === "chat/chatDeleted"),
-    ).toBe(false);
-  });
-});
-
-describe("chatDeleted effect", () => {
-  it("does nothing when the chat is still there: the last chat is never deleted", async () => {
-    const { dispatch, fire } = makeHarness(makeState([makeChat()], []));
-    await fire({ type: "chat/chatDeleted", payload: { id: "fc-1" } });
-    expect(dispatch).not.toHaveBeenCalled();
-  });
-
-  it("releases the chat's drafts", async () => {
-    // The state an effect reads is the one the reducer left: the chat is gone.
-    const { dispatch, fire } = makeHarness(
-      makeState([makeChat({ id: "other" })], []),
-    );
-    await fire({ type: "chat/chatDeleted", payload: { id: "fc-1" } });
-
-    const dispatched = dispatch.mock.calls.map(([a]) => a);
-    expect(dispatched).toContainEqual({
-      type: "world/draftsReleasedFromChat",
-      payload: { chatId: "fc-1" },
     });
   });
 });

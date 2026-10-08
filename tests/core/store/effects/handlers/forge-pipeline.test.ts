@@ -13,7 +13,6 @@ import type {
   WorldEntity,
 } from "../../../../../src/core/store/types";
 import { rootReducer } from "../../../../../src/core/store";
-import { selectForgeDraftPoolCount } from "../../../../../src/core/store/selectors/forge";
 import type { ForgeSegment } from "../../../../../src/core/chat-types/types";
 
 const CHAT_ID = "fc-1";
@@ -92,11 +91,6 @@ describe("a forge pass, end to end", () => {
     const made = Object.values(state.world.entitiesById) as WorldEntity[];
     expect(made.length).toBeGreaterThan(0);
     for (const e of made) expect(e.sourceChatId).toBe(CHAT_ID);
-  });
-
-  it("leaves nothing in the draft pool, since nothing is a draft", async () => {
-    const { state } = await runPass();
-    expect(selectForgeDraftPoolCount(state, CHAT_ID)).toBe(0);
   });
 
   it("records a segment per command, which is what the chat draws", async () => {

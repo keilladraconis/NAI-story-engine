@@ -13,7 +13,6 @@ import { ChatInput } from "./ChatInput";
 import { ChatHeader } from "./ChatHeader";
 import { Sessions } from "./Sessions";
 import { RefineCommitBar } from "./RefineCommitBar";
-import { ForgeCommitBar } from "./ForgeCommitBar";
 import { pageWindow } from "./paging";
 
 // Identity + message-id sequence (NO content). Drives the shell: it re-renders
@@ -154,7 +153,6 @@ export function Chat(props: { onBack: () => void }) {
       <MessageList />
       <ChatInput />
       {chat.type === "refine" && <RefineCommitBar />}
-      {chat.type === "scenario" && <ForgeCommitBar />}
     </div>
   );
 }

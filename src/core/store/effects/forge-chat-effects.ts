@@ -1,38 +1,30 @@
 /**
  * Forge Chat Effects — Signal handlers for the Scenario chat.
  *
- * Four signals, each with a single handler:
+ * Three signals, each with a single handler:
  *   1. forgeChatContinueRequested  → queue a Build turn: append an assistant
  *                                     placeholder, submit a forgeChat generation.
  *                                     The request says whether the send was
  *                                     directed (typed) or empty.
- *      scenarioPlanRequested       → queue a Plan turn: an assistant placeholder
+ *   2. scenarioPlanRequested       → queue a Plan turn: an assistant placeholder
  *                                     and an ordinary chat generation. Nothing it
  *                                     writes is applied.
  *      Both do all of it before they yield, so the queue is what refuses a
  *      second send.
- *   2. entityDiscardRequested      → user-initiated draft discard: delete the
- *                                     entity.
- *   3. Cast / Cast All / Discard All → promote or drop drafts. The chat outlives
- *                                     them; none of these ends it.
+ *   3. entityDiscardRequested      → discard a manual draft ("+ Add Entity", not
+ *                                     yet saved): delete the entity.
  *
  * All actions are local to this module — declared with a static `.type`
  * field so `matchesAction` can subscribe.
  */
 
 import { Store, matchesAction } from "nai-store";
-import type { RootState, AppDispatch, WorldEntity } from "../types";
+import type { RootState, AppDispatch } from "../types";
 import type { Chat } from "../../chat-types/types";
-import { messageAdded, chatDeleted } from "../slices/chat";
+import { messageAdded } from "../slices/chat";
 import { requestQueued } from "../slices/runtime";
 import { generationSubmitted } from "../slices/ui";
-import {
-  entityDeleted,
-  entityLorebookEntryBound,
-  draftsReleasedFromChat,
-} from "../slices/world";
-import { ensureCategory } from "./lorebook-sync";
-import { nameKey } from "./handlers/lorebook";
+import { entityDeleted } from "../slices/world";
 import {
   buildScenarioBuildStrategy,
   buildScenarioPlanStrategy,
@@ -68,52 +60,12 @@ export const entityDiscardRequested = (
 });
 entityDiscardRequested.type = ENTITY_DISCARD_REQUESTED;
 
-export interface EntityCastRequestedPayload {
-  entityId: string;
-}
-const ENTITY_CAST_REQUESTED = "forgeChat/entityCastRequested";
-export const entityCastRequested = (payload: EntityCastRequestedPayload) => ({
-  type: ENTITY_CAST_REQUESTED as typeof ENTITY_CAST_REQUESTED,
-  payload,
-});
-entityCastRequested.type = ENTITY_CAST_REQUESTED;
-
-export interface ForgeCastAllRequestedPayload {
-  chatId: string;
-}
-const FORGE_CAST_ALL_REQUESTED = "forgeChat/castAllRequested";
-export const forgeCastAllRequested = (
-  payload: ForgeCastAllRequestedPayload,
-) => ({
-  type: FORGE_CAST_ALL_REQUESTED as typeof FORGE_CAST_ALL_REQUESTED,
-  payload,
-});
-forgeCastAllRequested.type = FORGE_CAST_ALL_REQUESTED;
-
-export interface ForgeDiscardAllRequestedPayload {
-  chatId: string;
-}
-const FORGE_DISCARD_ALL_REQUESTED = "forgeChat/discardAllRequested";
-export const forgeDiscardAllRequested = (
-  payload: ForgeDiscardAllRequestedPayload,
-) => ({
-  type: FORGE_DISCARD_ALL_REQUESTED as typeof FORGE_DISCARD_ALL_REQUESTED,
-  payload,
-});
-forgeDiscardAllRequested.type = FORGE_DISCARD_ALL_REQUESTED;
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
 function findChat(state: RootState, id: string): Chat | undefined {
   return state.chat.chats.find((c) => c.id === id);
-}
-
-function poolFor(state: RootState, chatId: string): WorldEntity[] {
-  return Object.values(state.world.entitiesById).filter(
-    (e) => e.lifecycle === "draft" && e.sourceChatId === chatId,
-  );
 }
 
 /** True if a Scenario generation for this chat (a Build turn or a Plan
@@ -216,94 +168,13 @@ export function registerForgeChatEffects(
     },
   );
 
-  // ─── Chat deleted (release its drafts) ──────────────────────────────────────
-  // Deleting the chat is the only way a Scenario ends. Its drafts are hidden
-  // from the World because the chat shows them, so without this they would be
-  // unreachable.
-  subscribeEffect(
-    matchesAction(chatDeleted),
-    async (action, { getState: latest }) => {
-      const chatId = action.payload.id;
-      // The reducer refuses to delete the last chat. A chat still here was not
-      // deleted, and keeps its drafts.
-      if (latest().chat.chats.some((c) => c.id === chatId)) return;
-      dispatch(draftsReleasedFromChat({ chatId }));
-    },
-  );
-
-  // ─── Entity Discard (user-initiated draft removal) ──────────────────────────
+  // ─── Discard a manual draft ("+ Add Entity", not yet saved) ─────────────────
   subscribeEffect(
     matchesAction(entityDiscardRequested),
     async (action, { getState: latest }) => {
-      const { entityId } = action.payload;
-      const state = latest();
-      const entity = state.world.entitiesById[entityId];
+      const entity = latest().world.entitiesById[action.payload.entityId];
       if (!entity || entity.lifecycle !== "draft") return;
-
-      dispatch(entityDeleted({ entityId }));
-    },
-  );
-
-  // ─── Cast (promote a single draft to live by binding a lorebook entry) ──────
-  subscribeEffect(
-    matchesAction(entityCastRequested),
-    async (action, { getState: latest }) => {
-      const { entityId } = action.payload;
-      const entity = latest().world.entitiesById[entityId];
-      if (!entity) return;
-      if (entity.lifecycle !== "draft") return;
-
-      const categoryId = await ensureCategory(entity.categoryId);
-      const allEntries = await api.v1.lorebook.entries();
-      const existing = allEntries.find(
-        (e) =>
-          (e.displayName ?? "").toLowerCase() === entity.name.toLowerCase() &&
-          !e.category,
-      );
-
-      let lorebookEntryId: string;
-      if (existing) {
-        lorebookEntryId = existing.id;
-        await api.v1.lorebook.updateEntry(lorebookEntryId, {
-          category: categoryId,
-        });
-      } else {
-        lorebookEntryId = await api.v1.lorebook.createEntry({
-          id: api.v1.uuid(),
-          displayName: entity.name,
-          text: "",
-          keys: [nameKey(entity.name)],
-          enabled: true,
-          category: categoryId,
-        });
-      }
-
-      dispatch(entityLorebookEntryBound({ entityId, lorebookEntryId }));
-    },
-  );
-
-  // ─── Cast All (promote every draft) ─────────────────────────────────────────
-  subscribeEffect(
-    matchesAction(forgeCastAllRequested),
-    async (action, { getState: latest }) => {
-      const { chatId } = action.payload;
-      const drafts = poolFor(latest(), chatId);
-      // Casting does not end the session: the chat is the story's, and outlives any one batch of drafts.
-      for (const entity of drafts) {
-        dispatch(entityCastRequested({ entityId: entity.id }));
-      }
-    },
-  );
-
-  // ─── Discard All (delete every draft) ───────────────────────────
-  subscribeEffect(
-    matchesAction(forgeDiscardAllRequested),
-    async (action, { getState: latest }) => {
-      const { chatId } = action.payload;
-      const drafts = poolFor(latest(), chatId);
-      for (const entity of drafts) {
-        dispatch(entityDeleted({ entityId: entity.id }));
-      }
+      dispatch(entityDeleted({ entityId: entity.id }));
     },
   );
 }

@@ -20,10 +20,8 @@ import {
   chatSwitched,
   uiChatRefineCommitted,
   uiChatRefineDiscarded,
-  worldExpansionSet,
   importWizardOpened,
 } from "../core/store";
-import { forgeCastAllRequested } from "../core/store/effects/forge-chat-effects";
 import { matchesAction } from "nai-store";
 
 function tabButtonStyle(active: boolean) {
@@ -87,12 +85,6 @@ export function App(props: { initialHasDocumentContent: boolean }) {
           setTab(tabForActiveEdit(getState().ui.activeEditId));
         },
       ),
-      // Casting drafts lands on the Engine tab with the World expanded so the
-      // freshly-cast entities are right there.
-      store.subscribeEffect(matchesAction(forgeCastAllRequested), () => {
-        setTab("engine");
-        store.dispatch(worldExpansionSet({ expanded: true }));
-      }),
       // The wizard renders inside Setup now — surface that tab, not Engine.
       store.subscribeEffect(matchesAction(importWizardOpened), () =>
         setTab("setup"),

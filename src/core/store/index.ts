@@ -54,18 +54,6 @@ export function rootReducer(
 
     const chat = data.chat ? keepKnownChats(data.chat) : current.chat;
     const loadedWorld = data.world ?? current.world;
-    // A draft made in a chat that no longer exists is hidden from the World
-    // (it is shown inline in its chat) and so would be unreachable. Cut the
-    // tie and it is an ordinary draft again.
-    const chatIds = new Set(chat.chats.map((c) => c.id));
-    const entitiesById = Object.fromEntries(
-      Object.entries(loadedWorld.entitiesById).map(([id, e]) => [
-        id,
-        e.sourceChatId && !chatIds.has(e.sourceChatId)
-          ? { ...e, sourceChatId: undefined }
-          : e,
-      ]),
-    );
 
     return {
       ...current,
@@ -73,7 +61,7 @@ export function rootReducer(
         ? { ...initialStoryState, ...data.story }
         : current.story,
       chat,
-      world: { ...loadedWorld, entitiesById },
+      world: loadedWorld,
       foundation: data.foundation
         ? pickFoundation(data.foundation)
         : current.foundation,

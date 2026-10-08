@@ -3,7 +3,6 @@ import {
   worldSlice,
   entityForged,
   entityDeleted,
-  draftsReleasedFromChat,
   entitySummaryUpdated,
   entityLorebookEntryBound,
   entityBound,
@@ -268,46 +267,6 @@ describe("entityDeleted", () => {
   });
 });
 
-describe("draftsReleasedFromChat", () => {
-  const draft = (id: string, sourceChatId?: string): WorldEntity => ({
-    ...ENTITY,
-    id,
-    lifecycle: "draft",
-    sourceChatId,
-  });
-
-  it("clears the source chat of that chat's drafts and no one else's", () => {
-    const before = makeState({
-      entitiesById: {
-        a: draft("a", "c1"),
-        b: draft("b", "c1"),
-        c: draft("c", "c2"),
-        d: draft("d"),
-        e1: ENTITY,
-      },
-      entityIds: ["a", "b", "c", "d", "e1"],
-    });
-    const after = reduce(before, draftsReleasedFromChat({ chatId: "c1" }));
-    expect(after.entitiesById["a"].sourceChatId).toBeUndefined();
-    expect(after.entitiesById["b"].sourceChatId).toBeUndefined();
-    expect(after.entitiesById["a"].lifecycle).toBe("draft");
-    expect(after.entitiesById["c"].sourceChatId).toBe("c2");
-    expect(after.entitiesById["d"]).toBe(before.entitiesById["d"]);
-    expect(after.entitiesById["e1"]).toBe(ENTITY);
-    expect(after.entityIds).toEqual(before.entityIds);
-  });
-
-  it("returns the same state when no entity belongs to the chat", () => {
-    const before = makeState({
-      entitiesById: { c: draft("c", "c2") },
-      entityIds: ["c"],
-    });
-    expect(reduce(before, draftsReleasedFromChat({ chatId: "c1" }))).toBe(
-      before,
-    );
-  });
-});
-
 describe("entitySummaryUpdated", () => {
   it("updates the summary of an entity", () => {
     const state = reduce(
@@ -506,44 +465,21 @@ describe("worldSlice — lifecycle and sourceChatId", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// lastAffectingMessageId field
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe("WorldEntity.lastAffectingMessageId", () => {
-  it("entityForged accepts and stores lastAffectingMessageId", () => {
+describe("entitySummaryUpdated", () => {
+  it("replaces the summary and nothing else", () => {
     const entity: WorldEntity = {
       id: "e1",
       categoryId: FieldID.DramatisPersonae,
       name: "Vesper",
       summary: "Paranoid governess",
       lifecycle: "draft",
-      lastAffectingMessageId: "m-a",
-    };
-    const state = reduce(makeState(), entityForged({ entity }));
-    expect(state.entitiesById["e1"].lastAffectingMessageId).toBe("m-a");
-  });
-
-  it("entitySummaryUpdated can update lastAffectingMessageId", () => {
-    const entity: WorldEntity = {
-      id: "e1",
-      categoryId: FieldID.DramatisPersonae,
-      name: "Vesper",
-      summary: "Paranoid governess",
-      lifecycle: "draft",
-      lastAffectingMessageId: "m-a",
     };
     const seeded = reduce(makeState(), entityForged({ entity }));
     const next = reduce(
       seeded,
-      entitySummaryUpdated({
-        entityId: "e1",
-        summary: "revised",
-        lastAffectingMessageId: "m-b",
-      } as any),
+      entitySummaryUpdated({ entityId: "e1", summary: "revised" }),
     );
-    expect(next.entitiesById["e1"].summary).toBe("revised");
-    expect(next.entitiesById["e1"].lastAffectingMessageId).toBe("m-b");
+    expect(next.entitiesById["e1"]).toEqual({ ...entity, summary: "revised" });
   });
 });
 

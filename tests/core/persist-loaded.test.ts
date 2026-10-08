@@ -74,13 +74,13 @@ describe("persist/loaded replaces branch-scoped slices", () => {
     expect(after.story.fields.dramatisPersonae).toBeUndefined();
   });
 
-  it("returns drafts of a dropped chat to the World", () => {
+  it("keeps the source chat of an entity whose chat is gone", () => {
     const draft: WorldEntity = {
       id: "e1",
       name: "Hesper Vane",
       summary: "",
       categoryId: FieldID.DramatisPersonae,
-      lifecycle: "draft",
+      lifecycle: "live",
       sourceChatId: "old-forge",
     };
     const next = rootReducer(
@@ -106,7 +106,7 @@ describe("persist/loaded replaces branch-scoped slices", () => {
       }),
     );
     expect(next.chat.chats.every((c) => c.type === "scenario")).toBe(true);
-    expect(next.world.entitiesById.e1.sourceChatId).toBeUndefined();
+    expect(next.world.entitiesById.e1.sourceChatId).toBe("old-forge");
   });
 
   it("drops a stored Shape and Intent", () => {

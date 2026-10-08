@@ -72,18 +72,6 @@ export const scenarioSpec: ChatTypeSpec<ScenarioMode> = {
     ];
   },
 
-  inlineEntityIdsFor(message, chat, ctx) {
-    if (message.role !== "assistant") return [];
-    return Object.values(ctx.getState().world.entitiesById)
-      .filter(
-        (e) =>
-          e.sourceChatId === chat.id &&
-          e.lifecycle === "draft" &&
-          e.lastAffectingMessageId === message.id,
-      )
-      .map((e) => e.id);
-  },
-
   handleSend(chat, content, ctx) {
     // Refuse while any turn for this chat is queued or
     // running: a second send would only stack another empty assistant turn.

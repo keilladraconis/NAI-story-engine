@@ -96,7 +96,7 @@ describe("the Scenario Plan prompt", () => {
 
   it("says a missing list is an empty one, and writes no bracketed line", () => {
     expect(SCENARIO_PLAN_PROMPT).toContain(
-      "\n\nThe context block lists what has been built so far under [POOL], [LIVE] and [THREADS]; a list that is missing is empty. Refer to what is there by name, and do not read it back. Bracketed lines in the conversation are the builder's record of what was built; write none yourself.\n\n",
+      "\n\nThe context block lists what exists so far under [WORLD] and [THREADS]; a list that is missing is empty. Refer to what is there by name, and do not read it back. Bracketed lines in the conversation are the builder's record of what was built; write none yourself.\n\n",
     );
   });
 
@@ -127,8 +127,14 @@ describe("the Scenario Build prompt", () => {
 
   it("says a missing list is an empty one", () => {
     expect(SCENARIO_BUILD_PROMPT).toContain(
-      "The context block above the conversation lists the drafts under [POOL], the cast under [LIVE], and [THREADS]. A list that is missing is empty. The writer's last message says what to build.",
+      "The context block above the conversation lists everything that exists under [WORLD], and how things stand under [THREADS]. A list that is missing is empty. The writer's last message says what to build.",
     );
+  });
+
+  it("names no pool, cast list or tombstones", () => {
+    for (const p of [SCENARIO_BUILD_PROMPT, SCENARIO_PLAN_PROMPT]) {
+      expect(p).not.toMatch(/\[POOL\]|\[LIVE\]|\[TOMBSTONES\]|draft/i);
+    }
   });
 
   it("gives an example whose conversation raised what its private segment holds", () => {

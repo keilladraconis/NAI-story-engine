@@ -54,28 +54,9 @@ export const worldSlice = createSlice({
       };
     },
 
-    // A deleted chat takes its drafts' only home with it: `isForgeDraft` hides a
-    // draft that has a source chat from the World list. Clearing the link hands
-    // them to the World, where they can be cast or deleted like any manual draft.
-    draftsReleasedFromChat: (state, payload: { chatId: string }) => {
-      const owned = Object.values(state.entitiesById).filter(
-        (e) => e.sourceChatId === payload.chatId,
-      );
-      if (owned.length === 0) return state;
-      const entitiesById = { ...state.entitiesById };
-      for (const e of owned) {
-        entitiesById[e.id] = { ...e, sourceChatId: undefined };
-      }
-      return { ...state, entitiesById };
-    },
-
     entitySummaryUpdated: (
       state,
-      payload: {
-        entityId: string;
-        summary: string;
-        lastAffectingMessageId?: string;
-      },
+      payload: { entityId: string; summary: string },
     ) => {
       const entity = state.entitiesById[payload.entityId];
       if (!entity) return state;
@@ -83,13 +64,7 @@ export const worldSlice = createSlice({
         ...state,
         entitiesById: {
           ...state.entitiesById,
-          [payload.entityId]: {
-            ...entity,
-            summary: payload.summary,
-            ...(payload.lastAffectingMessageId !== undefined
-              ? { lastAffectingMessageId: payload.lastAffectingMessageId }
-              : {}),
-          },
+          [payload.entityId]: { ...entity, summary: payload.summary },
         },
       };
     },
@@ -318,7 +293,6 @@ export const {
   worldCleared,
   entityForged,
   entityDeleted,
-  draftsReleasedFromChat,
   entitySummaryUpdated,
   entityEdited,
   entityCategoryChanged,

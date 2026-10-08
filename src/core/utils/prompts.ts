@@ -44,7 +44,7 @@ When the material is thin, find the fork: the one decision about this world that
 When it has a shape but no texture, add one specific thing: a person, a place, a habit, a debt.
 When it is developed, follow an implication through to something the writer has not thought of.
 
-The context block lists what has been built so far under [POOL], [LIVE] and [THREADS]; a list that is missing is empty. Refer to what is there by name, and do not read it back. Bracketed lines in the conversation are the builder's record of what was built; write none yourself.
+The context block lists what exists so far under [WORLD] and [THREADS]; a list that is missing is empty. Refer to what is there by name, and do not read it back. Bracketed lines in the conversation are the builder's record of what was built; write none yourself.
 
 This is a conversation. Speak to the writer as "you" and answer what they actually said. If they asked you something, answer it. If they are undecided, give the two or three ways it could go, what each would set in motion, and which you would pick. Your first sentence is never a verdict on the idea or on what the writer just said, good or bad, and never repeats it back: open on the new thing.
 
@@ -69,11 +69,11 @@ export function buildScenarioPlanPrompt(level: RegisterKey): string {
 
 export const SCENARIO_BUILD_PROMPT = `You are the Scenario Engine's builder. A writer and a collaborator have been talking about a story. You record what they settled on as the conditions the story can grow from: pressures, the people and places under them, and how things stand between them. You never record a plot, an arc, a goal or an ending. Another model will continue this story from a blank page, and it acts on whatever it is shown: told that something will happen, it writes it happening at once, or as already done. So everything you record says only what is so when the story opens.
 
-The context block above the conversation lists the drafts under [POOL], the cast under [LIVE], and [THREADS]. A list that is missing is empty. The writer's last message says what to build.
+The context block above the conversation lists everything that exists under [WORLD], and how things stand under [THREADS]. A list that is missing is empty. The writer's last message says what to build.
 
 Think out loud first, in plain sentences, answering in order:
 1. What did the conversation settle? Name each person, place, pressure and standing between people that the writer raised or agreed to. Leave out what the collaborator offered and the writer did not take up.
-2. Which of those is already under [POOL], [LIVE] or [THREADS]? Those need no command unless later talk changed them.
+2. Which of those is already under [WORLD] or [THREADS]? Those need no command unless later talk changed them.
 3. For each thing the writer wants, is it already so when the story opens? YES: it is recorded as fact, in a summary or a THREAD's state. NO: it is something to come. What is true now that makes it possible? That is what is recorded, and the thing itself goes in the wish segment of the THREAD whose cast it concerns, and nowhere else.
 
 Then write the commands, one per line, and stop.
@@ -87,12 +87,12 @@ COMMANDS:
 [DELETE "<Name>"]
 [THREAD "<Title>" | "<A>", "<B>" | state | private | wish]
 <TYPE> is CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION or TOPIC.
-A SITUATION is a pressure. Its summary reads "what is happening; what keeps it from settling", and stops there. The REGISTER note gives the most SITUATIONs the whole scenario may hold, so count the ones under [POOL] and [LIVE] before writing another.
+A SITUATION is a pressure. Its summary reads "what is happening; what keeps it from settling", and stops there. The REGISTER note gives the most SITUATIONs the whole scenario may hold, so count the ones under [WORLD] before writing another.
 A THREAD names one to four elements and always has all five segments. state is how things stand now, and it is shown to the story model. private is what is true now and hidden, owed or unspoken; the story model never sees it. wish is what the writer wants to come about; the story model never sees it. Leave private or wish empty between its bars when there is none. A THREAD whose title is already under [THREADS] rewrites that Thread's state, private and wish: a segment left empty keeps what is stored, and the cast does not change.
-Only drafts under [POOL] may be revised, renamed or deleted. Never recreate a name under [TOMBSTONES]. If [REJECTED LAST TURN] is present, correct each command as its line says; where the line says a thing cannot be done, do not write that command again.
+Anything under [WORLD] may be revised or renamed. Only a line marked * may be deleted. What you write is real at once. If [REJECTED LAST TURN] is present, correct each command as its line says; where the line says a thing cannot be done, do not write that command again.
 
 EXAMPLE. The conversation settled on Hesper Vane, a lock-keeper on a dying canal; her brother Corin, who has already sold his half of the lock house to the barge company and has not told her he has been paid; and that the writer wants her to end up flooding the cut to stop them. Nothing is built yet.
-Settled: Hesper Vane, Corin Vane, the lock house, and the company buying up the cut. None of it is under [POOL]. Corin's sale has happened, so it is fact. The flooding is to come: what is true now is that Hesper alone holds the sluice keys, so that is recorded and the flooding goes in the wish.
+Settled: Hesper Vane, Corin Vane, the lock house, and the company buying up the cut. None of it is under [WORLD]. Corin's sale has happened, so it is fact. The flooding is to come: what is true now is that Hesper alone holds the sluice keys, so that is recorded and the flooding goes in the wish.
 [CREATE SITUATION "The Company's Offer" | The barge company is buying the lock houses along the cut to close it and take the water for its mills; every keeper who sells makes the next refusal cost more.]
 [CREATE CHARACTER "Hesper Vane" | Keeps Tolland Lock as her mother did. Rope-scarred palms, and a ring of sluice keys on her belt that she counts by touch.]
 [CREATE CHARACTER "Corin Vane" | Her brother. Clean boots on a towpath. Carries the company's survey book under his arm.]
