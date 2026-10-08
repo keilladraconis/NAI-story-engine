@@ -2,16 +2,17 @@
 compatibilityVersion: naiscript-1.0
 id: 6d0e7c1b-2a54-4f0e-9b7d-3c5a8e21f4a9
 name: Scenario Probe
-version: 0.1.0
-description: How often does a Scenario sketch keep a thing to come out of everything the story model is shown, at twenty runs per fixture?
+version: 0.2.0
+description: How often does a Build turn keep a thing to come out of everything the story model is shown, and how much does it build that nobody asked for?
 memoryLimit: 8
 ---*/
 
-// These two constants are copies of the shipped prompt and its Gritty register
-// in src/core/utils/prompts.ts; tests/tools/scenario-probe.test.ts fails if
-// they drift.
-const SCENARIO_PROMPT = "You are the Scenario Engine. A writer gives you a few sentences about a story they want, and you build the conditions it can grow from: pressures, the people and places under them, and how things stand between them. You never write a plot, an arc, a goal or an ending. Another model will continue this story from a blank page, and it acts on whatever it is shown: told that something will happen, it writes it happening at once, or as already done. So everything you record says only what is so when the story opens.\n\nThe context block above the conversation gives TURN, the drafts under [POOL], the cast under [LIVE], and [THREADS]. Answer by TURN.\n\nTURN: SKETCH. The writer's message is the seed. A sketch is small: one pressure and the people under it. The writer builds the rest with you, a turn at a time. Answer in order:\n1. Quote the phrase in the seed the writer is most drawn to.\n2. What one pressure does that phrase rest on? Write one SITUATION. It reads \"what is happening; what keeps it from settling\", and stops there.\n3. Who stands on either side of that pressure? Write a CHARACTER or FACTION for each side, three at most.\n4. Where does that pressure become visible? Write one LOCATION. Write a SYSTEM or TOPIC only if the pressure cannot be stated without one.\n5. What stands between those people? Write one THREAD. Write a second only when something the writer wants concerns someone the first does not hold.\n6. What other pressures does the seed hold? Build none of them. Name them in your closing question.\n\nTURN: STEER. Does the writer's last message ask for something in the sketch to be added, changed or removed? YES: make that change with the commands below and no other. NO: answer it in prose and write no command and no CRITIQUE.\n\nTURN: GROW. Read [PREVIOUS CRITIQUE]. Write the commands that answer it and no others.\n\nThe REGISTER note gives the most pressures the whole scenario may hold. Before writing a SITUATION, count the ones already under [POOL] and [LIVE].\n\nOn every turn, for each thing the writer says they want, answer in order:\n1. Is it already so when the story opens? YES: record it as fact, in a summary or a THREAD's state. NO: continue.\n2. It is something to come. Record what is true now that makes it possible, in a summary, a SITUATION, or a THREAD's state. Then write the thing itself in the wish segment of the THREAD whose cast it concerns, and nowhere else.\n\nCOMMANDS, one per line:\n[CREATE <TYPE> \"<Name>\" | summary of one to three sentences]\n[REVISE \"<Name>\" | new summary]\n[RENAME \"<Old>\" → \"<New>\"]\n[DELETE \"<Name>\"]\n[THREAD \"<Title>\" | \"<A>\", \"<B>\" | state | private | wish]\n[CRITIQUE | which element has nothing pressing on it, and which pressure has no one under it]\n<TYPE> is CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION or TOPIC.\nA THREAD names one to four elements and always has all five segments. state is how things stand now, and it is shown to the story model. private is what is true now and hidden, owed or unspoken; the story model never sees it. wish is what the writer wants to come about; the story model never sees it. Leave private or wish empty between its bars when there is none. A THREAD whose title is already under [THREADS] rewrites that Thread's state, private and wish: a segment left empty keeps what is stored, and the cast does not change.\nOnly drafts under [POOL] may be revised, renamed or deleted. Never recreate a name under [TOMBSTONES]. If [REJECTED LAST TURN] is present, correct each command as its line says; where the line says a thing cannot be done, do not write that command again.\n\nREPLY SHAPE:\n- Two or three sentences of prose first: what you took from the writer's message and, for anything to come, what you recorded in its place. When a step above says to write no command, the prose is the whole reply.\n- Then the commands.\n- Then one CRITIQUE.\n- Then one question, the one whose answer would change the most. On a sketch, it names the pressures in the seed you did not build and asks which to open next.\n\nEXAMPLE. Seed: \"A lock-keeper on a dying canal. Her brother already sold his half of the lock house to the barge company. I want her to end up flooding the cut to stop them.\"\nThe phrase is \"a dying canal\": the trade has gone and the company wants the water. Her brother has sold his half before the story opens, so that is recorded as fact. Flooding the cut is to come, so what is recorded is that she alone holds the sluice keys, and the flooding goes in the wish.\n[CREATE SITUATION \"The Company's Offer\" | The barge company is buying the lock houses along the cut to close it and take the water for its mills; every keeper who sells makes the next refusal cost more.]\n[CREATE CHARACTER \"Hesper Vane\" | Keeps Tolland Lock as her mother did. Rope-scarred palms, and a ring of sluice keys on her belt that she counts by touch.]\n[CREATE CHARACTER \"Corin Vane\" | Her brother. Clean boots on a towpath. Carries the company's survey book under his arm.]\n[CREATE LOCATION \"Tolland Lock House\" | Damp plaster and coal smoke; one kitchen and two owners. The sluice wheel stands in the yard where anyone on the towpath can see who turns it.]\n[THREAD \"Half the House\" | \"Hesper Vane\", \"Corin Vane\" | Corin Vane has sold his half of Tolland Lock House to the barge company. Hesper Vane holds the only set of sluice keys. | Corin Vane has not told Hesper Vane that the company has already paid him. | Hesper Vane floods the cut to stop the company.]\n[CRITIQUE | The Company's Offer has no one who speaks for the company at the lock. Tolland Lock House has no one on the towpath to see the sluice wheel turned.]\nThe seed also holds two pressures I have not built: the trade that has gone from the canal, and the mills that want its water. Which should I open next?";
-const REGISTER = "REGISTER, Gritty: Three pressures at most in the whole scenario, with stakes that last. Each sets two things someone values against each other, where walking away is possible and costs something real. Ground each in a person, not a spectacle.";
+// These three constants are copies of the shipped Build prompt, its Gritty
+// register and the fixed Build instruction in src/core/utils/prompts.ts;
+// tests/tools/scenario-probe.test.ts fails if they drift.
+const SCENARIO_BUILD_PROMPT = "You are the Scenario Engine's builder. A writer and a collaborator have been talking about a story. You record what they settled on as the conditions the story can grow from: pressures, the people and places under them, and how things stand between them. You never record a plot, an arc, a goal or an ending. Another model will continue this story from a blank page, and it acts on whatever it is shown: told that something will happen, it writes it happening at once, or as already done. So everything you record says only what is so when the story opens.\n\nThe context block above the conversation lists the drafts under [POOL], the cast under [LIVE], and [THREADS]. The writer's last message says what to build.\n\nThink out loud first, in plain sentences, answering in order:\n1. What did the conversation settle? Name each person, place, pressure and standing between people that the writer raised or agreed to. Leave out what the collaborator offered and the writer did not take up.\n2. Which of those is already under [POOL], [LIVE] or [THREADS]? Those need no command unless later talk changed them.\n3. For each thing the writer wants, is it already so when the story opens? YES: it is recorded as fact, in a summary or a THREAD's state. NO: it is something to come. What is true now that makes it possible? That is what is recorded, and the thing itself goes in the wish segment of the THREAD whose cast it concerns, and nowhere else.\n\nThen write the commands, one per line, and stop.\n\nBuild only what the conversation supports. Write nothing the conversation did not raise: no extra people to fill a town, no place nobody mentioned. If there is nothing new to record, say so and write no command.\n\nCOMMANDS:\n[CREATE <TYPE> \"<Name>\" | summary of one to three sentences]\n[REVISE \"<Name>\" | new summary]\n[RENAME \"<Old>\" → \"<New>\"]\n[DELETE \"<Name>\"]\n[THREAD \"<Title>\" | \"<A>\", \"<B>\" | state | private | wish]\n<TYPE> is CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION or TOPIC.\nA SITUATION is a pressure. Its summary reads \"what is happening; what keeps it from settling\", and stops there. The REGISTER note gives the most SITUATIONs the whole scenario may hold, so count the ones under [POOL] and [LIVE] before writing another.\nA THREAD names one to four elements and always has all five segments. state is how things stand now, and it is shown to the story model. private is what is true now and hidden, owed or unspoken; the story model never sees it. wish is what the writer wants to come about; the story model never sees it. Leave private or wish empty between its bars when there is none. A THREAD whose title is already under [THREADS] rewrites that Thread's state, private and wish: a segment left empty keeps what is stored, and the cast does not change.\nOnly drafts under [POOL] may be revised, renamed or deleted. Never recreate a name under [TOMBSTONES]. If [REJECTED LAST TURN] is present, correct each command as its line says; where the line says a thing cannot be done, do not write that command again.\n\nEXAMPLE. The conversation settled on Hesper Vane, a lock-keeper on a dying canal; her brother Corin, who has already sold his half of the lock house to the barge company; and that the writer wants her to end up flooding the cut to stop them. Nothing is built yet.\nSettled: Hesper Vane, Corin Vane, the lock house, and the company buying up the cut. None of it is under [POOL]. Corin's sale has happened, so it is fact. The flooding is to come: what is true now is that Hesper alone holds the sluice keys, so that is recorded and the flooding goes in the wish.\n[CREATE SITUATION \"The Company's Offer\" | The barge company is buying the lock houses along the cut to close it and take the water for its mills; every keeper who sells makes the next refusal cost more.]\n[CREATE CHARACTER \"Hesper Vane\" | Keeps Tolland Lock as her mother did. Rope-scarred palms, and a ring of sluice keys on her belt that she counts by touch.]\n[CREATE CHARACTER \"Corin Vane\" | Her brother. Clean boots on a towpath. Carries the company's survey book under his arm.]\n[CREATE LOCATION \"Tolland Lock House\" | Damp plaster and coal smoke; one kitchen and two owners. The sluice wheel stands in the yard where anyone on the towpath can see who turns it.]\n[THREAD \"Half the House\" | \"Hesper Vane\", \"Corin Vane\" | Corin Vane has sold his half of Tolland Lock House to the barge company. Hesper Vane holds the only set of sluice keys. | Corin Vane has not told Hesper Vane that the company has already paid him. | Hesper Vane floods the cut to stop the company.]";
+const REGISTER = "REGISTER, Gritty: Three pressures at most in the whole scenario, with stakes that last. Each sets two things someone values against each other, where walking away is possible and costs something real.";
+const SCENARIO_BUILD_INSTRUCTION = "Build what we have discussed.";
 
 // 60 generations against a 2048-token-per-240s output bucket: it takes a while.
 // A generation is refused outright when the bucket holds less than max_tokens,
@@ -19,20 +20,66 @@ const REGISTER = "REGISTER, Gritty: Three pressures at most in the whole scenari
 // denominator: a run that threw was not measured and is not a failing run.
 const RUNS = 20;
 const MODEL = "glm-4-6";
-// The shipped chat asks for 1536. A sketch is about 300 tokens, and a generation
-// is refused unless the bucket holds max_tokens, so asking for less halves the
-// wait between runs. A reply cut off here shows up as a run with no THREAD.
-const PARAMS = { model: MODEL, max_tokens: 768, temperature: 0.9, min_p: 0.05 };
+// The shipped Build turn asks for 1024 per call and continues; the probe does
+// not continue, so a reply cut off at 1024 shows up as a run with no THREAD. A
+// generation is refused unless the bucket holds max_tokens.
+const PARAMS = { model: MODEL, max_tokens: 1024, temperature: 0.9, min_p: 0.05 };
 
-// Fixtures use a glassworks and an observatory: unlike the prompt's canal, so
+// Each fixture is a short Plan conversation, written by hand, then an empty
+// Build send. A glassworks and an observatory: unlike the prompt's canal, so
 // no fixture is a copy of the example the prompt carries.
-const SEEDS = {
-  ToCome:
-    "A glassblower's widow runs the furnace with her late husband's apprentice. I want it to end in what the town will call the Quillane Fire, when the apprentice burns the furnace house down.",
-  AlreadySo:
-    "A glassblower's widow runs the furnace with her late husband's apprentice. Two winters ago the apprentice burned the furnace house down in what the town calls the Quillane Fire, and she rebuilt it without a word.",
-  TwoWishes:
-    "Two astronomers share one telescope on a mountain. I want the younger to end up publishing, under her own name, what she will call the Vessarine Catalogue, and I want the older to finally leave for the post at Orrowmere.",
+const TALKS = {
+  ToCome: [
+    {
+      role: "user",
+      content:
+        "A glassblower's widow, Maud Tarn, runs the furnace house with her late husband's apprentice, Wick. I want it to end in what the town will call the Quillane Fire, when Wick burns the furnace house down.",
+    },
+    {
+      role: "assistant",
+      content:
+        "Then page one needs what Wick already resents and what he already has his hands on. He banks the furnace alone at night and knows the flues better than Maud does. What does she owe him that she hasn't paid?",
+    },
+    {
+      role: "user",
+      content:
+        "His indenture ended when her husband died and she never signed his release. She needs him and can't afford a journeyman's wage.",
+    },
+  ],
+  AlreadySo: [
+    {
+      role: "user",
+      content:
+        "A glassblower's widow, Maud Tarn, runs the furnace house with her late husband's apprentice, Wick. Two winters ago Wick burned the furnace house down in what the town calls the Quillane Fire, and Maud rebuilt it without a word.",
+    },
+    {
+      role: "assistant",
+      content:
+        "So the fire is history and the silence is the live thing. Everyone in town knows who set it, and she kept him on anyway. Has she ever asked him why?",
+    },
+    {
+      role: "user",
+      content:
+        "Never. He still works for her and neither of them has spoken of it.",
+    },
+  ],
+  TwoWishes: [
+    {
+      role: "user",
+      content:
+        "Two astronomers share one telescope on a mountain: Ilse Marrow, the younger, and Osric Hale. I want Ilse to end up publishing, under her own name, what she will call the Vessarine Catalogue, and I want Osric to finally leave for the post at Orrowmere.",
+    },
+    {
+      role: "assistant",
+      content:
+        "Then what matters now is whose name is on the observing log, and why Osric is still on the mountain. Who do the plates belong to tonight?",
+    },
+    {
+      role: "user",
+      content:
+        "The log is in his name by observatory rule, though she takes most of the plates. Orrowmere has written to him twice and he has not answered.",
+    },
+  ],
 };
 
 // Each thing to come is matched as the event, never as a bare invented noun:
@@ -43,16 +90,16 @@ const FIRE = /Quillane Fire|burn\w*\b[^.\n]*\bdown\b/i;
 const CATALOGUE = /Vessarine Catalogue/i;
 const LEAVING = /\b(leav\w*|left|depart\w*)\b[^.\n]*Orrowmere/i;
 
-const messages = (seed) => [
-  { role: "system", content: `${SCENARIO_PROMPT}\n\n${REGISTER}` },
-  { role: "assistant", content: "TURN: SKETCH" },
-  { role: "user", content: seed },
+const messages = (talk) => [
+  { role: "system", content: `${SCENARIO_BUILD_PROMPT}\n\n${REGISTER}` },
+  ...talk,
+  { role: "user", content: SCENARIO_BUILD_INSTRUCTION },
 ];
 
 // --- read:start ---
 // Mirrors the five-segment THREAD regex in src/core/utils/crucible-command-parser.ts.
 const THREAD = /^\[\s*THREAD\s+"([^"]+)"\s*\|([^|]+?)\|([^|]*?)\|([^|]*?)\|([^|\]]*?)\]?\s*$/;
-const CREATE = /^\[\s*CREATE\s+[A-Z]+\s+"([^"]+)"\s*\|\s*(.+?)\]?\s*$/;
+const CREATE = /^\[\s*CREATE\s+([A-Z]+)\s+"([^"]+)"\s*\|\s*(.+?)\]?\s*$/;
 
 // Everything the story model could be shown: every element's name and summary,
 // and every Thread's title and state. A name or a title is shown as surely as a
@@ -63,6 +110,7 @@ const read = (text) => {
   const shown = [];
   const wishes = [];
   const privates = [];
+  const created = [];
   let threads = 0;
   for (const raw of text.split(/\r\n|\r|\n/)) {
     const line = raw.trim();
@@ -75,16 +123,39 @@ const read = (text) => {
       continue;
     }
     const c = CREATE.exec(line);
-    if (c) shown.push(c[1], c[2]);
+    if (c) {
+      shown.push(c[2], c[3]);
+      created.push({ type: c[1], name: c[2] });
+    }
   }
   return {
     shown: shown.join("\n"),
     wishes: wishes.join("\n"),
     privates: privates.join("\n"),
     threads,
+    created,
   };
 };
 // --- read:end ---
+
+// --- unasked:start ---
+// People, places and factions the conversation never mentioned. A name counts
+// as mentioned when any of its words of four letters or more appears in the
+// talk. Situations, systems and topics are left out: the model coins their
+// names, so a name the talk lacks says nothing.
+const NAMED_TYPES = new Set(["CHARACTER", "LOCATION", "FACTION"]);
+const unasked = (created, conversation) => {
+  const talk = conversation.toLowerCase();
+  return created.filter(
+    (c) =>
+      NAMED_TYPES.has(c.type) &&
+      !c.name
+        .toLowerCase()
+        .split(/[^a-z]+/)
+        .some((w) => w.length >= 4 && talk.includes(w)),
+  ).length;
+};
+// --- unasked:end ---
 
 // Each fixture states its contract in one sentence; `holds` is that sentence,
 // checked against the already-read reply.
@@ -93,7 +164,7 @@ const FIXTURES = [
     name: "ToCome",
     contract:
       "a thing to come is written in a wish and appears in nothing the story model is shown, nor in a private segment",
-    seed: SEEDS.ToCome,
+    talk: TALKS.ToCome,
     holds: (r) =>
       FIRE.test(r.wishes) && !FIRE.test(r.shown) && !FIRE.test(r.privates),
   },
@@ -101,14 +172,14 @@ const FIXTURES = [
     name: "AlreadySo",
     contract:
       "a thing already so is written in what the story model is shown and in no wish",
-    seed: SEEDS.AlreadySo,
+    talk: TALKS.AlreadySo,
     holds: (r) => FIRE.test(r.shown) && !FIRE.test(r.wishes),
   },
   {
     name: "TwoWishes",
     contract:
       "two things to come are each written in a wish and neither appears in anything shown, nor in a private segment",
-    seed: SEEDS.TwoWishes,
+    talk: TALKS.TwoWishes,
     holds: (r) =>
       /Vessarine|publish/i.test(r.wishes) &&
       /Orrowmere/i.test(r.wishes) &&
@@ -131,6 +202,10 @@ async function runFixture(fixture) {
   let failing = 0;
   let unparsed = 0;
   let threw = 0;
+  let built = 0;
+  let extra = 0;
+  let worst = 0;
+  const talkText = fixture.talk.map((m) => m.content).join("\n");
   let firstFailure = "";
   let firstError = "";
   for (let run = 0; run < RUNS; run++) {
@@ -143,7 +218,7 @@ async function runFixture(fixture) {
       }
       await api.v1.script.waitForAllowedOutput(PARAMS.max_tokens);
       // One at a time: concurrent script generations are refused.
-      const response = await api.v1.generate(messages(fixture.seed), PARAMS);
+      const response = await api.v1.generate(messages(fixture.talk), PARAMS);
       text = response.choices?.[0]?.text ?? "";
     } catch (e) {
       threw++;
@@ -157,10 +232,18 @@ async function runFixture(fixture) {
       failing++;
       if (!firstFailure) firstFailure = text;
     }
-    log(`  ${fixture.name} run ${run + 1}: ${failed ? "FAIL" : "pass"}`);
+    const n = unasked(r.created, talkText);
+    built += r.created.length;
+    extra += n;
+    worst = Math.max(worst, n);
+    log(
+      `  ${fixture.name} run ${run + 1}: ${failed ? "FAIL" : "pass"}, ${n} unasked`,
+    );
   }
+  const measured = RUNS - threw;
+  const per = (total) => (measured > 0 ? (total / measured).toFixed(1) : "0.0");
   log(
-    `${fixture.name}: ${failing} failing runs of ${RUNS - threw} measured (${unparsed} with no THREAD parsed, ${threw} not measured) — ${fixture.contract}`,
+    `${fixture.name}: ${failing} failing runs of ${measured} measured (${unparsed} with no THREAD parsed, ${threw} not measured) — ${fixture.contract} — built ${per(built)} per run, ${per(extra)} unasked (worst ${worst})`,
   );
   if (firstError) log(`  first run not measured: ${firstError}`);
   if (firstFailure) log(`  first failing output:\n${firstFailure}`);

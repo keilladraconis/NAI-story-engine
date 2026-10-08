@@ -2,8 +2,9 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { parseCommands } from "../../src/core/utils/crucible-command-parser";
 import {
-  SCENARIO_PROMPT,
-  SCENARIO_REGISTERS,
+  SCENARIO_BUILD_INSTRUCTION,
+  SCENARIO_BUILD_PROMPT,
+  SCENARIO_BUILD_REGISTERS,
 } from "../../src/core/utils/prompts";
 
 /** The probe is a standalone script and cannot import from `src/`, so it
@@ -13,8 +14,9 @@ describe("tools/scenario-probe.naiscript measures the shipped prompt", () => {
   const probe = readFileSync("tools/scenario-probe.naiscript", "utf8");
 
   it.each([
-    ["SCENARIO_PROMPT", SCENARIO_PROMPT],
-    ["REGISTER", SCENARIO_REGISTERS.Gritty],
+    ["SCENARIO_BUILD_PROMPT", SCENARIO_BUILD_PROMPT],
+    ["REGISTER", SCENARIO_BUILD_REGISTERS.Gritty],
+    ["SCENARIO_BUILD_INSTRUCTION", SCENARIO_BUILD_INSTRUCTION],
   ])("carries %s verbatim", (name, prompt) => {
     expect(probe).toContain(`const ${name} = ${JSON.stringify(prompt)};`);
   });
@@ -25,6 +27,7 @@ type Read = (text: string) => {
   wishes: string;
   privates: string;
   threads: number;
+  created: { type: string; name: string }[];
 };
 
 /** The probe cannot import the parser either, so it carries a mirror of it.
@@ -82,6 +85,16 @@ describe("tools/scenario-probe.naiscript reads replies as the product does", () 
     },
   );
 
+  it("lists what a reply created, by type and name", () => {
+    const r = read(
+      '[CREATE CHARACTER "Odile Marsh" | Keeps the books.]\n[CREATE SITUATION "The Guild\'s Lien" | The guild holds the hides; nobody can pay.]',
+    );
+    expect(r.created).toEqual([
+      { type: "CHARACTER", name: "Odile Marsh" },
+      { type: "SITUATION", name: "The Guild's Lien" },
+    ]);
+  });
+
   it("keeps what is shown, what is private and what is wished apart", () => {
     const r = read(samples.clean);
     expect(r.privates.trim()).toBe("Brannock Tye has altered two entries.");
@@ -95,7 +108,7 @@ describe("tools/scenario-probe.naiscript reads replies as the product does", () 
   /** A fixture's `holds`, lifted out of the probe by name. */
   const holds = (name: string) => {
     const body = probe.slice(
-      probe.indexOf("const SEEDS"),
+      probe.indexOf("const TALKS"),
       probe.indexOf("let report"),
     );
     const fixtures = new Function(`${body}\nreturn FIXTURES;`)() as {
@@ -171,5 +184,48 @@ describe("tools/scenario-probe.naiscript reads replies as the product does", () 
     expect(
       parseCommands(samples.fourSegments).filter((c) => c.kind === "THREAD"),
     ).toHaveLength(0);
+  });
+});
+
+describe("the probe's over-building count", () => {
+  const probe = readFileSync("tools/scenario-probe.naiscript", "utf8");
+  const source = probe
+    .split("// --- unasked:start ---")[1]
+    .split("// --- unasked:end ---")[0];
+  const unasked = new Function(`${source}\nreturn unasked;`)() as (
+    created: { type: string; name: string }[],
+    conversation: string,
+  ) => number;
+  const talk = "Maud Tarn runs the furnace house with Wick.";
+
+  it("does not count a person or place the conversation named", () => {
+    expect(
+      unasked(
+        [
+          { type: "CHARACTER", name: "Maud Tarn" },
+          { type: "CHARACTER", name: "Wick" },
+          { type: "LOCATION", name: "The Furnace House" },
+        ],
+        talk,
+      ),
+    ).toBe(0);
+  });
+
+  it("counts a person, place or faction nobody mentioned", () => {
+    expect(
+      unasked(
+        [
+          { type: "CHARACTER", name: "Master Valerius" },
+          { type: "FACTION", name: "The Glaziers' Guild" },
+        ],
+        talk,
+      ),
+    ).toBe(2);
+  });
+
+  it("never counts a SITUATION, SYSTEM or TOPIC, whose names are always coined", () => {
+    expect(
+      unasked([{ type: "SITUATION", name: "The Unsigned Release" }], talk),
+    ).toBe(0);
   });
 });
