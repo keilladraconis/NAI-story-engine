@@ -109,26 +109,46 @@ describe("tools/scenario-probe.naiscript reads replies as the product does", () 
       `[CREATE CHARACTER "${name}" | Runs the furnace.]\n[THREAD "${title}" | "${name}" | She runs the furnace. | ${priv} | ${wish}]`,
     );
 
-  it("passes a thing to come that is named only in the wish", () => {
+  const FIRE_WISH = "Maud burns the furnace house down.";
+
+  it("passes a thing to come that is written only in the wish", () => {
+    expect(holds("ToCome")(sketch("The Furnace", "Maud", "", FIRE_WISH))).toBe(
+      true,
+    );
+  });
+
+  it("passes an invented noun used as a name for something that is so", () => {
     expect(
-      holds("ToCome")(sketch("The Furnace", "Maud", "", "The Quillane Fire.")),
+      holds("ToCome")(sketch("The Furnace", "Maud Quillane", "", FIRE_WISH)),
+    ).toBe(true);
+    expect(
+      holds("TwoWishes")(
+        sketch(
+          "The Post at Orrowmere",
+          "Ada Vessarine",
+          "Orrowmere has written twice.",
+          "Ada publishes the Vessarine Catalogue; Tobias leaves for Orrowmere.",
+        ),
+      ),
     ).toBe(true);
   });
 
   it.each([
-    ["a THREAD title", sketch("The Quillane Fire", "Maud", "", "Quillane.")],
-    ["a CREATE name", sketch("The Furnace", "Quillane", "", "Quillane.")],
+    ["a THREAD title", sketch("The Quillane Fire", "Maud", "", FIRE_WISH)],
+    [
+      "a CREATE name",
+      sketch("The Furnace", "The Quillane Fire", "", FIRE_WISH),
+    ],
     [
       "the private segment",
-      sketch(
-        "The Furnace",
-        "Maud",
-        "The Quillane Fire is coming.",
-        "Quillane.",
-      ),
+      sketch("The Furnace", "Maud", "Maud will burn it down.", FIRE_WISH),
     ],
-  ])("fails a thing to come that is named in %s", (_where, r) => {
+  ])("fails a thing to come that is written in %s", (_where, r) => {
     expect(holds("ToCome")(r)).toBe(false);
+  });
+
+  it("fails a thing to come that no wish holds", () => {
+    expect(holds("ToCome")(sketch("The Furnace", "Maud", "", ""))).toBe(false);
   });
 
   it("fails either of two things to come copied into the private segment", () => {
@@ -136,7 +156,10 @@ describe("tools/scenario-probe.naiscript reads replies as the product does", () 
     expect(holds("TwoWishes")(sketch("The Telescope", "Ada", "", both))).toBe(
       true,
     );
-    for (const priv of ["Vessarine is drafted.", "Orrowmere has written."]) {
+    for (const priv of [
+      "The Vessarine Catalogue is drafted.",
+      "Tobias has already left for Orrowmere.",
+    ]) {
       expect(
         holds("TwoWishes")(sketch("The Telescope", "Ada", priv, both)),
       ).toBe(false);

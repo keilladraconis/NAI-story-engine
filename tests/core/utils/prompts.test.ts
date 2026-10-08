@@ -76,12 +76,12 @@ describe("the Scenario prompt", () => {
     );
   });
 
-  it("says before its example that the example is shorter than a sketch", () => {
-    const lines = SCENARIO_PROMPT.split("\n");
-    const example = lines.findIndex((l) => l.startsWith("EXAMPLE. Seed:"));
-    expect(lines[example - 1]).toBe(
-      "The example below is cut short to one pressure and one THREAD to save room. Write as many as the REGISTER note says.",
-    );
+  it("sketches one pressure, and its example is the size of a sketch", () => {
+    expect(SCENARIO_PROMPT).toContain("Write one SITUATION.");
+    expect(SCENARIO_PROMPT).toContain("Build none of them.");
+    const example = SCENARIO_PROMPT.slice(SCENARIO_PROMPT.indexOf("EXAMPLE."));
+    expect(example.match(/\[CREATE SITUATION /g)).toHaveLength(1);
+    expect(example.match(/\[THREAD /g)).toHaveLength(1);
   });
 
   it("tells the model to correct a rejected command, or drop one that cannot be done", () => {
