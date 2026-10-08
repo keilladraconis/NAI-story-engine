@@ -855,7 +855,7 @@ In `src/core/utils/prompts.ts`, change exactly these passages and nothing else:
 - `The context block above the conversation lists the drafts under [POOL], the cast under [LIVE], and [THREADS]. A list that is missing is empty.` → `The context block above the conversation lists everything that exists under [WORLD], and how things stand under [THREADS]. A list that is missing is empty.`
 - `2. Which of those is already under [POOL], [LIVE] or [THREADS]?` → `2. Which of those is already under [WORLD] or [THREADS]?`
 - `before writing another.` sentence: `count the ones under [POOL] and [LIVE] before writing another.` → `count the ones under [WORLD] before writing another.`
-- `Only drafts under [POOL] may be revised, renamed or deleted. Never recreate a name under [TOMBSTONES].` → `Anything under [WORLD] may be revised or renamed. Only a line marked * may be deleted. What you write is real at once: it is not a draft.`
+- `Only drafts under [POOL] may be revised, renamed or deleted. Never recreate a name under [TOMBSTONES].` → `Anything under [WORLD] may be revised or renamed. Only a line marked * may be deleted. What you write is real at once.`
 - In the EXAMPLE: `None of it is under [POOL].` → `None of it is under [WORLD].`
 
 Update `tests/core/utils/prompts.test.ts`: any pin of the old sentences becomes a pin of the new ones, and add:
