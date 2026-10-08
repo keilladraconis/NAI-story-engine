@@ -87,14 +87,14 @@ If `slices/forge.ts` holds nothing after this, it is deleted.
 
 Each applied command stores its reverse on its `ForgeActionRecord` (`undo`):
 
-| Command | Reverse data |
-|---|---|
-| CREATE (and REVISE-as-create) | entity id; whether the entry was created or an existing one was bound |
-| REVISE | entity id, previous summary, the summary written |
-| RENAME | entity id, previous name, the name written |
-| DELETE | the whole entity; the entry's `displayName`, `text`, `keys`, `enabled`, `forceActivation`, category; the Threads it was a member of |
-| THREAD (new) | thread id |
-| THREAD (rewrite) | thread id; previous state, latent, wish; the values written |
+| Command                       | Reverse data                                                                                                                        |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| CREATE (and REVISE-as-create) | entity id; whether the entry was created or an existing one was bound                                                               |
+| REVISE                        | entity id, previous summary, the summary written                                                                                    |
+| RENAME                        | entity id, previous name, the name written                                                                                          |
+| DELETE                        | the whole entity; the entry's `displayName`, `text`, `keys`, `enabled`, `forceActivation`, category; the Threads it was a member of |
+| THREAD (new)                  | thread id                                                                                                                           |
+| THREAD (rewrite)              | thread id; previous state, latent, wish; the values written                                                                         |
 
 A THREAD rewrite stores its previous and written values positionally, as
 `before: [state, private, wish]` and `wrote: [state, private, wish]`, so the
@@ -147,7 +147,7 @@ slice beside the transcript, which already carries them as text.
 - Labels: `thinking`, `+ <type> | Name`, `~ revised | Name`,
   `+ thread | Title`, `~ thread | Title`, `rename | "Old" → "New"`,
   `− deleted | Name`, `unrecognised`. Rejected pills are struck through with
-  the repair line inside. An undone reply's pills are all struck through.
+  the repair line inside. On an undone reply, each pill whose command was reversed is struck through; one that undo left alone (changed since) keeps its card and says so.
 - The inline `EntityCard` block under a reply and `inlineEntityIdsFor` are
   removed.
 
