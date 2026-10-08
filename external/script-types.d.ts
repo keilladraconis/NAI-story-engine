@@ -3021,23 +3021,24 @@ declare namespace api {
         }
 
         /**
-         * History Storage API - Store data associated with specific history nodes. When data is retrieved, the value from the closest ancestor node with that key is returned.
+         * History Storage API - Store data associated with history nodes. Values are stored on generation nodes only (history nodes created by a generation). Values stored while no generation node is an ancestor of the current node are stored on the story root.
+         * When data is retrieved, ancestor generation nodes are searched starting from the given node (the current node by default) and the value from the closest one with that key is returned.
          * Useful for tracking state across undo/redo operations.
          * History storage always stores data within the current story, even if the script is an account-level script. Stored data will remain if the account-level script is deleted.
          */
         namespace historyStorage {
             /**
-             * Remove a value from history storage.
+             * Remove a value from history storage. Only the value stored on the targeted generation node is removed. Values on ancestor nodes are unaffected.
              * @param key Storage key
-             * @param nodeId Optional history node ID (defaults to current)
+             * @param nodeId Optional history node ID to remove from. Must be a generation node; throws if the node does not exist or is not a generation node. Defaults to the closest ancestor generation node of the current node.
              * @returns Promise that resolves when removed
              */
             function remove(key: string, nodeId?: number): Promise<void>
 
             /**
-             * Get a value from history storage. If the key is not found in the specified node, ancestor nodes are searched until a value is found or the root is reached.
+             * Get a value from history storage. If the key is not found on the closest ancestor generation node, further ancestor generation nodes are searched until a value is found or the root is reached.
              * @param key Storage key
-             * @param nodeId Optional history node ID (defaults to current)
+             * @param nodeId Optional history node ID to search from (defaults to the current node). Throws if no history node with the given ID exists.
              * @returns Promise resolving to the stored value
              * @example
              * const data = await api.v1.historyStorage.get("myData");
@@ -3045,8 +3046,8 @@ declare namespace api {
             function get(key: string, nodeId?: number): Promise<any>
 
             /**
-             * List all keys in history storage.
-             * @param nodeId Optional history node ID (defaults to current)
+             * List all keys visible in history storage, searching ancestor generation nodes.
+             * @param nodeId Optional history node ID to search from (defaults to the current node). Throws if no history node with the given ID exists.
              * @returns Promise resolving to array of storage keys
              * @example
              * const keys = await api.v1.historyStorage.list();
@@ -3058,7 +3059,7 @@ declare namespace api {
              * Set a value in history storage.
              * @param key Storage key
              * @param value Value to store (will be JSON serialized)
-             * @param nodeId Optional history node ID (defaults to current)
+             * @param nodeId Optional history node ID to store on. Must be a generation node; throws if the node does not exist or is not a generation node. Defaults to the closest ancestor generation node of the current node.
              * @returns Promise that resolves when stored
              * @example
              * await api.v1.historyStorage.set("myData", { count: 5 });
@@ -3066,9 +3067,9 @@ declare namespace api {
             function set(key: string, value: any, nodeId?: number): Promise<void>
 
             /**
-             * Check if a key exists in history storage. A value of undefined is considered to not exist.
+             * Check if a key exists in history storage, searching ancestor generation nodes. A value of undefined is considered to not exist.
              * @param key Storage key
-             * @param nodeId Optional history node ID (defaults to current)
+             * @param nodeId Optional history node ID to search from (defaults to the current node). Throws if no history node with the given ID exists.
              * @returns Promise resolving to true if the key exists, false otherwise
              * @example
              * const exists = await api.v1.historyStorage.has("lastRun");
@@ -3079,7 +3080,7 @@ declare namespace api {
              * Gets the value from history storage, or the default value if the key does not exist.
              * @param key Storage key
              * @param defaultValue Value to return if the key does not exist
-             * @param nodeId Optional history node ID (defaults to current)
+             * @param nodeId Optional history node ID to search from (defaults to the current node). Throws if no history node with the given ID exists.
              * @returns Promise resolving to the stored value or the default value
              * @example
              * const data = await api.v1.historyStorage.getOrDefault("myData", { count: 0 });
@@ -3087,10 +3088,10 @@ declare namespace api {
             function getOrDefault(key: string, defaultValue: any, nodeId?: number): Promise<any>
 
             /**
-             * Set a value in history storage only if the key does not already exist.
+             * Set a value in history storage only if the key does not already exist on the searched node or its ancestor generation nodes.
              * @param key Storage key
              * @param value Value to store (will be JSON serialized)
-             * @param nodeId Optional history node ID (defaults to current)
+             * @param nodeId Optional history node ID to store on. Must be a generation node; throws if the node does not exist or is not a generation node. Defaults to the closest ancestor generation node of the current node.
              * @returns Promise that resolves to true if the value was set, false if the key already existed
              * @example
              * const wasSet = await api.v1.historyStorage.setIfAbsent("myData", { count: 1 });
@@ -4233,7 +4234,7 @@ type OnTextAdventureInput = (params: {
 }) => OnTextAdventureInputReturnValue | void | Promise<OnTextAdventureInputReturnValue | void>
 
 /**
- * Called when the history is navigated. Must be registered via api.v1.hooks.register with the name onHistoryNodeChanged.
+ * Called when the history is navigated. Must be registered via api.v1.hooks.register with the name onHistoryNavigated.
  * This hook will not be called for all cases where the current history node changes. It is only called when the user or script explicitly navigates the history (e.g., via undo/redo/jump operations). It, for example, will not be called when a new history node is created as part of normal document editing or generation.
  *
  * @param params History navigation information
@@ -4244,9 +4245,9 @@ type OnTextAdventureInput = (params: {
  */
 type OnHistoryNavigated = (params: {
     /** The ID of the new current history node */
-    nodeId: string
+    nodeId: number
     /** The ID of the previous history node */
-    previousNodeId: string
+    previousNodeId: number
     /** The direction of the navigation: "forward", "backward", or "both" */
     direction: 'forward' | 'backward' | 'both'
     /** The distance between the new and previous history nodes */
