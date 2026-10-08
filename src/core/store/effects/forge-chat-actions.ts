@@ -47,3 +47,17 @@ export const scenarioTurnUndoRequested = (
   payload,
 });
 scenarioTurnUndoRequested.type = SCENARIO_TURN_UNDO_REQUESTED;
+
+export interface ScenarioRetryRequestedPayload {
+  chatId: string;
+  messageId: string;
+}
+
+const SCENARIO_RETRY_REQUESTED = "forgeChat/retryRequested";
+export const scenarioRetryRequested = (
+  payload: ScenarioRetryRequestedPayload,
+) => ({
+  type: SCENARIO_RETRY_REQUESTED as typeof SCENARIO_RETRY_REQUESTED,
+  payload,
+});
+scenarioRetryRequested.type = SCENARIO_RETRY_REQUESTED;

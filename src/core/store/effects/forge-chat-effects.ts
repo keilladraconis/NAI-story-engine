@@ -22,7 +22,7 @@
 import { Store, matchesAction } from "nai-store";
 import type { RootState, AppDispatch } from "../types";
 import type { Chat } from "../../chat-types/types";
-import { messageAdded } from "../slices/chat";
+import { messageAdded, messagesPrunedAfter } from "../slices/chat";
 import { requestQueued } from "../slices/runtime";
 import { generationSubmitted } from "../slices/ui";
 import { entityDeleted } from "../slices/world";
@@ -30,7 +30,11 @@ import {
   buildScenarioBuildStrategy,
   buildScenarioPlanStrategy,
 } from "../../utils/forge-chat-strategy";
-import { latestUndoable } from "../../chat-types/undo";
+import {
+  isUndoable,
+  latestUndoable,
+  pruneBlocked,
+} from "../../chat-types/undo";
 import { undoTurn } from "./handlers/forge-chat";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -44,12 +48,14 @@ import {
   forgeChatContinueRequested,
   scenarioPlanRequested,
   scenarioTurnUndoRequested,
+  scenarioRetryRequested,
   type ForgeChatContinueRequestedPayload,
 } from "./forge-chat-actions";
 export {
   forgeChatContinueRequested,
   scenarioPlanRequested,
   scenarioTurnUndoRequested,
+  scenarioRetryRequested,
   type ForgeChatContinueRequestedPayload,
 };
 
@@ -98,6 +104,12 @@ export function registerForgeChatEffects(
   dispatch: AppDispatch,
   _getState: () => RootState,
 ): void {
+  // Chats whose World is being reversed (an undo, or a retry's undo). The
+  // work spans lorebook awaits, so any other Scenario work on the chat waits.
+  const reversing = new Set<string>();
+  const busy = (state: RootState, chatId: string): boolean =>
+    reversing.has(chatId) || scenarioRequestPending(state, chatId);
+
   // ─── A Build turn ───────────────────────────────────────────────────────────
   subscribeEffect(
     matchesAction(forgeChatContinueRequested),
@@ -106,7 +118,7 @@ export function registerForgeChatEffects(
       if (!findChat(latest(), chatId)) return;
       // No-op if a turn is already queued or running, so repeated sends cannot
       // stack empty turns and background generations.
-      if (scenarioRequestPending(latest(), chatId)) return;
+      if (busy(latest(), chatId)) return;
 
       const assistantId = api.v1.uuid();
       dispatch(
@@ -147,7 +159,7 @@ export function registerForgeChatEffects(
       const { chatId } = action.payload;
       const chat = findChat(latest(), chatId);
       if (!chat) return;
-      if (scenarioRequestPending(latest(), chatId)) return;
+      if (busy(latest(), chatId)) return;
 
       // Nothing here is awaited: the placeholder is added in the turn the send
       // arrived in, and the request is in the queue before a second send can
@@ -177,22 +189,68 @@ export function registerForgeChatEffects(
   );
 
   // ─── Undo a Build turn ──────────────────────────────────────────────────────
-  // The work spans awaits (lorebook calls), so a second press is refused here.
-  const undoing = new Set<string>();
   subscribeEffect(
     matchesAction(scenarioTurnUndoRequested),
     async (action, { getState: latest }) => {
       const { chatId, messageId } = action.payload;
       const chat = findChat(latest(), chatId);
       if (!chat || latestUndoable(chat.messages)?.id !== messageId) return;
-      if (scenarioRequestPending(latest(), chatId)) return;
-      if (undoing.has(messageId)) return;
-      undoing.add(messageId);
+      if (busy(latest(), chatId)) return;
+      reversing.add(chatId);
       try {
         await undoTurn(latest, dispatch, chatId, messageId);
       } finally {
-        undoing.delete(messageId);
+        reversing.delete(chatId);
       }
+    },
+  );
+
+  // ─── Retry a Scenario reply ─────────────────────────────────────────────────
+  // A Build reply is undone before it is re-run, or its first attempt would
+  // stay applied under the second. A Plan reply applied nothing, so it is
+  // only pruned.
+  subscribeEffect(
+    matchesAction(scenarioRetryRequested),
+    async (action, { getState: latest }) => {
+      const { chatId, messageId } = action.payload;
+      const chat = findChat(latest(), chatId);
+      const retried = chat?.messages.find((m) => m.id === messageId);
+      if (!chat || !retried) return;
+      if (busy(latest(), chatId)) return;
+      // Pruning drops every later message. A later Build reply whose
+      // commands still stand would be left with nothing to undo them.
+      const blocked = () => {
+        const now = findChat(latest(), chatId);
+        if (!now || !pruneBlocked(now.messages, messageId)) return false;
+        void api.v1.ui.toast("Undo the later Build turns first.", {
+          type: "warning",
+        });
+        return true;
+      };
+      if (blocked()) return;
+      if (isUndoable(retried)) {
+        reversing.add(chatId);
+        let undone: boolean;
+        try {
+          undone = await undoTurn(latest, dispatch, chatId, messageId);
+        } finally {
+          reversing.delete(chatId);
+        }
+        if (!undone) {
+          void api.v1.ui.toast(
+            "Undo did not finish, so the reply was not retried.",
+            { type: "warning" },
+          );
+          return;
+        }
+      }
+      if (blocked()) return;
+      dispatch(messagesPrunedAfter({ chatId, id: messageId }));
+      dispatch(
+        retried.mode === "plan"
+          ? scenarioPlanRequested({ chatId })
+          : forgeChatContinueRequested({ chatId }),
+      );
     },
   );
 

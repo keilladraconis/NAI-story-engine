@@ -11,10 +11,7 @@ import {
   uiCancelRequest,
   generationSubmitted,
 } from "../slices/ui";
-import {
-  forgeChatContinueRequested,
-  scenarioPlanRequested,
-} from "./forge-chat-actions";
+import { scenarioRetryRequested } from "./forge-chat-actions";
 import { requestQueued } from "../slices/runtime";
 import {
   chatCreated,
@@ -25,8 +22,6 @@ import {
   messagesPrunedAfter,
 } from "../slices/chat";
 import { getChatTypeSpec } from "../../chat-types";
-import { isUndoable, pruneBlocked } from "../../chat-types/undo";
-import { undoTurn } from "./handlers/forge-chat";
 import type { Chat, ChatSeed } from "../../chat-types/types";
 import { buildChatStrategy } from "../../utils/chat-strategy";
 import { buildModelParams } from "../../utils/config";
@@ -152,40 +147,15 @@ export function registerChatEffects(
       const { chatId, messageId } = action.payload;
       const before = findChat(latest(), chatId);
       if (!before) return;
-      // Read before the prune removes it: a reply is re-run in the mode that
-      // wrote it, whatever the toggle says now.
-      const retried = before.messages.find((m) => m.id === messageId);
+      // A Scenario retry undoes, prunes and re-runs under the Scenario
+      // effects' one guard (forge-chat-effects.ts).
       if (before.type === "scenario") {
-        // Pruning drops every later message. A later Build reply whose
-        // commands still stand would be left with nothing to undo them.
-        if (pruneBlocked(before.messages, messageId)) {
-          void api.v1.ui.toast("Undo the later Build turns first.", {
-            type: "warning",
-          });
-          return;
-        }
-        // A Build reply is undone before it is re-run, or its first attempt
-        // would stay applied under the second.
-        if (retried && isUndoable(retried)) {
-          const undone = await undoTurn(latest, dispatch, chatId, messageId);
-          if (!undone) return;
-        }
+        dispatch(scenarioRetryRequested({ chatId, messageId }));
+        return;
       }
       dispatch(messagesPrunedAfter({ chatId, id: messageId }));
       const chat = findChat(latest(), chatId);
       if (!chat) return;
-      // A Scenario turn is not an ordinary chat turn: `buildChatStrategy`
-      // knows refine and the saved-chat path only. A Build reply retried
-      // through it would have its commands written as text and never applied;
-      // a Plan reply would lose its context. Each has its own request.
-      if (chat.type === "scenario") {
-        dispatch(
-          retried?.mode === "plan"
-            ? scenarioPlanRequested({ chatId })
-            : forgeChatContinueRequested({ chatId }),
-        );
-        return;
-      }
       const assistantId = api.v1.uuid();
       dispatch(
         messageAdded({

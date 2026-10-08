@@ -21,6 +21,7 @@ import {
   threadLedgerUpdated,
   threadWishSet,
   entitySummaryUpdated,
+  threadStatusSet,
 } from "../../../../../src/core/store/slices/world";
 import {
   chatSlice,
@@ -961,6 +962,14 @@ describe("undoing a Build command", () => {
   const run = async (h: ReturnType<typeof harness>, cmd: ParsedCommand) =>
     executeForgeCommand(cmd, "c1", "m1", h.getState, h.dispatch);
 
+  /** The entry Build made is in the lorebook when undo goes to remove it. */
+  beforeEach(() => {
+    vi.mocked(api.v1.lorebook.entry).mockResolvedValue({
+      id: "e-new",
+      displayName: "Mikki",
+    });
+  });
+
   it("removes a created entity and the entry Build made, even if edited since", async () => {
     const h = harness();
     const rec = await run(h, {
@@ -978,6 +987,20 @@ describe("undoing a Build command", () => {
     expect(await undoForgeAction(rec, h.getState, h.dispatch)).toBe("undone");
     expect(h.getState().world.entitiesById[rec.entityId!]).toBeUndefined();
     expect(api.v1.lorebook.removeEntry).toHaveBeenCalledWith("e-new");
+  });
+
+  it("undoes a created entity whose entry the writer already deleted", async () => {
+    const h = harness();
+    const rec = await run(h, {
+      kind: "CREATE",
+      elementType: "CHARACTER",
+      name: "Mikki",
+      content: "A fox.",
+    });
+    vi.mocked(api.v1.lorebook.entry).mockResolvedValue(null);
+    expect(await undoForgeAction(rec, h.getState, h.dispatch)).toBe("undone");
+    expect(api.v1.lorebook.removeEntry).not.toHaveBeenCalled();
+    expect(h.getState().world.entitiesById[rec.entityId!]).toBeUndefined();
   });
 
   it("unbinds, and keeps, an entry that existed before Build bound it", async () => {
@@ -1064,8 +1087,13 @@ describe("undoing a Build command", () => {
     });
     const rec = await run(h, { kind: "DELETE", name: "Kei" });
     expect(h.getState().world.threads[0].entityIds).toEqual([]);
+    // The lorebook hands the recreated entry a new id; the entity binds to it.
+    vi.mocked(api.v1.lorebook.createEntry).mockResolvedValue("e-back");
     expect(await undoForgeAction(rec, h.getState, h.dispatch)).toBe("undone");
-    expect(h.getState().world.entitiesById[built.id]).toEqual(built);
+    expect(h.getState().world.entitiesById[built.id]).toEqual({
+      ...built,
+      lorebookEntryId: "e-back",
+    });
     expect(h.getState().world.threads[0].entityIds).toEqual([built.id]);
     expect(api.v1.lorebook.createEntry).toHaveBeenCalledWith(entry);
   });
@@ -1118,6 +1146,34 @@ describe("undoing a Build command", () => {
 
     expect(await undoForgeAction(made, h.getState, h.dispatch)).toBe("undone");
     expect(h.getState().world.threads).toHaveLength(0);
+  });
+
+  it("skips undoing a rewrite of a Thread that is concluded now", async () => {
+    const h = harness({
+      entities: [imported("A", "s")],
+      threads: [
+        {
+          id: "t1",
+          title: "Half",
+          state: "S0",
+          latent: "P0",
+          wish: "W0",
+          entityIds: [],
+          status: "open",
+        },
+      ],
+    });
+    const rec = await run(h, {
+      kind: "THREAD",
+      title: "Half",
+      memberNames: ["A"],
+      state: "S1",
+      latent: "",
+      wish: "",
+    });
+    h.dispatch(threadStatusSet({ threadId: "t1", status: "concluded" }));
+    expect(await undoForgeAction(rec, h.getState, h.dispatch)).toBe("skipped");
+    expect(h.getState().world.threads[0].state).toBe("S1");
   });
 
   it("reports a lorebook failure and changes nothing", async () => {

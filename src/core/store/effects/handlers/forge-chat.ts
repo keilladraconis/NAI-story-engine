@@ -479,8 +479,11 @@ export async function undoForgeAction(
       case "entityCreated": {
         const entity = world.entitiesById[undo.entityId];
         if (!entity) return "undone";
+        // Read first: an entry the writer already deleted by hand needs no
+        // removal, and a removal of it would fail the undo for good.
         if (undo.entryCreated && entity.lorebookEntryId) {
-          await api.v1.lorebook.removeEntry(entity.lorebookEntryId);
+          const entry = await api.v1.lorebook.entry(entity.lorebookEntryId);
+          if (entry) await api.v1.lorebook.removeEntry(entry.id);
         }
         dispatch(entityDeleted({ entityId: entity.id }));
         return "undone";
@@ -510,9 +513,17 @@ export async function undoForgeAction(
       }
       case "entityDeleted": {
         if (world.entitiesById[undo.entity.id]) return "undone";
-        if (undo.entry) await api.v1.lorebook.createEntry(undo.entry);
+        // The recreated entry has a new id; the entity must bind to it.
+        const entryId = undo.entry
+          ? await api.v1.lorebook.createEntry(undo.entry)
+          : undefined;
         dispatch(
-          entityRestored({ entity: undo.entity, threadIds: undo.threadIds }),
+          entityRestored({
+            entity: entryId
+              ? { ...undo.entity, lorebookEntryId: entryId }
+              : undo.entity,
+            threadIds: undo.threadIds,
+          }),
         );
         return "undone";
       }
@@ -531,6 +542,7 @@ export async function undoForgeAction(
         const thread = world.threads.find((t) => t.id === undo.threadId);
         if (
           !thread ||
+          thread.status !== "open" ||
           thread.state !== undo.wrote[0] ||
           thread.latent !== undo.wrote[1] ||
           thread.wish !== undo.wrote[2]

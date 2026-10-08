@@ -55,7 +55,8 @@ export const worldSlice = createSlice({
     },
 
     /** Undo of a Build DELETE: the entity returns, to the Threads it was a
-     *  member of. `thread-bind.ts` subscribes and re-syncs their entries. */
+     *  member of. `thread-bind.ts` subscribes and re-syncs their entries. It returns at the end of the
+     *  entity list and of each cast. */
     entityRestored: (
       state,
       payload: { entity: WorldEntity; threadIds: string[] },
