@@ -6,8 +6,10 @@ import {
   activeSavedChat,
   chatCreated,
   chatSwitched,
+  subModeChanged,
 } from "../../../core/store";
 import { getChatTypeSpec } from "../../../core/chat-types";
+import { scenarioMode } from "../../../core/chat-types/scenario";
 import type { Chat as ChatT } from "../../../core/chat-types/types";
 import { nextScenarioTitle } from "./chat-actions";
 import { Plus, Folder, ArrowLeft } from "nai:icons/feather";
@@ -30,7 +32,7 @@ export function ChatHeader(props: ChatHeaderProps) {
   // Re-render on title / type / id changes.
   const stamp = useSlice((s) => {
     const c = activeSavedChat(s.chat);
-    return c ? `${c.id}|${c.title}|${c.type}` : "";
+    return c ? `${c.id}|${c.title}|${c.type}|${c.subMode ?? ""}` : "";
   });
   const scrubbing = useSlice((s) => {
     const c = activeSavedChat(s.chat);
@@ -48,6 +50,40 @@ export function ChatHeader(props: ChatHeaderProps) {
 
   const trailing = controls.map((c) => {
     switch (c.kind) {
+      case "modeToggle": {
+        const mode = scenarioMode(chat);
+        return (
+          <div key={c.id} style={{ display: "flex" }}>
+            {(["plan", "build"] as const).map((m) => (
+              <button
+                key={m}
+                title={
+                  m === "plan"
+                    ? "Talk the scenario through. Builds nothing."
+                    : "Record what you've discussed as drafts and Threads."
+                }
+                onClick={() =>
+                  store.dispatch(subModeChanged({ id: chat.id, subMode: m }))
+                }
+                style={{
+                  background: mode === m ? "rgba(255,255,255,0.12)" : "none",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                  borderRadius: m === "plan" ? "6px 0 0 6px" : "0 6px 6px 0",
+                  color: T.text,
+                  opacity: mode === m ? 1 : 0.55,
+                  cursor: "pointer",
+                  fontFamily: T.fontDefault,
+                  fontSize: "0.75em",
+                  fontWeight: mode === m ? "bold" : "normal",
+                  padding: "2px 8px",
+                }}
+              >
+                {m === "plan" ? "Plan" : "Build"}
+              </button>
+            ))}
+          </div>
+        );
+      }
       case "newChatButton":
         return (
           <button

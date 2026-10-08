@@ -26,6 +26,15 @@ import {
 export function ChatInput() {
   const chatId = useSlice((s) => s.chat.activeChatId);
   const chatType = useSlice((s) => activeSavedChat(s.chat)?.type ?? "");
+  // The placeholder is selected as a string, so it follows the mode toggle.
+  const placeholder = useSlice((s) => {
+    const chat = activeSavedChat(s.chat);
+    if (!chat) return "";
+    const spec = getChatTypeSpec(chat.type);
+    return (
+      spec.inputPlaceholderFor?.(chat) ?? spec.inputPlaceholder ?? "Message…"
+    );
+  });
   // Seeded from the draft buffer, so text typed before a tab switch is already
   // there on the first render after remounting.
   const [text, setText] = useState(readComposerDraft(chatId ?? ""));
@@ -90,7 +99,7 @@ export function ChatInput() {
       <textarea
         value={text}
         onInput={(e) => editText(e.target.value ?? "")}
-        placeholder={spec.inputPlaceholder ?? "Message…"}
+        placeholder={placeholder}
         style={{
           minHeight: "60px",
           maxHeight: "120px",

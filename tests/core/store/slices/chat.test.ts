@@ -105,6 +105,19 @@ describe("chat slice", () => {
     expect(next.chats[0].subMode).toBe("critic");
   });
 
+  it("subModeChanged switches a scenario chat to build and adds no message", () => {
+    const start = {
+      chats: [blankChat({ id: "c1", type: "scenario", subMode: "plan" })],
+      activeChatId: "c1",
+    };
+    const next = chatSliceReducer(
+      start,
+      subModeChanged({ id: "c1", subMode: "build" }),
+    );
+    expect(next.chats[0].subMode).toBe("build");
+    expect(next.chats[0].messages).toEqual([]);
+  });
+
   it("messageAdded appends to the matching chat", () => {
     const start = {
       chats: [blankChat({ id: "a" })],
