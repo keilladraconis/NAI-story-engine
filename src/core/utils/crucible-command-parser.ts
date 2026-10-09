@@ -425,7 +425,10 @@ function parseCommandAt(lines: string[], i: number): ParsedCommandAt | null {
   }
 
   const threadMatch = line.match(
-    /^\[\s*THREAD\s+"([^"]+)"\s*\|([^|]+?)\|([^|]*?)\|([^|]*?)\|([^|\]]*?)\]?\s*$/,
+    // The trailing `(?:\|\s*)?` takes one empty extra segment: told to leave
+    // the wish "empty between its bars", the model closes it with a bar of its
+    // own (`| |]`). Nothing is guessed, since the extra segment holds nothing.
+    /^\[\s*THREAD\s+"([^"]+)"\s*\|([^|]+?)\|([^|]*?)\|([^|]*?)\|([^|\]]*?)(?:\|\s*)?\]?\s*$/,
   );
   if (threadMatch) {
     const memberNames: string[] = [];

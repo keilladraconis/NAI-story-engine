@@ -691,3 +691,28 @@ describe("[CREATE THREAD …] is read as a THREAD", () => {
     expect(unrecognizedAction(short).reason).toBe(THREAD_REPAIR);
   });
 });
+
+describe("a THREAD whose empty wish is closed with a bar of its own", () => {
+  const head =
+    '[THREAD "The Furnace" | "Maud Tarn", "Wick" | They work together. | Wick set the fire.';
+
+  it.each([`${head} | |]`, `${head} | |`, `${head} || ]`])(
+    "parses with an empty wish: %s",
+    (line) => {
+      expect(parseCommands(line)).toEqual([
+        {
+          kind: "THREAD",
+          title: "The Furnace",
+          memberNames: ["Maud Tarn", "Wick"],
+          state: "They work together.",
+          latent: "Wick set the fire.",
+          wish: "",
+        },
+      ]);
+    },
+  );
+
+  it("still refuses a sixth segment that says something", () => {
+    expect(parseCommands(`${head} | | and one more thing]`)).toEqual([]);
+  });
+});

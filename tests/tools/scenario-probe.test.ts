@@ -62,6 +62,9 @@ describe("tools/scenario-probe.naiscript reads replies as the product does", () 
       'Prose.\n[THREAD "The Ledger" | "Odile Marsh", "Brannock Tye" | Odile Marsh keeps the books. | Odile Marsh takes the tannery.]\n' +
       creates[1],
     decorated: `Prose.\n${creates[0]}\n- ${thread}\nDoes it hold?`,
+    closedEmptyWish:
+      'Prose.\n[THREAD "The Ledger" | "Odile Marsh", "Brannock Tye" | Odile Marsh keeps the books. | Brannock Tye has altered two entries. | |]\n' +
+      creates[0],
     createThread: `Prose.\n${creates[0]}\n${thread.replace("[THREAD", "[CREATE THREAD")}`,
   };
 
