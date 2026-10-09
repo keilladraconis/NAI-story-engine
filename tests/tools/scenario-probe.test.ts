@@ -383,4 +383,13 @@ describe("the probe's over-building count", () => {
       ),
     ).toBe(0);
   });
+
+  it("does not count a name whose every word the conversation used", () => {
+    expect(
+      unasked(
+        [{ type: "CHARACTER", name: "Mab Roe" }],
+        "Ansel Roe keeps the clock with his daughter Mab.",
+      ),
+    ).toBe(0);
+  });
 });

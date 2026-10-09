@@ -171,14 +171,22 @@ describe("the Scenario Build prompt", () => {
 
   it("takes a detail the collaborator added and the writer did not turn down", () => {
     expect(SCENARIO_BUILD_PROMPT).toContain(
-      "A detail it added counts as accepted unless the writer turned it down",
+      "A new detail that disagrees with nothing counts as accepted unless the writer turned it down",
     );
     expect(example().all).toContain('[CREATE CHARACTER "Mr Rudd"');
   });
 
   it("keeps the writer's version where the collaborator contradicts it", () => {
+    // Asked before what the collaborator added, so acceptance cannot reach it.
+    const disagree = SCENARIO_BUILD_PROMPT.indexOf(
+      "2. Does anything the collaborator said disagree with something the writer said",
+    );
+    expect(disagree).toBeGreaterThan(-1);
+    expect(
+      SCENARIO_BUILD_PROMPT.indexOf("3. What else did the collaborator add?"),
+    ).toBeGreaterThan(disagree);
     expect(SCENARIO_BUILD_PROMPT).toContain(
-      "Where it contradicts something the writer said, the writer's version stands",
+      "Only the writer changes what the writer said, and silence is not a change.",
     );
     expect(example().all).toContain("ten years at the lock");
     expect(example().all).not.toMatch(/nineteen|never worked/);
@@ -186,7 +194,7 @@ describe("the Scenario Build prompt", () => {
 
   it("leaves out a scene the collaborator narrated, in whatever tense", () => {
     expect(SCENARIO_BUILD_PROMPT).toContain(
-      "a scene it narrates is not a fact, in whatever tense it is told",
+      "A scene it narrates is not a fact, in whatever tense it is told",
     );
     expect(example().all).not.toMatch(/writ\b|towpath with/);
   });
