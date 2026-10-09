@@ -25,6 +25,7 @@ import {
 import { WorldEntity, ThreadDraft, RootState, AppDispatch } from "../../types";
 import {
   walkForgeLines,
+  type ForgeLineToken,
   canonicalizeForgeCommands,
   TYPE_TO_FIELD,
   unrecognizedAction,
@@ -37,6 +38,7 @@ import type {
 } from "../../../chat-types/types";
 import { bindEntryFor, renameEntry } from "../entity-entry";
 import { SCENARIO_BUILD_PREFILL } from "../../../utils/prompts";
+import { withoutHidden } from "../../../utils/hidden-overlap";
 import { stripThinkingTags } from "../../../utils/tag-parser";
 import { DulfsFieldID, FieldID } from "../../../../config/field-definitions";
 
@@ -68,6 +70,8 @@ const REASON = {
   taken: "is the name of another element; choose a different name",
   notBuiltHere: "was not built here and cannot be deleted from the chat",
   concluded: "is concluded and cannot be rewritten",
+  onlyHidden:
+    "says only what is hidden; write what anyone in the story could see, and leave the hidden thing in a private segment",
 } as const;
 
 function lorebookRefused(error: unknown): string {
@@ -439,6 +443,48 @@ export async function executeForgeCommand(
   }
 }
 
+/** What a reply hides, and the names in play. Hidden is every private segment
+ *  and every thing to come: the ones the reply writes, and the ones open
+ *  Threads already hold. Read before any command runs, because a reply writes
+ *  its CREATEs before the THREAD that says what is hidden. */
+function hiddenIn(
+  tokens: ForgeLineToken[],
+  state: RootState,
+): { hidden: string[]; names: string[] } {
+  const open = state.world.threads.filter((t) => t.status === "open");
+  const hidden = open.flatMap((t) => [t.latent, t.wish]);
+  const names = Object.values(state.world.entitiesById).map((e) => e.name);
+  for (const tok of tokens) {
+    if (tok.kind !== "command") continue;
+    const cmd = tok.command;
+    if (cmd.kind === "THREAD") {
+      hidden.push(cmd.latent, cmd.wish);
+      names.push(...cmd.memberNames);
+    } else if (cmd.kind === "CREATE") {
+      names.push(cmd.name);
+    }
+  }
+  return { hidden: hidden.filter((h) => h.trim() !== ""), names };
+}
+
+/** The command with every sentence that restates something hidden cut from
+ *  what it would show the story model: a summary, or a Thread's state. */
+function showingNothingHidden(
+  cmd: ParsedCommand,
+  hidden: string[],
+  names: string[],
+): { command: ParsedCommand; withheld: string } {
+  if (cmd.kind === "CREATE" || cmd.kind === "REVISE") {
+    const { kept, cut } = withoutHidden(cmd.content, hidden, names);
+    return { command: cut ? { ...cmd, content: kept } : cmd, withheld: cut };
+  }
+  if (cmd.kind === "THREAD") {
+    const { kept, cut } = withoutHidden(cmd.state, hidden, names);
+    return { command: cut ? { ...cmd, state: kept } : cmd, withheld: cut };
+  }
+  return { command: cmd, withheld: "" };
+}
+
 /** Walk a finished turn into ordered display segments, executing each command
  *  as it is encountered. DONE/LINK produce no segment. */
 async function buildForgeSegments(
@@ -455,7 +501,9 @@ async function buildForgeSegments(
     if (joined) segments.push({ kind: "prose", text: joined });
     prose = [];
   };
-  for (const tok of walkForgeLines(text)) {
+  const tokens = walkForgeLines(text);
+  const { hidden, names } = hiddenIn(tokens, getState());
+  for (const tok of tokens) {
     if (tok.kind === "prose") {
       prose.push(tok.text);
       continue;
@@ -467,8 +515,13 @@ async function buildForgeSegments(
     }
     if (tok.command.kind === "DONE" || tok.command.kind === "LINK") continue;
     flush();
-    const action = await executeForgeCommand(
+    const { command, withheld } = showingNothingHidden(
       tok.command,
+      hidden,
+      names,
+    );
+    const action = await executeForgeCommand(
+      command,
       chatId,
       messageId,
       getState,
@@ -476,7 +529,16 @@ async function buildForgeSegments(
     );
     segments.push({
       kind: "action",
-      action: { ...action, body: commandBody(tok.command) },
+      action: {
+        ...action,
+        // A summary that was nothing but the hidden thing leaves no summary.
+        ...(withheld && action.reason === REASON.noSummary
+          ? { reason: REASON.onlyHidden }
+          : {}),
+        ...(withheld ? { withheld } : {}),
+        // What was written, not what was applied: the pill shows both.
+        body: commandBody(tok.command),
+      },
     });
   }
   flush();

@@ -18,7 +18,12 @@ const TONE = {
 const NONE: Record<number, boolean> = {};
 
 /** Body parts that are about the command, not a copy of the thing. */
-const NOTE_LABELS = new Set(["Replaced", "Not undone", "Undo failed"]);
+const NOTE_LABELS = new Set([
+  "Replaced",
+  "Left out",
+  "Not undone",
+  "Undo failed",
+]);
 
 /** What an opened pill shows. A pill with a target shows the live card while
  *  the thing exists, and what was written once it does not. Both are mounted

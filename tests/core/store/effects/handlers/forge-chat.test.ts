@@ -1330,3 +1330,83 @@ describe("undoing a Build command", () => {
     expect(api.v1.lorebook.removeEntry).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("a Build reply shows nothing it hides", () => {
+  const reply = [
+    '[CREATE CHARACTER "Brisa Calloway" | A ferrywoman at the Marrow crossing.]',
+    '[CREATE CHARACTER "Dov" | Her nephew, here for the season. He signed the landing rights over to the commission.]',
+    '[CREATE CHARACTER "Pell" | Dov has signed the landing rights to the commission and been paid.]',
+    '[THREAD "The Landing" | "Brisa Calloway", "Dov" | They work the ferry together. Dov signed the ferry landing rights to the commission. | Dov has signed the ferry\'s landing rights over to the commission and been paid. | Brisa finds out on her own.]',
+  ].join("\n");
+
+  const run = async () => {
+    const h = harness();
+    const dispatch = vi.fn(h.dispatch);
+    await forgeChatHandler.completion({
+      target: { type: "forgeChat", chatId: "c1", messageId: "m1" },
+      getState: h.getState,
+      dispatch,
+      accumulatedText: reply,
+      generationSucceeded: true,
+    } as CompletionContext<ForgeChatTarget>);
+    const actions = segmentsFromCompletion(dispatch.mock.calls).flatMap((s) =>
+      s.kind === "action" ? [s.action] : [],
+    );
+    return { actions, world: h.getState().world };
+  };
+
+  it("cuts the hidden sentence from a summary written before the THREAD", async () => {
+    const { actions, world } = await run();
+    const dov = Object.values(world.entitiesById).find((e) => e.name === "Dov");
+    expect(dov?.summary).toBe("Her nephew, here for the season.");
+    expect(actions[1]).toMatchObject({
+      status: "applied",
+      withheld: "He signed the landing rights over to the commission.",
+    });
+    // The pill still shows what was written.
+    expect(actions[1].body?.[1].text).toContain("He signed the landing rights");
+  });
+
+  it("cuts it from the Thread's state and keeps it in the private notes", async () => {
+    const { actions, world } = await run();
+    expect(world.threads[0].state).toBe("They work the ferry together.");
+    expect(world.threads[0].latent).toContain("been paid");
+    expect(actions[3].withheld).toContain(
+      "Dov signed the ferry landing rights",
+    );
+  });
+
+  it("rejects a CREATE whose summary was only the hidden thing, with the repair", async () => {
+    const { actions, world } = await run();
+    expect(actions[2]).toMatchObject({ kind: "CREATE", status: "rejected" });
+    expect(actions[2].reason).toMatch(/^says only what is hidden/);
+    expect(
+      Object.values(world.entitiesById).some((e) => e.name === "Pell"),
+    ).toBe(false);
+  });
+
+  it("leaves an untouched command without a withheld note", async () => {
+    const { actions } = await run();
+    expect(actions[0]).not.toHaveProperty("withheld");
+  });
+
+  it("holds a later REVISE against what an open Thread already hides", async () => {
+    const h = harness();
+    const complete = (accumulatedText: string) =>
+      forgeChatHandler.completion({
+        target: { type: "forgeChat", chatId: "c1", messageId: "m1" },
+        getState: h.getState,
+        dispatch: h.dispatch,
+        accumulatedText,
+        generationSucceeded: true,
+      } as CompletionContext<ForgeChatTarget>);
+    await complete(reply);
+    await complete(
+      '[REVISE "Dov" | Quiet since spring. He signed the landing rights over to the commission.]',
+    );
+    const dov = Object.values(h.getState().world.entitiesById).find(
+      (e) => e.name === "Dov",
+    );
+    expect(dov?.summary).toBe("Quiet since spring.");
+  });
+});

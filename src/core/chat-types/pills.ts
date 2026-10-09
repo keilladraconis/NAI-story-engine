@@ -90,6 +90,9 @@ export function pillsFor(
                 },
               ]
             : [];
+    const withheld: PillPart[] = action.withheld
+      ? [{ label: "Left out", text: action.withheld }]
+      : [];
     const replaced: PillPart[] =
       action.undo?.op === "summary"
         ? [{ label: "Replaced", text: action.undo.before }]
@@ -98,7 +101,7 @@ export function pillsFor(
     pills.push({
       label: pillLabel(action),
       tone: live ? "applied" : "rejected",
-      body: [...lead, ...(action.body ?? []), ...replaced],
+      body: [...lead, ...(action.body ?? []), ...replaced, ...withheld],
       ...(live && action.entityId
         ? { target: { kind: "entity" as const, id: action.entityId } }
         : live && action.threadId

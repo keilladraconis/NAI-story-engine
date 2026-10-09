@@ -55,6 +55,9 @@ export interface ForgeActionRecord {
   entityId?: string;
   /** The Thread this command made or rewrote, for the pill's row. */
   threadId?: string;
+  /** Sentences cut from what this command would have shown the story model,
+   *  because they restated what the reply itself marked as hidden. */
+  withheld?: string;
   /** How to reverse it. Present only on applied commands. */
   undo?: ForgeUndo;
   /** Set when the turn was undone: what happened to this command. */
