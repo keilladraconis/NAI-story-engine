@@ -184,11 +184,11 @@ describe("the Scenario Build prompt", () => {
     expect(example().all).not.toMatch(/nineteen|never worked/);
   });
 
-  it("leaves out what the collaborator said will happen", () => {
+  it("leaves out a scene the collaborator narrated, in whatever tense", () => {
     expect(SCENARIO_BUILD_PROMPT).toContain(
-      "what it says will happen is not a fact",
+      "a scene it narrates is not a fact, in whatever tense it is told",
     );
-    expect(example().all).not.toMatch(/writ\b|Friday/);
+    expect(example().all).not.toMatch(/writ\b|towpath with/);
   });
 
   it("shows the story model nothing that is hidden", () => {
