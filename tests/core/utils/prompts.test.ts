@@ -208,6 +208,12 @@ describe("the Scenario Build prompt", () => {
     expect(hidden).toContain("has sold his half of Tolland Lock House");
   });
 
+  it("says a title is shown too", () => {
+    expect(SCENARIO_BUILD_PROMPT).toContain(
+      "Never title a THREAD or name an element after something hidden or something to come.",
+    );
+  });
+
   it("invents nothing to carry a wish", () => {
     expect(SCENARIO_BUILD_PROMPT).toContain(
       "do not invent an object, a place or a circumstance to carry the wish.",
