@@ -212,6 +212,12 @@ describe("the Scenario Build prompt", () => {
     expect(SCENARIO_BUILD_PROMPT).toContain(
       "Never title a THREAD or name an element after something hidden or something to come.",
     );
+    expect(SCENARIO_BUILD_PROMPT).toContain(
+      "not in that THREAD's title, and not in any name, even when the writer gave the thing to come a name of its own.",
+    );
+    expect(SCENARIO_BUILD_PROMPT).toContain(
+      "The THREAD is titled for the house the two of them share, which is so now, and not for the sale or the flooding.",
+    );
   });
 
   it("invents nothing to carry a wish", () => {
