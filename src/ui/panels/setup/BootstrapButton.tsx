@@ -1,24 +1,48 @@
-// Opening Scene — the last step on the Setup tab, and the point of everything
-// above it. Sized and shaped like the brainstorm prompt: at this stage it is the
-// primary action, and a small text button read as an afterthought.
+// Opening Scene and Continue Scene — the last step on the Setup tab, and the
+// point of everything above it. Sized and shaped like the Scenario prompt: at
+// this stage it is the primary action, and a small text button read as an
+// afterthought.
 //
-// There is no Continue Scene. Once the story has prose the card is gone
-// entirely (Setup owns that condition), because continuing belongs in the story
-// editor rather than behind a setup control.
-//
-// The modal asks first: it collects the writer's direction and dispatches on its
-// own Generate, so a dismissed modal generates nothing.
+// On a blank story the card writes the opening. The modal asks first: it
+// collects the writer's direction and dispatches on its own Generate, so a
+// dismissed modal generates nothing. The opening introduces no one, so once
+// there is prose the same card extends it one passage per press with the World
+// in context, which is where the cast and the place arrive by name.
 
-import { store, bootstrapRequested } from "../../../core/store";
+import {
+  store,
+  bootstrapRequested,
+  bootstrapContinueRequested,
+} from "../../../core/store";
 import { SP, T } from "../../style";
 import { openOpeningSceneModal } from "../../header/opening-scene-modal";
 import { Feather } from "nai:icons/feather";
 
-export function BootstrapButton(props: { disabled: boolean }) {
+const COPY = {
+  opening: {
+    idle: "Write the opening scene",
+    busy: "Writing the opening scene…",
+    hint: "The Foundation is set. Start the story from it — you will be asked for any direction you want to give first.",
+  },
+  continue: {
+    idle: "Continue the scene",
+    busy: "Continuing the scene…",
+    hint: "Adds one passage, bringing the World's people and places into the scene by name. Two or three before you write on is usually enough.",
+  },
+} as const;
+
+export function BootstrapButton(props: {
+  disabled: boolean;
+  stage: "opening" | "continue";
+}) {
   const openingModalOpen = useRef(false);
 
   const onBootstrap = () => {
     if (props.disabled) return;
+    if (props.stage === "continue") {
+      store.dispatch(bootstrapContinueRequested());
+      return;
+    }
     // Nothing in the store dims the card while the modal is up (no request
     // exists yet), so this is what stops a second click stacking a second modal.
     if (openingModalOpen.current) return;
@@ -62,13 +86,10 @@ export function BootstrapButton(props: { disabled: boolean }) {
         }}
       >
         <Feather size={16} />
-        {props.disabled
-          ? "Writing the opening scene…"
-          : "Write the opening scene"}
+        {props.disabled ? COPY[props.stage].busy : COPY[props.stage].idle}
       </span>
       <span style={{ fontSize: "0.85em", opacity: 0.8 }}>
-        The Foundation is set. Start the story from it — you will be asked for
-        any direction you want to give first.
+        {COPY[props.stage].hint}
       </span>
     </button>
   );

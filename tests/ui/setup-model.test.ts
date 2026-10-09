@@ -122,11 +122,26 @@ describe("deriveSetup — the opening scene card", () => {
     expect(deriveSetup(state({}, {}, FILLED), INPUTS).showBootstrap).toBe(true);
   });
 
-  it("hides again once the story has prose — there is no Continue", () => {
+  it("writes the opening on a blank story", () => {
+    expect(deriveSetup(state({}, {}, FILLED), INPUTS).bootstrapStage).toBe(
+      "opening",
+    );
+  });
+
+  it("stays, as Continue Scene, once the story has prose", () => {
     const m = deriveSetup(state({}, {}, FILLED), {
       hasDocumentContent: true,
     });
-    expect(m.showBootstrap).toBe(false);
+    expect(m.showBootstrap).toBe(true);
+    expect(m.bootstrapStage).toBe("continue");
+  });
+
+  it("disables itself while a continuation is queued", () => {
+    const m = deriveSetup(
+      state({ queue: [req("bootstrapContinue", "c1")] }, {}, FILLED),
+      { hasDocumentContent: true },
+    );
+    expect(m.bootstrapDisabled).toBe(true);
   });
 
   it("disables itself while its request is queued", () => {

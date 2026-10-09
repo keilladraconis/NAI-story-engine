@@ -18,9 +18,11 @@ export type SetupModel = {
   showScenarioCta: boolean;
   /** Foundation section open? Follows the flow until the writer overrides it. */
   foundationOpen: boolean;
-  /** The opening-scene card: once the Foundation has content and the story is
-   *  still blank. There is no Continue — once prose exists, this is done. */
+  /** The opening-scene card: once the Foundation has content. */
   showBootstrap: boolean;
+  /** What the card does: write the opening on a blank story, extend it by one
+   *  passage once there is prose. */
+  bootstrapStage: "opening" | "continue";
   bootstrapDisabled: boolean;
   importDisabled: boolean;
 };
@@ -30,9 +32,9 @@ export type SetupInputs = {
   hasDocumentContent: boolean;
 };
 
-const BOOTSTRAP_TYPES: readonly string[] = ["bootstrap"];
+const BOOTSTRAP_TYPES: readonly string[] = ["bootstrap", "bootstrapContinue"];
 
-/** Is the opening generation queued or in flight? Also read by
+/** Is an opening or continue generation queued or in flight? Also read by
  *  useHasDocumentContent — a bootstrap is what turns an empty story non-empty. */
 export function selectBootstrapPending(state: RootState): boolean {
   const { queue, activeRequest } = state.runtime;
@@ -63,7 +65,8 @@ export function deriveSetup(state: RootState, inputs: SetupInputs): SetupModel {
       state.ui.foundationExpanded,
       scenarioStarted,
     ),
-    showBootstrap: !fieldsEmpty && !inputs.hasDocumentContent,
+    showBootstrap: !fieldsEmpty,
+    bootstrapStage: inputs.hasDocumentContent ? "continue" : "opening",
     bootstrapDisabled: selectBootstrapPending(state),
     importDisabled: state.ui.importWizardOpen,
   };

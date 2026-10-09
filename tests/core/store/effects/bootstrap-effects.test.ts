@@ -2,14 +2,18 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { registerBootstrapEffects } from "../../../../src/core/store/effects/bootstrap-effects";
 import {
   bootstrapRequested,
+  bootstrapContinueRequested,
   generationSubmitted,
+  requestQueued,
 } from "../../../../src/core/store";
+import { buildStoryEnginePrefix } from "../../../../src/core/utils/context-builder";
 import type {
   RootState,
   GenerationStrategy,
 } from "../../../../src/core/store/types";
 import {
   BOOTSTRAP_P1_PROMPT,
+  BOOTSTRAP_CONTINUE_PROMPT,
   BOOTSTRAP_OPENING_DIRECTION_FRAME,
 } from "../../../../src/core/utils/prompts";
 
@@ -93,6 +97,71 @@ describe("bootstrapRequested — the Opening Scene direction", () => {
         contents.some((c) => c.includes(BOOTSTRAP_OPENING_DIRECTION_FRAME)),
       ).toBe(false);
       expect(contents).toContain(BOOTSTRAP_P1_PROMPT);
+    }
+  });
+});
+
+/** Registers the effects and runs Continue Scene against `runtime`. */
+async function continueWith(runtime: object) {
+  const handlers: EffectHandler[] = [];
+  const dispatch = vi.fn();
+  const getState = () => ({ ...state(), runtime }) as unknown as RootState;
+
+  registerBootstrapEffects(
+    ((predicate: (a: { type: string }) => boolean, handler: EffectHandler) => {
+      if (predicate({ type: bootstrapContinueRequested.type }))
+        handlers.push(handler);
+      return () => {};
+    }) as never,
+    dispatch as never,
+    getState,
+  );
+
+  await handlers[0](bootstrapContinueRequested() as never, { getState });
+  return dispatch.mock.calls.map(
+    (c) => c[0] as { type: string; payload: GenerationStrategy },
+  );
+}
+
+describe("bootstrapContinueRequested — Continue Scene", () => {
+  const IDLE = { queue: [], activeRequest: null };
+
+  it("writes with the World in context, the instruction last", async () => {
+    const actions = await continueWith(IDLE);
+    const submitted = actions.find((a) => a.type === generationSubmitted.type);
+    expect(submitted?.payload.target.type).toBe("bootstrapContinue");
+
+    const { messages } = await submitted!.payload.messageFactory!();
+    // Only the story text is left out of the prefix: the World stays in.
+    expect(buildStoryEnginePrefix).toHaveBeenLastCalledWith(expect.anything(), {
+      excludeSections: ["storyText"],
+    });
+    const contents = messages.map((m) => m.content ?? "");
+    expect(contents).toContain(BOOTSTRAP_CONTINUE_PROMPT);
+  });
+
+  it("queues its request under the id it submits", async () => {
+    const actions = await continueWith(IDLE);
+    const queued = actions.find((a) => a.type === requestQueued.type);
+    const submitted = actions.find((a) => a.type === generationSubmitted.type);
+    expect(queued).toBeDefined();
+    expect((queued!.payload as unknown as { id: string }).id).toBe(
+      submitted!.payload.requestId,
+    );
+  });
+
+  it("refuses a second press while an opening or continuation is pending", async () => {
+    for (const type of ["bootstrap", "bootstrapContinue"]) {
+      const queued = await continueWith({
+        queue: [{ id: "q", type, targetId: "bootstrap" }],
+        activeRequest: null,
+      });
+      expect(queued).toEqual([]);
+      const active = await continueWith({
+        queue: [],
+        activeRequest: { id: "a", type, targetId: "bootstrap" },
+      });
+      expect(active).toEqual([]);
     }
   });
 });

@@ -186,6 +186,7 @@ export const runtimeSlice = createSlice({
     // `guidance` is the writer's free-text answer to "Open the story with:" —
     // empty string when they generated without typing anything.
     bootstrapRequested: (state, _payload: { guidance: string }) => state,
+    bootstrapContinueRequested: (state) => state,
   },
 });
 
@@ -207,4 +208,5 @@ export const {
   segaStatusUpdated,
   segaKeysCompleted,
   bootstrapRequested,
+  bootstrapContinueRequested,
 } = runtimeSlice.actions;

@@ -113,7 +113,10 @@ export function Setup(props: {
       </div>
 
       <div style={{ display: model.showBootstrap ? "block" : "none" }}>
-        <BootstrapButton disabled={model.bootstrapDisabled} />
+        <BootstrapButton
+          disabled={model.bootstrapDisabled}
+          stage={model.bootstrapStage}
+        />
       </div>
     </div>
   );

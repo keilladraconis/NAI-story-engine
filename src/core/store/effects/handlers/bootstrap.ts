@@ -5,11 +5,22 @@ import {
   CompletionContext,
 } from "../generation-handlers";
 import { stripThinkingTags } from "../../../utils/tag-parser";
+import { trimStopTail } from "../../../utils/config";
 
 type BootstrapTarget = Extract<
   GenerationStrategy["target"],
   { type: "bootstrap" }
 >;
+type BootstrapContinueTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "bootstrapContinue" }
+>;
+
+// When true, the next Continue Scene joins the last document section inline
+// rather than starting a new paragraph. Set when a generation ends mid-sentence
+// (max_tokens fired before a natural boundary). Reset on a clean end or failure.
+let continueInline = false;
+
 function parseParagraphs(text: string): string[] {
   return stripThinkingTags(text)
     .trim()
@@ -51,6 +62,21 @@ function chunkParagraph(paragraph: string): string[] {
   return result;
 }
 
+/** True when text ended at a natural sentence boundary, not a max_tokens cut. */
+function endsAtBoundary(text: string): boolean {
+  return /[.!?…]["'”’]?$/.test(text);
+}
+
+/** A continuation often opens by restating the page's last paragraph before
+ *  going on. Drop that echo so the line is not on the page twice. */
+export function dropEchoedTail(text: string, lastParagraph: string): string {
+  const tail = lastParagraph.trim();
+  const body = text.trimStart();
+  return tail.length > 0 && body.startsWith(tail)
+    ? body.slice(tail.length).trimStart()
+    : text;
+}
+
 // A scene-break marker the model appends to close a scene. We render these as a
 // proper centered "***" section rather than leaving the glyph in the prose.
 const SCENE_BREAK_TAIL = /\s*(?:\*{3,}|-{3,}|⁂)\s*$/;
@@ -89,7 +115,7 @@ export const bootstrapHandler: GenerationHandlers<BootstrapTarget> = {
       return;
     }
 
-    const { text: cleaned } = stripTrailingSceneBreak(
+    const { text: cleaned, hadBreak } = stripTrailingSceneBreak(
       stripThinkingTags(ctx.accumulatedText),
     );
     const chunks = parseParagraphs(cleaned);
@@ -98,9 +124,53 @@ export const bootstrapHandler: GenerationHandlers<BootstrapTarget> = {
       // paragraph break). The engine still records one undo step per paragraph —
       // multi-paragraph single-undo isn't reachable through the document API.
       await api.v1.document.append(chunks.join("\n"));
+      // An opening cut mid-sentence is stitched onto by the next Continue Scene.
+      continueInline = !hadBreak && !endsAtBoundary(chunks[chunks.length - 1]);
     }
 
-    // The opening is on the page and the stage is done. Continuing the scene is
-    // the story editor's job — Story Engine has no Continue control.
+    // The stage stops here. The card now offers Continue Scene, and the writer
+    // decides whether to extend the opening.
   },
 };
+
+// ─── Phase 2 handler ─────────────────────────────────────────────────────────
+
+export const bootstrapContinueHandler: GenerationHandlers<BootstrapContinueTarget> =
+  {
+    streaming(
+      _ctx: StreamingContext<BootstrapContinueTarget>,
+      _newText: string,
+    ): void {},
+
+    async completion(
+      ctx: CompletionContext<BootstrapContinueTarget>,
+    ): Promise<void> {
+      if (!ctx.generationSucceeded || !ctx.accumulatedText) {
+        continueInline = false;
+        return;
+      }
+
+      const { text: noBreak, hadBreak } = stripTrailingSceneBreak(
+        stripThinkingTags(ctx.accumulatedText),
+      );
+      const sections = await api.v1.document.scan();
+      const lastParagraph = sections[sections.length - 1]?.section.text ?? "";
+      const paragraphs = parseParagraphs(
+        dropEchoedTail(trimStopTail(noBreak, ["\n[ "]), lastParagraph),
+      );
+      if (paragraphs.length === 0) {
+        if (hadBreak) continueInline = false;
+        return;
+      }
+
+      // A leading newline starts a fresh paragraph; after a mid-sentence cut a
+      // space stitches this onto the end of the last one instead.
+      await api.v1.document.append(
+        (continueInline ? " " : "\n") + paragraphs.join("\n"),
+      );
+      continueInline =
+        !hadBreak && !endsAtBoundary(paragraphs[paragraphs.length - 1]);
+
+      // One passage per press. No auto-chain and no cap.
+    },
+  };

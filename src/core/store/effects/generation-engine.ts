@@ -64,6 +64,8 @@ export function targetToQueueEntry(target: GenerationStrategy["target"]): {
       return { type: "threadSummary", targetId: target.threadId };
     case "bootstrap":
       return { type: "bootstrap", targetId: "bootstrap" };
+    case "bootstrapContinue":
+      return { type: "bootstrapContinue", targetId: "bootstrap" };
     case "forgeChat":
       return { type: "forgeChat", targetId: target.messageId };
   }
@@ -169,6 +171,8 @@ export function cacheLabel(target: GenerationStrategy["target"]) {
       return `thread-summary:${target.threadId.slice(0, 8)}`;
     case "bootstrap":
       return "bootstrap";
+    case "bootstrapContinue":
+      return `bootstrap-continue:${target.iteration}`;
     case "chat":
       return `chat:${target.messageId}`;
     case "chatRefine":
@@ -488,6 +492,8 @@ export function registerGenerationEngineEffects(
         api.v1.ui.toast(`Keys: ${name}`, { type: "success" });
       } else if (target.type === "bootstrap") {
         api.v1.ui.toast("Story opener generated", { type: "success" });
+      } else if (target.type === "bootstrapContinue") {
+        api.v1.ui.toast("Scene continued", { type: "success" });
       }
     }
   });
