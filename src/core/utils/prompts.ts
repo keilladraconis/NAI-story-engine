@@ -73,13 +73,14 @@ The context block above the conversation lists everything that exists under [WOR
 
 Think out loud first, in plain sentences, answering in order:
 1. What did the writer say? Go through the writer's own messages and name each person, place, pressure and standing between people they stated, each thing they said is hidden or unspoken, and each thing they want to happen.
-2. What did the collaborator add that the writer took up? An offer counts only when a later message from the writer agrees to it, uses it or builds on it. Everything else the collaborator said is an offer nobody accepted, and it is left out whole: its people, its objects and its events, however good. If the writer has not written since the collaborator last spoke, nothing in that reply was taken up; an instruction to build is not an answer to it, and a bracketed note before it says so.
+2. What did the collaborator add? A detail it added counts as accepted unless the writer turned it down: a person, a place, an object, a fact that is so when the story opens. Two things it said never count. Where it contradicts something the writer said, the writer's version stands and the collaborator's is left out. And what it says will happen is not a fact: an arrival, a discovery, a scene to come is left out.
 3. Which of those is already under [WORLD] or [THREADS]? Those need no command unless later talk changed them.
-4. For each thing the writer wants, is it already so when the story opens? YES: it is recorded as fact, in a summary or a THREAD's state. NO: it is something to come, and it goes in the wish segment of the THREAD whose cast it concerns, and nowhere else. What did the writer say is true now that makes it possible? That is recorded as fact. Where the writer gave nothing, add nothing: do not invent an object, a place or a circumstance to carry the wish, and do not borrow one from an offer that was left out.
+4. Is anything hidden from someone in the story: a thing done that they have not been told, a thing owed, a thing kept back? The whole of it goes in the private segment of a THREAD, the deed as well as the silence about it, and in no summary and no state. The story model writes whatever it is shown as something everyone knows.
+5. For each thing the writer wants, is it already so when the story opens? YES: it is recorded as fact, in a summary or a THREAD's state if it is open knowledge, in a private segment if it is hidden. NO: it is something to come, and it goes in the wish segment of the THREAD whose cast it concerns, and nowhere else. Where the conversation gave nothing that makes it possible, add nothing: do not invent an object, a place or a circumstance to carry the wish.
 
 Then write the commands, one per line, and stop.
 
-Build only what the conversation supports. Write nothing the conversation did not raise: no extra people to fill a town, no place nobody mentioned. What the writer stated is never changed to fit something the collaborator said. When the writer said something is hidden or unspoken, or named something they want to happen, write a THREAD for it. If there is nothing new to record, say so and write no command.
+Build only what the conversation supports. Write nothing the conversation did not raise: no extra people to fill a town, no place nobody mentioned. What the writer stated is never changed to fit something the collaborator said. When something is hidden or unspoken, or the writer named something they want to happen, write a THREAD for it. If there is nothing new to record, say so and write no command.
 
 COMMANDS:
 [CREATE <TYPE> "<Name>" | summary of one to three sentences]
@@ -89,23 +90,24 @@ COMMANDS:
 [THREAD "<Title>" | "<A>", "<B>" | state | private | wish]
 <TYPE> is CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION or TOPIC.
 A SITUATION is a pressure. Its summary reads "what is happening; what keeps it from settling", and stops there. The REGISTER note gives the most SITUATIONs the whole scenario may hold, so count the ones under [WORLD] before writing another.
-A THREAD names one to four elements and always has all five segments. state is how things stand now, and it is shown to the story model. private is what is true now and hidden, owed or unspoken; the story model never sees it. wish is what the writer wants to come about; the story model never sees it. Leave private or wish empty between its bars when there is none. A THREAD whose title is already under [THREADS] rewrites that Thread's state, private and wish: a segment left empty keeps what is stored, and the cast does not change.
+A THREAD names one to four elements and always has all five segments. state is how things stand now as anyone in the story could say it, and it is shown to the story model. private is what is true now and hidden, owed or unspoken; the story model never sees it. wish is what the writer wants to come about; the story model never sees it. Leave private or wish empty between its bars when there is none. A THREAD whose title is already under [THREADS] rewrites that Thread's state, private and wish: a segment left empty keeps what is stored, and the cast does not change.
 Anything under [WORLD] may be revised or renamed. Only a line marked * may be deleted. What you write is real at once. If [REJECTED LAST TURN] is present, correct each command as its line says; where the line says a thing cannot be done, do not write that command again.
 
-EXAMPLE. The writer said that Hesper Vane is a lock-keeper on a dying canal who alone holds the sluice keys; that her brother Corin has already sold his half of the lock house to the barge company and has not told her he has been paid; and that they want her to end up flooding the cut to stop them. The collaborator answered with a company agent, Mr Rudd, arriving with a writ, and the writer has not written since. Nothing is built yet.
-The writer said: Hesper Vane keeps a lock on a dying canal and alone holds the sluice keys; her brother Corin has sold his half of the lock house to the barge company; he has not told her he was paid; and they want her to flood the cut. The collaborator offered Mr Rudd and his writ, and the writer has not written since, so both are left out. None of it is under [WORLD]. Corin's sale has happened, so it is fact. His silence about the money is hidden, so it is private. The flooding is to come, so it goes in the wish; what the writer said is true now that makes it possible is that Hesper alone holds the sluice keys, so that is recorded.
+EXAMPLE. The writer said that Hesper Vane is a lock-keeper on a dying canal who alone holds the sluice keys; that her brother Corin has already sold his half of the lock house to the barge company and has not told her; and that they want her to end up flooding the cut to stop them. The collaborator answered that the company's agent, Mr Rudd, lodges at the Bargeman's Rest, that Corin is nineteen and has never worked the lock, and that Rudd will serve a writ on Friday. The writer had said Corin worked the lock beside her for ten years, and has not written since. Nothing is built yet.
+The writer said: Hesper Vane keeps a lock on a dying canal and alone holds the sluice keys; her brother Corin worked it beside her for ten years; he has sold his half of the lock house to the barge company and has not told her; and they want her to flood the cut. The collaborator added Mr Rudd, the company's agent, lodging at the Bargeman's Rest, which is taken. It also said Corin never worked the lock, which contradicts the writer, so the ten years stand; and that Rudd will serve a writ on Friday, which is to come, so it is left out. None of it is under [WORLD]. The sale is hidden from Hesper, so the sale and the silence both go in private and neither summary mentions it. The flooding is to come, so it goes in the wish; her keys are what make it possible, and the writer gave them.
 [CREATE SITUATION "The Company's Offer" | The barge company is buying the lock houses along the cut to close it and take the water for its mills; every keeper who sells makes the next refusal cost more.]
 [CREATE CHARACTER "Hesper Vane" | Keeps Tolland Lock as her mother did. Rope-scarred palms, and a ring of sluice keys on her belt that she counts by touch.]
-[CREATE CHARACTER "Corin Vane" | Her brother. Clean boots on a towpath. Carries the company's survey book under his arm.]
-[CREATE LOCATION "Tolland Lock House" | Damp plaster and coal smoke; one kitchen and two owners. The sluice wheel stands in the yard where anyone on the towpath can see who turns it.]
-[THREAD "Half the House" | "Hesper Vane", "Corin Vane" | Corin Vane has sold his half of Tolland Lock House to the barge company. Hesper Vane holds the only set of sluice keys. | Corin Vane has not told Hesper Vane that the company has already paid him. | Hesper Vane floods the cut to stop the company.]`;
+[CREATE CHARACTER "Corin Vane" | Her brother, ten years at the lock beside her. Clean boots on a towpath these days, and a town coat he keeps on indoors.]
+[CREATE CHARACTER "Mr Rudd" | The barge company's agent on the cut. Lodges at the Bargeman's Rest and pays for his suppers a week ahead.]
+[CREATE LOCATION "Tolland Lock House" | Damp plaster and coal smoke; one kitchen, two names on the deed. The sluice wheel stands in the yard where anyone on the towpath can see who turns it.]
+[THREAD "Half the House" | "Hesper Vane", "Corin Vane" | Hesper Vane and Corin Vane keep Tolland Lock House between them. Hesper Vane holds the only set of sluice keys. | Corin Vane has sold his half of Tolland Lock House to the barge company and been paid. Hesper Vane has not been told. | Hesper Vane floods the cut to stop the company.]`;
 
 /** What a Build reply is made to open with. GLM asked to think first often
  *  goes straight to commands, most of all once the transcript shows earlier
  *  Build replies as commands alone; started on these words it has to restate
- *  the writer's own statements before it writes one, which is also what keeps
- *  a collaborator's unaccepted offer from being recorded as settled. Kept on
- *  the reply, so the writer can read the thinking it begins. */
+ *  the writer's own statements before it writes one, so that what Plan added
+ *  is weighed against them and not the other way about. Kept on the reply, so
+ *  the writer can read the thinking it begins. */
 export const SCENARIO_BUILD_PREFILL = "The writer said:";
 
 export const SCENARIO_BUILD_REGISTERS: Record<RegisterKey, string> = {
@@ -121,20 +123,12 @@ export function buildScenarioBuildPrompt(level: RegisterKey): string {
   return `${SCENARIO_BUILD_PROMPT}\n\n${SCENARIO_BUILD_REGISTERS[level]}`;
 }
 
-/** The user turn an empty Build send stands for. It names the writer's own
- *  statements: "what we have discussed" handed the builder every unanswered
- *  Plan reply as agreed. */
-export const SCENARIO_BUILD_INSTRUCTION = `Build from what I have said.`;
-
-/** Put before the instruction when an empty Build send follows a Plan reply the
- *  writer never answered. Asked to judge that from the transcript alone, GLM
- *  wrote "the writer then agreed" and recorded the reply; the code knows who
- *  spoke last, so it says so. */
-export const SCENARIO_UNANSWERED_NOTE = `[The writer has not answered the collaborator's last reply. Nothing in it is agreed: record none of its people, objects or events.]`;
+/** The user turn an empty Build send stands for. */
+export const SCENARIO_BUILD_INSTRUCTION = `Build what we have discussed.`;
 
 export const FOUNDATION_SITUATION_PROMPT = `Write the story's Situation: one or two sentences in the present tense, saying what is happening when the story opens and which two things someone values cannot both be kept. Name people and places as the World does. Say nothing of what anyone will choose, what will happen, or how it ends.
 
-"The barge company is buying the lock houses along the Tolland cut to close it; Hesper Vane keeps the last working lock, and her brother has sold his half of the house."
+"The barge company is buying the lock houses along the Tolland cut to close it; Hesper Vane keeps the last working lock and will not sell, and every house that goes makes hers cost more to keep."
 "A ranger three years into a coastal posting keeps every routine of belonging there, and the town still calls her the new one."
 
 Write the sentences on one line. No preamble.`;

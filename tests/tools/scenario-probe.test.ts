@@ -6,7 +6,6 @@ import {
   SCENARIO_BUILD_PREFILL,
   SCENARIO_BUILD_PROMPT,
   SCENARIO_BUILD_REGISTERS,
-  SCENARIO_UNANSWERED_NOTE,
 } from "../../src/core/utils/prompts";
 
 /** The probe is a standalone script and cannot import from `src/`, so it
@@ -19,7 +18,6 @@ describe("tools/scenario-probe.naiscript measures the shipped prompt", () => {
     ["SCENARIO_BUILD_PROMPT", SCENARIO_BUILD_PROMPT],
     ["REGISTER", SCENARIO_BUILD_REGISTERS.Gritty],
     ["SCENARIO_BUILD_INSTRUCTION", SCENARIO_BUILD_INSTRUCTION],
-    ["SCENARIO_UNANSWERED_NOTE", SCENARIO_UNANSWERED_NOTE],
     ["SCENARIO_BUILD_PREFILL", SCENARIO_BUILD_PREFILL],
   ])("carries %s verbatim", (name, prompt) => {
     expect(probe).toContain(`const ${name} = ${JSON.stringify(prompt)};`);
@@ -64,6 +62,7 @@ describe("tools/scenario-probe.naiscript reads replies as the product does", () 
       'Prose.\n[THREAD "The Ledger" | "Odile Marsh", "Brannock Tye" | Odile Marsh keeps the books. | Odile Marsh takes the tannery.]\n' +
       creates[1],
     decorated: `Prose.\n${creates[0]}\n- ${thread}\nDoes it hold?`,
+    createThread: `Prose.\n${creates[0]}\n${thread.replace("[THREAD", "[CREATE THREAD")}`,
   };
 
   it.each(Object.keys(samples))(
@@ -228,70 +227,93 @@ describe("tools/scenario-probe.naiscript reads replies as the product does", () 
     read(
       `[CREATE CHARACTER "Dov" | ${summary}]\n[THREAD "The Landing" | "Brisa Calloway", "Dov" | ${state} | ${priv} | ${wish}]`,
     );
-  const SIGNED = "Dov has signed the landing rights over to the commission.";
-  const UNTOLD = "Dov has not told Brisa Calloway.";
+  const OPEN = "The commission has stopped the ferry's subsidy.";
+  const SECRET = "Dov has signed the landing rights over; Brisa is not told.";
   const FINDS = "Brisa Calloway finds out on her own.";
 
-  it("passes a build that records what the writer said and nothing else", () => {
-    expect(holds("Untaken")(ferry("Her nephew.", SIGNED, UNTOLD, FINDS))).toBe(
+  it("passes a build that keeps the hidden signing private", () => {
+    expect(holds("Unanswered")(ferry("Her nephew.", OPEN, SECRET, FINDS))).toBe(
       true,
     );
-    // The signing may be kept private instead of shown.
+  });
+
+  it("passes the collaborator's unanswered details", () => {
     expect(
-      holds("Untaken")(
-        ferry("Her nephew.", "Dov works the crossing.", SIGNED, FINDS),
+      holds("Unanswered")(
+        read(
+          `[CREATE CHARACTER "Pell" | A commission surveyor with a brass theodolite.]\n[THREAD "The Landing" | "Brisa Calloway", "Dov" | ${OPEN} | ${SECRET} The deed is gone from the strongbox. | ${FINDS}]`,
+        ),
       ),
     ).toBe(true);
   });
 
   it.each([
-    ["a summary", ferry("Away upriver for the day.", SIGNED, UNTOLD, FINDS)],
-    ["a state", ferry("Her nephew.", `${SIGNED} Pell walks it.`, "", FINDS)],
     [
-      "a private segment",
-      ferry(
-        "Her nephew.",
-        SIGNED,
-        "The deed is gone from the strongbox.",
-        FINDS,
-      ),
+      "a summary",
+      ferry("Signed the rights away in spring.", OPEN, SECRET, FINDS),
     ],
     [
-      "a wish",
-      ferry("Her nephew.", SIGNED, UNTOLD, "She finds the surveyor first."),
+      "a state",
+      ferry("Her nephew.", `${OPEN} Dov's signature is on it.`, SECRET, FINDS),
     ],
-  ])("fails the collaborator's untaken invention in %s", (_where, r) => {
-    expect(holds("Untaken")(r)).toBe(false);
+    [
+      "a state, as the deed gone",
+      ferry("Her nephew.", `${OPEN} The deed is gone.`, SECRET, FINDS),
+    ],
+  ])("fails the hidden signing shown in %s", (_where, r) => {
+    expect(holds("Unanswered")(r)).toBe(false);
   });
 
-  it("passes rope on a ferry, and fails the deed gone missing", () => {
-    expect(
-      holds("Untaken")(
-        ferry("Hands calloused from the pole and the rope.", SIGNED, "", FINDS),
-      ),
-    ).toBe(true);
-    expect(
-      holds("Untaken")(
-        ferry("Her nephew.", SIGNED, UNTOLD, "She finds the deed is missing."),
-      ),
-    ).toBe(false);
-  });
-
-  it("fails a build that drops what the writer said", () => {
-    expect(
-      holds("Untaken")(ferry("Her nephew.", "They work it.", "", FINDS)),
-    ).toBe(false);
-    expect(holds("Untaken")(ferry("Her nephew.", SIGNED, UNTOLD, ""))).toBe(
+  it("fails the hidden signing left out of every private segment", () => {
+    expect(holds("Unanswered")(ferry("Her nephew.", OPEN, "", FINDS))).toBe(
       false,
     );
   });
 
-  it("fails the finding out written where the story model is shown it", () => {
+  it.each([
+    [
+      "an arrival",
+      ferry("Her nephew.", `${OPEN} Pell arrives to walk it.`, SECRET, FINDS),
+    ],
+    [
+      "the finding out",
+      ferry("Her nephew.", `${OPEN} She learns of it alone.`, SECRET, FINDS),
+    ],
+  ])("fails %s shown as if it were so", (_what, r) => {
+    expect(holds("Unanswered")(r)).toBe(false);
+  });
+
+  it("fails the finding out that no wish holds", () => {
+    expect(holds("Unanswered")(ferry("Her nephew.", OPEN, SECRET, ""))).toBe(
+      false,
+    );
+  });
+
+  const clock = (mab: string, pressure: string) =>
+    read(
+      `[CREATE CHARACTER "Mab Roe" | ${mab}]\n[CREATE SITUATION "The Stipend" | ${pressure}]\n[THREAD "The Clock" | "Mab Roe" | Mab winds it. | | Mab keeps the clock herself.]`,
+    );
+
+  it("passes the writer's version of a contradicted fact", () => {
     expect(
-      holds("Untaken")(
-        ferry("Her nephew.", `${SIGNED} She learns of it alone.`, "", FINDS),
+      holds("Contradicted")(
+        clock("Twelve years old.", "The council has cut the stipend by half."),
       ),
-    ).toBe(false);
+    ).toBe(true);
+  });
+
+  it.each([
+    ["her age", clock("Nineteen.", "The council has cut the stipend by half.")],
+    [
+      "the stipend",
+      clock("Twelve years old.", "The stipend was stopped altogether."),
+    ],
+    [
+      "a dropped fact",
+      clock("His daughter.", "The council has cut the stipend by half."),
+    ],
+  ])("fails the collaborator's version of %s", (_what, r) => {
+    expect(holds("Contradicted")(r)).toBe(false);
   });
 
   it("counts zero Threads for a four-segment line in both readers", () => {

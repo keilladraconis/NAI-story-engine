@@ -8,6 +8,7 @@ import {
   parseForgeStream,
   describeForgeCommand,
   THREAD_REPAIR,
+  unrecognizedAction,
 } from "../../../src/core/utils/crucible-command-parser";
 
 describe("parseCommands", () => {
@@ -664,5 +665,29 @@ describe("commandBody", () => {
         ],
       },
     });
+  });
+});
+
+describe("[CREATE THREAD …] is read as a THREAD", () => {
+  const line =
+    '[CREATE THREAD "A Brother\'s Secret" | "Ilse", "Tam" | They keep the light. | Tam has sold his share. | Ilse finds out by herself.]';
+
+  it("parses with all five segments", () => {
+    expect(parseCommands(line)).toEqual([
+      {
+        kind: "THREAD",
+        title: "A Brother's Secret",
+        memberNames: ["Ilse", "Tam"],
+        state: "They keep the light.",
+        latent: "Tam has sold his share.",
+        wish: "Ilse finds out by herself.",
+      },
+    ]);
+  });
+
+  it("is told the THREAD repair when it is short a segment", () => {
+    const short =
+      '[CREATE THREAD "A Brother\'s Secret" | "Ilse", "Tam" | They keep the light.]';
+    expect(unrecognizedAction(short).reason).toBe(THREAD_REPAIR);
   });
 });

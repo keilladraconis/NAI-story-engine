@@ -140,10 +140,7 @@ describe("the Scenario Build prompt", () => {
 
   it("gives an example whose conversation raised what its private segment holds", () => {
     expect(SCENARIO_BUILD_PROMPT).toContain(
-      "\nEXAMPLE. The writer said that Hesper Vane is a lock-keeper on a dying canal who alone holds the sluice keys; that her brother Corin has already sold his half of the lock house to the barge company and has not told her he has been paid; and that they want her to end up flooding the cut to stop them.",
-    );
-    expect(SCENARIO_BUILD_PROMPT).toContain(
-      "Corin Vane has not told Hesper Vane that the company has already paid him.",
+      "\nEXAMPLE. The writer said that Hesper Vane is a lock-keeper on a dying canal who alone holds the sluice keys; that her brother Corin has already sold his half of the lock house to the barge company and has not told her;",
     );
   });
 
@@ -156,29 +153,62 @@ describe("the Scenario Build prompt", () => {
     );
   });
 
-  it("leaves out what the collaborator offered and the writer never took up", () => {
-    expect(SCENARIO_BUILD_PROMPT).toContain(
-      "An offer counts only when a later message from the writer agrees to it, uses it or builds on it.",
-    );
-    expect(SCENARIO_BUILD_PROMPT).toContain(
-      "an instruction to build is not an answer to it, and a bracketed note before it says so.",
-    );
-    // The example's untaken offer appears in no command.
-    const commands = SCENARIO_BUILD_PROMPT.slice(
+  /** The example's commands, each split into what the story model is shown
+   *  and what it is not. */
+  const example = () => {
+    const lines = SCENARIO_BUILD_PROMPT.slice(
       SCENARIO_BUILD_PROMPT.indexOf('[CREATE SITUATION "The Company'),
+    ).split("\n");
+    const thread = lines.find((l) => l.startsWith("[THREAD"))!.split("|");
+    return {
+      shown: [...lines.filter((l) => l.startsWith("[CREATE")), thread[2]].join(
+        "\n",
+      ),
+      private: thread[3],
+      all: lines.join("\n"),
+    };
+  };
+
+  it("takes a detail the collaborator added and the writer did not turn down", () => {
+    expect(SCENARIO_BUILD_PROMPT).toContain(
+      "A detail it added counts as accepted unless the writer turned it down",
     );
-    expect(commands).not.toMatch(/Rudd|writ\b/);
+    expect(example().all).toContain('[CREATE CHARACTER "Mr Rudd"');
+  });
+
+  it("keeps the writer's version where the collaborator contradicts it", () => {
+    expect(SCENARIO_BUILD_PROMPT).toContain(
+      "Where it contradicts something the writer said, the writer's version stands",
+    );
+    expect(example().all).toContain("ten years at the lock");
+    expect(example().all).not.toMatch(/nineteen|never worked/);
+  });
+
+  it("leaves out what the collaborator said will happen", () => {
+    expect(SCENARIO_BUILD_PROMPT).toContain(
+      "what it says will happen is not a fact",
+    );
+    expect(example().all).not.toMatch(/writ\b|Friday/);
+  });
+
+  it("shows the story model nothing that is hidden", () => {
+    expect(SCENARIO_BUILD_PROMPT).toContain(
+      "The whole of it goes in the private segment of a THREAD, the deed as well as the silence about it, and in no summary and no state.",
+    );
+    const { shown, private: hidden } = example();
+    expect(shown).not.toMatch(/\bsold\b|\bsale\b|\bpaid\b/);
+    expect(hidden).toContain("has sold his half of Tolland Lock House");
   });
 
   it("invents nothing to carry a wish", () => {
     expect(SCENARIO_BUILD_PROMPT).toContain(
-      "Where the writer gave nothing, add nothing: do not invent an object, a place or a circumstance to carry the wish, and do not borrow one from an offer that was left out.",
+      "do not invent an object, a place or a circumstance to carry the wish.",
     );
   });
 
   it("asks for a THREAD when something is hidden or wanted", () => {
     expect(SCENARIO_BUILD_PROMPT).toContain(
-      "When the writer said something is hidden or unspoken, or named something they want to happen, write a THREAD for it.",
+      "When something is hidden or unspoken, or the writer named something they want to happen, write a THREAD for it.",
     );
   });
 
@@ -204,6 +234,6 @@ describe("the Scenario Build prompt", () => {
   });
 
   it("exports the instruction an empty send stands for", () => {
-    expect(SCENARIO_BUILD_INSTRUCTION).toBe("Build from what I have said.");
+    expect(SCENARIO_BUILD_INSTRUCTION).toBe("Build what we have discussed.");
   });
 });

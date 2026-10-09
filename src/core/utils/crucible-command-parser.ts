@@ -193,7 +193,7 @@ export function unrecognizedAction(raw: string): ForgeActionRecord {
   return {
     kind: "UNKNOWN",
     status: "unrecognized",
-    reason: /^\[\s*THREAD\b/i.test(raw) ? THREAD_REPAIR : raw,
+    reason: /^\[\s*(?:CREATE\s+)?THREAD\b/i.test(raw) ? THREAD_REPAIR : raw,
     body: [{ label: "Written", text: raw }],
   };
 }
@@ -308,6 +308,8 @@ interface ParsedCommandAt {
   consumed: number;
 }
 
+const CREATE_THREAD = /^\[\s*CREATE\s+THREAD\b/i;
+
 /** What a THREAD that did not parse is told. Position is meaning in this
  *  command, so a short one is never guessed at: read as four segments, a wish
  *  would land in `latent` and be written into an entry as fact on conclusion. */
@@ -317,7 +319,10 @@ export const THREAD_REPAIR =
 /** Parse the command starting at lines[i], or null if that line is not a
  *  command. Returns how many *following* lines were consumed as content. */
 function parseCommandAt(lines: string[], i: number): ParsedCommandAt | null {
-  const line = lines[i].trim();
+  // Every other creation is CREATE <TYPE>, so the model sometimes writes
+  // [CREATE THREAD …]. Read it as the THREAD it is: rejected as an unknown
+  // type, it took the Thread's private notes and wish with it.
+  const line = lines[i].trim().replace(CREATE_THREAD, "[THREAD");
 
   if (/^\[\s*DONE\s*\]$/.test(line)) {
     return { command: { kind: "DONE" }, consumed: 0 };

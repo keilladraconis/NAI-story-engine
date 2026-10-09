@@ -42,7 +42,7 @@ export const scenarioSpec: ChatTypeSpec<ScenarioMode> = {
 
   inputPlaceholderFor(chat: Chat): string {
     return scenarioMode(chat) === "build"
-      ? "Say what to build, or send empty to build from what you've said…"
+      ? "Say what to build, or send empty to build what you've discussed…"
       : "Talk the scenario through…";
   },
 
