@@ -2,19 +2,21 @@
 compatibilityVersion: naiscript-1.0
 id: 6d0e7c1b-2a54-4f0e-9b7d-3c5a8e21f4a9
 name: Scenario Probe
-version: 0.2.0
+version: 0.3.0
 description: How often does a Build turn keep a thing to come out of everything the story model is shown, and how much does it build that nobody asked for?
 memoryLimit: 8
 ---*/
 
-// These four constants are copies of the shipped Build prompt, its Gritty
-// register, the fixed Build instruction and the Build prefill in
+// These five constants are copies of the shipped Build prompt, its Gritty
+// register, the fixed Build instruction, the unanswered-reply note and the
+// Build prefill in
 // src/core/utils/prompts.ts;
 // tests/tools/scenario-probe.test.ts fails if they drift.
-const SCENARIO_BUILD_PROMPT = "You are the Scenario Engine's builder. A writer and a collaborator have been talking about a story. You record what they settled on as the conditions the story can grow from: pressures, the people and places under them, and how things stand between them. You never record a plot, an arc, a goal or an ending. Another model will continue this story from a blank page, and it acts on whatever it is shown: told that something will happen, it writes it happening at once, or as already done. So everything you record says only what is so when the story opens.\n\nThe context block above the conversation lists everything that exists under [WORLD], and how things stand under [THREADS]. A list that is missing is empty. The writer's last message says what to build.\n\nThink out loud first, in plain sentences, answering in order:\n1. What did the conversation settle? Name each person, place, pressure and standing between people that the writer raised or agreed to. Leave out what the collaborator offered and the writer did not take up.\n2. Which of those is already under [WORLD] or [THREADS]? Those need no command unless later talk changed them.\n3. For each thing the writer wants, is it already so when the story opens? YES: it is recorded as fact, in a summary or a THREAD's state. NO: it is something to come. What is true now that makes it possible? That is what is recorded, and the thing itself goes in the wish segment of the THREAD whose cast it concerns, and nowhere else.\n\nThen write the commands, one per line, and stop.\n\nBuild only what the conversation supports. Write nothing the conversation did not raise: no extra people to fill a town, no place nobody mentioned. If there is nothing new to record, say so and write no command.\n\nCOMMANDS:\n[CREATE <TYPE> \"<Name>\" | summary of one to three sentences]\n[REVISE \"<Name>\" | new summary]\n[RENAME \"<Old>\" → \"<New>\"]\n[DELETE \"<Name>\"]\n[THREAD \"<Title>\" | \"<A>\", \"<B>\" | state | private | wish]\n<TYPE> is CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION or TOPIC.\nA SITUATION is a pressure. Its summary reads \"what is happening; what keeps it from settling\", and stops there. The REGISTER note gives the most SITUATIONs the whole scenario may hold, so count the ones under [WORLD] before writing another.\nA THREAD names one to four elements and always has all five segments. state is how things stand now, and it is shown to the story model. private is what is true now and hidden, owed or unspoken; the story model never sees it. wish is what the writer wants to come about; the story model never sees it. Leave private or wish empty between its bars when there is none. A THREAD whose title is already under [THREADS] rewrites that Thread's state, private and wish: a segment left empty keeps what is stored, and the cast does not change.\nAnything under [WORLD] may be revised or renamed. Only a line marked * may be deleted. What you write is real at once. If [REJECTED LAST TURN] is present, correct each command as its line says; where the line says a thing cannot be done, do not write that command again.\n\nEXAMPLE. The conversation settled on Hesper Vane, a lock-keeper on a dying canal; her brother Corin, who has already sold his half of the lock house to the barge company and has not told her he has been paid; and that the writer wants her to end up flooding the cut to stop them. Nothing is built yet.\nSettled: Hesper Vane, Corin Vane, the lock house, and the company buying up the cut. None of it is under [WORLD]. Corin's sale has happened, so it is fact. The flooding is to come: what is true now is that Hesper alone holds the sluice keys, so that is recorded and the flooding goes in the wish.\n[CREATE SITUATION \"The Company's Offer\" | The barge company is buying the lock houses along the cut to close it and take the water for its mills; every keeper who sells makes the next refusal cost more.]\n[CREATE CHARACTER \"Hesper Vane\" | Keeps Tolland Lock as her mother did. Rope-scarred palms, and a ring of sluice keys on her belt that she counts by touch.]\n[CREATE CHARACTER \"Corin Vane\" | Her brother. Clean boots on a towpath. Carries the company's survey book under his arm.]\n[CREATE LOCATION \"Tolland Lock House\" | Damp plaster and coal smoke; one kitchen and two owners. The sluice wheel stands in the yard where anyone on the towpath can see who turns it.]\n[THREAD \"Half the House\" | \"Hesper Vane\", \"Corin Vane\" | Corin Vane has sold his half of Tolland Lock House to the barge company. Hesper Vane holds the only set of sluice keys. | Corin Vane has not told Hesper Vane that the company has already paid him. | Hesper Vane floods the cut to stop the company.]";
+const SCENARIO_BUILD_PROMPT = "You are the Scenario Engine's builder. A writer and a collaborator have been talking about a story. You record what they settled on as the conditions the story can grow from: pressures, the people and places under them, and how things stand between them. You never record a plot, an arc, a goal or an ending. Another model will continue this story from a blank page, and it acts on whatever it is shown: told that something will happen, it writes it happening at once, or as already done. So everything you record says only what is so when the story opens.\n\nThe context block above the conversation lists everything that exists under [WORLD], and how things stand under [THREADS]. A list that is missing is empty. The writer's last message says what to build.\n\nThink out loud first, in plain sentences, answering in order:\n1. What did the writer say? Go through the writer's own messages and name each person, place, pressure and standing between people they stated, each thing they said is hidden or unspoken, and each thing they want to happen.\n2. What did the collaborator add that the writer took up? An offer counts only when a later message from the writer agrees to it, uses it or builds on it. Everything else the collaborator said is an offer nobody accepted, and it is left out whole: its people, its objects and its events, however good. If the writer has not written since the collaborator last spoke, nothing in that reply was taken up; an instruction to build is not an answer to it, and a bracketed note before it says so.\n3. Which of those is already under [WORLD] or [THREADS]? Those need no command unless later talk changed them.\n4. For each thing the writer wants, is it already so when the story opens? YES: it is recorded as fact, in a summary or a THREAD's state. NO: it is something to come, and it goes in the wish segment of the THREAD whose cast it concerns, and nowhere else. What did the writer say is true now that makes it possible? That is recorded as fact. Where the writer gave nothing, add nothing: do not invent an object, a place or a circumstance to carry the wish, and do not borrow one from an offer that was left out.\n\nThen write the commands, one per line, and stop.\n\nBuild only what the conversation supports. Write nothing the conversation did not raise: no extra people to fill a town, no place nobody mentioned. What the writer stated is never changed to fit something the collaborator said. When the writer said something is hidden or unspoken, or named something they want to happen, write a THREAD for it. If there is nothing new to record, say so and write no command.\n\nCOMMANDS:\n[CREATE <TYPE> \"<Name>\" | summary of one to three sentences]\n[REVISE \"<Name>\" | new summary]\n[RENAME \"<Old>\" → \"<New>\"]\n[DELETE \"<Name>\"]\n[THREAD \"<Title>\" | \"<A>\", \"<B>\" | state | private | wish]\n<TYPE> is CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION or TOPIC.\nA SITUATION is a pressure. Its summary reads \"what is happening; what keeps it from settling\", and stops there. The REGISTER note gives the most SITUATIONs the whole scenario may hold, so count the ones under [WORLD] before writing another.\nA THREAD names one to four elements and always has all five segments. state is how things stand now, and it is shown to the story model. private is what is true now and hidden, owed or unspoken; the story model never sees it. wish is what the writer wants to come about; the story model never sees it. Leave private or wish empty between its bars when there is none. A THREAD whose title is already under [THREADS] rewrites that Thread's state, private and wish: a segment left empty keeps what is stored, and the cast does not change.\nAnything under [WORLD] may be revised or renamed. Only a line marked * may be deleted. What you write is real at once. If [REJECTED LAST TURN] is present, correct each command as its line says; where the line says a thing cannot be done, do not write that command again.\n\nEXAMPLE. The writer said that Hesper Vane is a lock-keeper on a dying canal who alone holds the sluice keys; that her brother Corin has already sold his half of the lock house to the barge company and has not told her he has been paid; and that they want her to end up flooding the cut to stop them. The collaborator answered with a company agent, Mr Rudd, arriving with a writ, and the writer has not written since. Nothing is built yet.\nThe writer said: Hesper Vane keeps a lock on a dying canal and alone holds the sluice keys; her brother Corin has sold his half of the lock house to the barge company; he has not told her he was paid; and they want her to flood the cut. The collaborator offered Mr Rudd and his writ, and the writer has not written since, so both are left out. None of it is under [WORLD]. Corin's sale has happened, so it is fact. His silence about the money is hidden, so it is private. The flooding is to come, so it goes in the wish; what the writer said is true now that makes it possible is that Hesper alone holds the sluice keys, so that is recorded.\n[CREATE SITUATION \"The Company's Offer\" | The barge company is buying the lock houses along the cut to close it and take the water for its mills; every keeper who sells makes the next refusal cost more.]\n[CREATE CHARACTER \"Hesper Vane\" | Keeps Tolland Lock as her mother did. Rope-scarred palms, and a ring of sluice keys on her belt that she counts by touch.]\n[CREATE CHARACTER \"Corin Vane\" | Her brother. Clean boots on a towpath. Carries the company's survey book under his arm.]\n[CREATE LOCATION \"Tolland Lock House\" | Damp plaster and coal smoke; one kitchen and two owners. The sluice wheel stands in the yard where anyone on the towpath can see who turns it.]\n[THREAD \"Half the House\" | \"Hesper Vane\", \"Corin Vane\" | Corin Vane has sold his half of Tolland Lock House to the barge company. Hesper Vane holds the only set of sluice keys. | Corin Vane has not told Hesper Vane that the company has already paid him. | Hesper Vane floods the cut to stop the company.]";
 const REGISTER = "REGISTER, Gritty: Three pressures at most in the whole scenario, with stakes that last. Each sets two things someone values against each other, where walking away is possible and costs something real.";
-const SCENARIO_BUILD_INSTRUCTION = "Build what we have discussed.";
-const SCENARIO_BUILD_PREFILL = "Settled:";
+const SCENARIO_BUILD_INSTRUCTION = "Build from what I have said.";
+const SCENARIO_UNANSWERED_NOTE = "[The writer has not answered the collaborator's last reply. Nothing in it is agreed: record none of its people, objects or events.]";
+const SCENARIO_BUILD_PREFILL = "The writer said:";
 
 // 60 generations against a 2048-token-per-240s output bucket: it takes a while.
 // A generation is refused outright when the bucket holds less than max_tokens,
@@ -82,6 +84,21 @@ const TALKS = {
         "The log is in his name by observatory rule, though she takes most of the plates. Orrowmere has written to him twice and he has not answered.",
     },
   ],
+  // The writer says everything in one message, the collaborator answers with
+  // a plot of its own, and the writer builds without replying. Nothing the
+  // collaborator said was taken up.
+  Untaken: [
+    {
+      role: "user",
+      content:
+        "A ferrywoman, Brisa Calloway, works the Marrow crossing with her nephew Dov, who came to help for the season. The bridge commission has stopped paying the ferry's subsidy. Dov has already signed the ferry's landing rights over to the commission and hasn't told her. I want her to find out on her own.",
+    },
+    {
+      role: "assistant",
+      content:
+        "Then a commission surveyor called Pell arrives with a brass theodolite while Dov is away upriver buying rope, and walks the landing as if it were his. Brisa goes to the tin strongbox under her bunk for the landing deed and finds it gone. Dov's signature is on the transfer.",
+    },
+  ],
 };
 
 // Each thing to come is matched as the event, never as a bare invented noun:
@@ -92,6 +109,15 @@ const FIRE = /Quillane Fire|burn\w*\b[^.\n]*\bdown\b/i;
 const CATALOGUE = /Vessarine Catalogue/i;
 const LEAVING = /\b(leav\w*|left|depart\w*)\b[^.\n]{0,20}\b(for|to)\s+Orrowmere/i;
 
+// What the collaborator made up in the Untaken talk. None of it was accepted,
+// so none of it may be recorded anywhere, shown or not.
+// "Rope" is not among them: a ferry has rope whoever is talking. The deed is,
+// but only as the collaborator used it, gone from where it was kept.
+const INVENTED =
+  /\bPell\b|theodolite|surveyor|upriver|strongbox|\bbunk\b|\bdeed\b[^.\n|]*\b(gone|missing)\b/i;
+const SIGNED = /\bsign\w*|landing rights/i;
+const FINDS_OUT = /\b(finds?|found|learns?|discovers?)\b/i;
+
 // What this does not send that the shipped Build turn does: no Foundation or
 // Setting, no [WORLD]/[THREADS] block (every fixture starts from an empty
 // world), and no continuation. Its numbers describe a first Build on an empty
@@ -99,6 +125,10 @@ const LEAVING = /\b(leav\w*|left|depart\w*)\b[^.\n]{0,20}\b(for|to)\s+Orrowmere/
 const messages = (talk) => [
   { role: "system", content: `${SCENARIO_BUILD_PROMPT}\n\n${REGISTER}` },
   ...talk,
+  // As the shipped Build turn does when the talk ends on the collaborator.
+  ...(talk[talk.length - 1].role === "assistant"
+    ? [{ role: "system", content: SCENARIO_UNANSWERED_NOTE }]
+    : []),
   { role: "user", content: SCENARIO_BUILD_INSTRUCTION },
   { role: "assistant", content: SCENARIO_BUILD_PREFILL },
 ];
@@ -147,15 +177,18 @@ const read = (text) => {
 
 // --- unasked:start ---
 // People, places and factions the conversation never mentioned. A name counts
-// as mentioned when any of its words of four letters or more appears in the
-// talk. Situations, systems and topics are left out: the model coins their
+// as mentioned when the talk contains it whole, or any of its words of four
+// letters or more. Situations, systems and topics are left out: the model coins their
 // names, so a name the talk lacks says nothing.
 const NAMED_TYPES = new Set(["CHARACTER", "LOCATION", "FACTION"]);
 const unasked = (created, conversation) => {
   const talk = new Set(conversation.toLowerCase().split(/[^a-z]+/));
+  const said = conversation.toLowerCase();
   return created.filter(
     (c) =>
       NAMED_TYPES.has(c.type) &&
+      // A short name ("Dov") has no four-letter word to match on.
+      !said.includes(c.name.toLowerCase()) &&
       !c.name
         .toLowerCase()
         .split(/[^a-z]+/)
@@ -195,6 +228,24 @@ const FIXTURES = [
       !CATALOGUE.test(r.privates) &&
       !LEAVING.test(r.privates),
   },
+  {
+    name: "Untaken",
+    contract:
+      "what the collaborator offered and the writer never took up is recorded nowhere, and what the writer said is: the signing is recorded, and the finding out is in a wish and in nothing shown",
+    talk: TALKS.Untaken,
+    parts: {
+      "collaborator's invention recorded": (r) =>
+        INVENTED.test(`${r.shown}\n${r.privates}\n${r.wishes}`),
+      "signing not recorded": (r) => !SIGNED.test(`${r.shown}\n${r.privates}`),
+      "finding out not in a wish": (r) => !FINDS_OUT.test(r.wishes),
+      "finding out shown": (r) => FINDS_OUT.test(r.shown),
+    },
+    holds: (r) =>
+      !INVENTED.test(`${r.shown}\n${r.privates}\n${r.wishes}`) &&
+      SIGNED.test(`${r.shown}\n${r.privates}`) &&
+      FINDS_OUT.test(r.wishes) &&
+      !FINDS_OUT.test(r.shown),
+  },
 ];
 
 let report = "";
@@ -212,6 +263,9 @@ async function runFixture(fixture) {
   let built = 0;
   let extra = 0;
   let worst = 0;
+  // A fixture may name the separate ways it can fail; each is counted.
+  const parts = Object.entries(fixture.parts ?? {});
+  const partCounts = parts.map(() => 0);
   const talkText = fixture.talk.map((m) => m.content).join("\n");
   let firstFailure = "";
   let firstError = "";
@@ -235,16 +289,27 @@ async function runFixture(fixture) {
     const r = read(text);
     const failed = r.threads === 0 || !fixture.holds(r);
     if (r.threads === 0) unparsed++;
+    const why = [];
+    parts.forEach(([name, test], i) => {
+      if (!test(r)) return;
+      partCounts[i]++;
+      why.push(name);
+    });
     if (failed) {
       failing++;
-      if (!firstFailure) firstFailure = text;
+      // Shown at once, not at the end: twenty runs is a long wait to learn
+      // what a failing reply looked like.
+      if (!firstFailure) {
+        firstFailure = text;
+        log(`  first failing output:\n${text}`);
+      }
     }
     const n = unasked(r.created, talkText);
     built += r.created.length;
     extra += n;
     worst = Math.max(worst, n);
     log(
-      `  ${fixture.name} run ${run + 1}: ${failed ? "FAIL" : "pass"}, ${n} unasked`,
+      `  ${fixture.name} run ${run + 1}: ${failed ? "FAIL" : "pass"}, ${n} unasked${why.length ? ` (${why.join("; ")})` : ""}`,
     );
   }
   const measured = RUNS - threw;
@@ -252,14 +317,16 @@ async function runFixture(fixture) {
   log(
     `${fixture.name}: ${failing} failing runs of ${measured} measured (${unparsed} with no THREAD parsed, ${threw} not measured) — ${fixture.contract} — built ${per(built)} per run, ${per(extra)} unasked (worst ${worst})`,
   );
+  parts.forEach(([name], i) =>
+    log(`  ${name}: ${partCounts[i]} runs of ${measured} measured`),
+  );
   if (firstError) log(`  first run not measured: ${firstError}`);
-  if (firstFailure) log(`  first failing output:\n${firstFailure}`);
 }
 
-async function runAll() {
+async function run(fixtures) {
   report = "";
   log(`Scenario probe — ${RUNS} runs per fixture on ${MODEL}`);
-  for (const fixture of FIXTURES) await runFixture(fixture);
+  for (const fixture of fixtures) await runFixture(fixture);
   log("done");
 }
 
@@ -270,10 +337,18 @@ api.v1.ui.register([
       api.v1.ui.part.column({
         content: [
           api.v1.ui.part.button({
-            text: "Run",
-            callback: () => runAll(),
+            text: "Run all",
+            callback: () => run(FIXTURES),
             disabledWhileCallbackRunning: true,
           }),
+          // One fixture at a time: twenty runs is a quarter of an hour.
+          ...FIXTURES.map((fixture) =>
+            api.v1.ui.part.button({
+              text: `Run ${fixture.name}`,
+              callback: () => run([fixture]),
+              disabledWhileCallbackRunning: true,
+            }),
+          ),
           // Does nothing itself: a budget wait only ends once a real button
           // has been pressed, and Run is disabled while the probe is running.
           api.v1.ui.part.button({
@@ -282,7 +357,7 @@ api.v1.ui.register([
           }),
           api.v1.ui.part.text({
             id: "report",
-            text: "Press Run. Report each line as N failing runs of M measured.",
+            text: "Press a Run button. Report each line as N failing runs of M measured.",
             noTemplate: true,
             style: { whiteSpace: "pre-wrap", userSelect: "text" },
           }),

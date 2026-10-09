@@ -31,6 +31,7 @@ import {
   normalizeRegisterKey,
   SCENARIO_BUILD_INSTRUCTION,
   SCENARIO_BUILD_PREFILL,
+  SCENARIO_UNANSWERED_NOTE,
   XIALONG_STYLE,
 } from "./prompts";
 import { DULFS_CATEGORY_LABELS } from "./category-detect";
@@ -161,7 +162,12 @@ export function buildScenarioBuildStrategy(
     // instruction. The send says which. The tail cannot: after a failed Plan
     // turn it is the writer's own Plan message, which directed nothing. Only
     // a retry, which carries no send, is read from the tail.
-    const directs = directed ?? prior[prior.length - 1]?.role === "user";
+    const last = prior[prior.length - 1];
+    const directs = directed ?? last?.role === "user";
+    // An empty send straight after a Plan reply: the writer answered none of
+    // it, and the transcript alone does not show the model that.
+    const unanswered =
+      !directs && last?.role === "assistant" && last.mode !== "build";
 
     const messages: Message[] = [
       {
@@ -179,6 +185,9 @@ export function buildScenarioBuildStrategy(
         formatRejections(prior),
       ]),
       ...scenarioConversation(chat.messages, assistantMessageId),
+      ...(unanswered
+        ? [{ role: "system" as const, content: SCENARIO_UNANSWERED_NOTE }]
+        : []),
       ...(directs
         ? []
         : [{ role: "user" as const, content: SCENARIO_BUILD_INSTRUCTION }]),

@@ -72,13 +72,14 @@ export const SCENARIO_BUILD_PROMPT = `You are the Scenario Engine's builder. A w
 The context block above the conversation lists everything that exists under [WORLD], and how things stand under [THREADS]. A list that is missing is empty. The writer's last message says what to build.
 
 Think out loud first, in plain sentences, answering in order:
-1. What did the conversation settle? Name each person, place, pressure and standing between people that the writer raised or agreed to. Leave out what the collaborator offered and the writer did not take up.
-2. Which of those is already under [WORLD] or [THREADS]? Those need no command unless later talk changed them.
-3. For each thing the writer wants, is it already so when the story opens? YES: it is recorded as fact, in a summary or a THREAD's state. NO: it is something to come. What is true now that makes it possible? That is what is recorded, and the thing itself goes in the wish segment of the THREAD whose cast it concerns, and nowhere else.
+1. What did the writer say? Go through the writer's own messages and name each person, place, pressure and standing between people they stated, each thing they said is hidden or unspoken, and each thing they want to happen.
+2. What did the collaborator add that the writer took up? An offer counts only when a later message from the writer agrees to it, uses it or builds on it. Everything else the collaborator said is an offer nobody accepted, and it is left out whole: its people, its objects and its events, however good. If the writer has not written since the collaborator last spoke, nothing in that reply was taken up; an instruction to build is not an answer to it, and a bracketed note before it says so.
+3. Which of those is already under [WORLD] or [THREADS]? Those need no command unless later talk changed them.
+4. For each thing the writer wants, is it already so when the story opens? YES: it is recorded as fact, in a summary or a THREAD's state. NO: it is something to come, and it goes in the wish segment of the THREAD whose cast it concerns, and nowhere else. What did the writer say is true now that makes it possible? That is recorded as fact. Where the writer gave nothing, add nothing: do not invent an object, a place or a circumstance to carry the wish, and do not borrow one from an offer that was left out.
 
 Then write the commands, one per line, and stop.
 
-Build only what the conversation supports. Write nothing the conversation did not raise: no extra people to fill a town, no place nobody mentioned. If there is nothing new to record, say so and write no command.
+Build only what the conversation supports. Write nothing the conversation did not raise: no extra people to fill a town, no place nobody mentioned. What the writer stated is never changed to fit something the collaborator said. When the writer said something is hidden or unspoken, or named something they want to happen, write a THREAD for it. If there is nothing new to record, say so and write no command.
 
 COMMANDS:
 [CREATE <TYPE> "<Name>" | summary of one to three sentences]
@@ -91,8 +92,8 @@ A SITUATION is a pressure. Its summary reads "what is happening; what keeps it f
 A THREAD names one to four elements and always has all five segments. state is how things stand now, and it is shown to the story model. private is what is true now and hidden, owed or unspoken; the story model never sees it. wish is what the writer wants to come about; the story model never sees it. Leave private or wish empty between its bars when there is none. A THREAD whose title is already under [THREADS] rewrites that Thread's state, private and wish: a segment left empty keeps what is stored, and the cast does not change.
 Anything under [WORLD] may be revised or renamed. Only a line marked * may be deleted. What you write is real at once. If [REJECTED LAST TURN] is present, correct each command as its line says; where the line says a thing cannot be done, do not write that command again.
 
-EXAMPLE. The conversation settled on Hesper Vane, a lock-keeper on a dying canal; her brother Corin, who has already sold his half of the lock house to the barge company and has not told her he has been paid; and that the writer wants her to end up flooding the cut to stop them. Nothing is built yet.
-Settled: Hesper Vane, Corin Vane, the lock house, and the company buying up the cut. None of it is under [WORLD]. Corin's sale has happened, so it is fact. The flooding is to come: what is true now is that Hesper alone holds the sluice keys, so that is recorded and the flooding goes in the wish.
+EXAMPLE. The writer said that Hesper Vane is a lock-keeper on a dying canal who alone holds the sluice keys; that her brother Corin has already sold his half of the lock house to the barge company and has not told her he has been paid; and that they want her to end up flooding the cut to stop them. The collaborator answered with a company agent, Mr Rudd, arriving with a writ, and the writer has not written since. Nothing is built yet.
+The writer said: Hesper Vane keeps a lock on a dying canal and alone holds the sluice keys; her brother Corin has sold his half of the lock house to the barge company; he has not told her he was paid; and they want her to flood the cut. The collaborator offered Mr Rudd and his writ, and the writer has not written since, so both are left out. None of it is under [WORLD]. Corin's sale has happened, so it is fact. His silence about the money is hidden, so it is private. The flooding is to come, so it goes in the wish; what the writer said is true now that makes it possible is that Hesper alone holds the sluice keys, so that is recorded.
 [CREATE SITUATION "The Company's Offer" | The barge company is buying the lock houses along the cut to close it and take the water for its mills; every keeper who sells makes the next refusal cost more.]
 [CREATE CHARACTER "Hesper Vane" | Keeps Tolland Lock as her mother did. Rope-scarred palms, and a ring of sluice keys on her belt that she counts by touch.]
 [CREATE CHARACTER "Corin Vane" | Her brother. Clean boots on a towpath. Carries the company's survey book under his arm.]
@@ -101,10 +102,11 @@ Settled: Hesper Vane, Corin Vane, the lock house, and the company buying up the 
 
 /** What a Build reply is made to open with. GLM asked to think first often
  *  goes straight to commands, most of all once the transcript shows earlier
- *  Build replies as commands alone; started on this word it has to say what
- *  was settled before it writes one. Kept on the reply, so the writer can read
- *  the thinking it begins. */
-export const SCENARIO_BUILD_PREFILL = "Settled:";
+ *  Build replies as commands alone; started on these words it has to restate
+ *  the writer's own statements before it writes one, which is also what keeps
+ *  a collaborator's unaccepted offer from being recorded as settled. Kept on
+ *  the reply, so the writer can read the thinking it begins. */
+export const SCENARIO_BUILD_PREFILL = "The writer said:";
 
 export const SCENARIO_BUILD_REGISTERS: Record<RegisterKey, string> = {
   unset: `REGISTER, not yet set: Record things at the pressure the conversation implies, with three pressures at most in the whole scenario. Add no danger the writer has not asked for.`,
@@ -119,8 +121,16 @@ export function buildScenarioBuildPrompt(level: RegisterKey): string {
   return `${SCENARIO_BUILD_PROMPT}\n\n${SCENARIO_BUILD_REGISTERS[level]}`;
 }
 
-/** The user turn an empty Build send stands for. */
-export const SCENARIO_BUILD_INSTRUCTION = `Build what we have discussed.`;
+/** The user turn an empty Build send stands for. It names the writer's own
+ *  statements: "what we have discussed" handed the builder every unanswered
+ *  Plan reply as agreed. */
+export const SCENARIO_BUILD_INSTRUCTION = `Build from what I have said.`;
+
+/** Put before the instruction when an empty Build send follows a Plan reply the
+ *  writer never answered. Asked to judge that from the transcript alone, GLM
+ *  wrote "the writer then agreed" and recorded the reply; the code knows who
+ *  spoke last, so it says so. */
+export const SCENARIO_UNANSWERED_NOTE = `[The writer has not answered the collaborator's last reply. Nothing in it is agreed: record none of its people, objects or events.]`;
 
 export const FOUNDATION_SITUATION_PROMPT = `Write the story's Situation: one or two sentences in the present tense, saying what is happening when the story opens and which two things someone values cannot both be kept. Name people and places as the World does. Say nothing of what anyone will choose, what will happen, or how it ends.
 

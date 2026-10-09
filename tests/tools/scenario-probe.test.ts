@@ -6,6 +6,7 @@ import {
   SCENARIO_BUILD_PREFILL,
   SCENARIO_BUILD_PROMPT,
   SCENARIO_BUILD_REGISTERS,
+  SCENARIO_UNANSWERED_NOTE,
 } from "../../src/core/utils/prompts";
 
 /** The probe is a standalone script and cannot import from `src/`, so it
@@ -18,6 +19,7 @@ describe("tools/scenario-probe.naiscript measures the shipped prompt", () => {
     ["SCENARIO_BUILD_PROMPT", SCENARIO_BUILD_PROMPT],
     ["REGISTER", SCENARIO_BUILD_REGISTERS.Gritty],
     ["SCENARIO_BUILD_INSTRUCTION", SCENARIO_BUILD_INSTRUCTION],
+    ["SCENARIO_UNANSWERED_NOTE", SCENARIO_UNANSWERED_NOTE],
     ["SCENARIO_BUILD_PREFILL", SCENARIO_BUILD_PREFILL],
   ])("carries %s verbatim", (name, prompt) => {
     expect(probe).toContain(`const ${name} = ${JSON.stringify(prompt)};`);
@@ -222,6 +224,76 @@ describe("tools/scenario-probe.naiscript reads replies as the product does", () 
     }
   });
 
+  const ferry = (summary: string, state: string, priv: string, wish: string) =>
+    read(
+      `[CREATE CHARACTER "Dov" | ${summary}]\n[THREAD "The Landing" | "Brisa Calloway", "Dov" | ${state} | ${priv} | ${wish}]`,
+    );
+  const SIGNED = "Dov has signed the landing rights over to the commission.";
+  const UNTOLD = "Dov has not told Brisa Calloway.";
+  const FINDS = "Brisa Calloway finds out on her own.";
+
+  it("passes a build that records what the writer said and nothing else", () => {
+    expect(holds("Untaken")(ferry("Her nephew.", SIGNED, UNTOLD, FINDS))).toBe(
+      true,
+    );
+    // The signing may be kept private instead of shown.
+    expect(
+      holds("Untaken")(
+        ferry("Her nephew.", "Dov works the crossing.", SIGNED, FINDS),
+      ),
+    ).toBe(true);
+  });
+
+  it.each([
+    ["a summary", ferry("Away upriver for the day.", SIGNED, UNTOLD, FINDS)],
+    ["a state", ferry("Her nephew.", `${SIGNED} Pell walks it.`, "", FINDS)],
+    [
+      "a private segment",
+      ferry(
+        "Her nephew.",
+        SIGNED,
+        "The deed is gone from the strongbox.",
+        FINDS,
+      ),
+    ],
+    [
+      "a wish",
+      ferry("Her nephew.", SIGNED, UNTOLD, "She finds the surveyor first."),
+    ],
+  ])("fails the collaborator's untaken invention in %s", (_where, r) => {
+    expect(holds("Untaken")(r)).toBe(false);
+  });
+
+  it("passes rope on a ferry, and fails the deed gone missing", () => {
+    expect(
+      holds("Untaken")(
+        ferry("Hands calloused from the pole and the rope.", SIGNED, "", FINDS),
+      ),
+    ).toBe(true);
+    expect(
+      holds("Untaken")(
+        ferry("Her nephew.", SIGNED, UNTOLD, "She finds the deed is missing."),
+      ),
+    ).toBe(false);
+  });
+
+  it("fails a build that drops what the writer said", () => {
+    expect(
+      holds("Untaken")(ferry("Her nephew.", "They work it.", "", FINDS)),
+    ).toBe(false);
+    expect(holds("Untaken")(ferry("Her nephew.", SIGNED, UNTOLD, ""))).toBe(
+      false,
+    );
+  });
+
+  it("fails the finding out written where the story model is shown it", () => {
+    expect(
+      holds("Untaken")(
+        ferry("Her nephew.", `${SIGNED} She learns of it alone.`, "", FINDS),
+      ),
+    ).toBe(false);
+  });
+
   it("counts zero Threads for a four-segment line in both readers", () => {
     expect(read(samples.fourSegments).threads).toBe(0);
     expect(
@@ -278,6 +350,15 @@ describe("the probe's over-building count", () => {
   it("never counts a SITUATION, SYSTEM or TOPIC, whose names are always coined", () => {
     expect(
       unasked([{ type: "SITUATION", name: "The Unsigned Release" }], talk),
+    ).toBe(0);
+  });
+
+  it("does not count a short name the conversation used whole", () => {
+    expect(
+      unasked(
+        [{ type: "CHARACTER", name: "Dov" }],
+        "Brisa works the crossing with her nephew Dov.",
+      ),
     ).toBe(0);
   });
 });

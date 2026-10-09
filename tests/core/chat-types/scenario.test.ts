@@ -77,7 +77,7 @@ describe("the Scenario chat's mode", () => {
       "Talk the scenario through…",
     );
     expect(scenarioSpec.inputPlaceholderFor!(inMode("build"))).toBe(
-      "Say what to build, or send empty to build what you've discussed…",
+      "Say what to build, or send empty to build from what you've said…",
     );
   });
 });

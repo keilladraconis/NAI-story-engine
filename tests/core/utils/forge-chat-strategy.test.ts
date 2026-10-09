@@ -12,6 +12,7 @@ import type { RootState } from "../../../src/core/store/types";
 import {
   SCENARIO_BUILD_INSTRUCTION,
   SCENARIO_BUILD_PREFILL,
+  SCENARIO_UNANSWERED_NOTE,
   XIALONG_STYLE,
   buildScenarioBuildPrompt,
   buildScenarioPlanPrompt,
@@ -287,6 +288,51 @@ describe("a Build turn", () => {
         role: "assistant",
         content: "What does she owe her brother?",
       });
+    });
+  });
+
+  describe("an empty send straight after a Plan reply", () => {
+    const note = { role: "system", content: SCENARIO_UNANSWERED_NOTE };
+    const built = async (c: typeof chat, directed?: boolean) => {
+      const state = stateOf(c);
+      return run(buildScenarioBuildStrategy(() => state, c, "p1", directed));
+    };
+
+    it("says the reply was never answered, before the instruction", async () => {
+      const messages = await built(chat, false);
+      expect(messages[messages.length - 3]).toEqual(note);
+      expect(messages[messages.length - 2].content).toBe(
+        SCENARIO_BUILD_INSTRUCTION,
+      );
+    });
+
+    it("says nothing when the writer typed the send", async () => {
+      expect(await built(chat, true)).not.toContainEqual(note);
+    });
+
+    it("says nothing when the writer spoke last", async () => {
+      const answered = chatOf([
+        ...chat.messages.slice(0, 2),
+        msg("u2", "user", "Yes, that."),
+        msg("p1", "assistant", "", { mode: "build" }),
+      ]);
+      expect(await built(answered, false)).not.toContainEqual(note);
+    });
+
+    it("says nothing when the last reply was a Build", async () => {
+      const afterBuild = chatOf([
+        ...chat.messages.slice(0, 2),
+        msg(
+          "b1",
+          "assistant",
+          '[CREATE CHARACTER "Hesper Vane" | Keeps a lock.]',
+          {
+            mode: "build",
+          },
+        ),
+        msg("p1", "assistant", "", { mode: "build" }),
+      ]);
+      expect(await built(afterBuild, false)).not.toContainEqual(note);
     });
   });
 
