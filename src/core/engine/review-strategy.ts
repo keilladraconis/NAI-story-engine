@@ -27,6 +27,7 @@ import type { Aliases } from "./thread-bind";
 import type { Thread } from "../store/types";
 import { buildModelParams } from "../utils/config";
 import { REVIEW_SYSTEM, REVIEW_INSTRUCTION } from "../utils/prompts";
+import { restatesHidden } from "../utils/hidden-overlap";
 
 /** The review call's output allowance: a reasoning line per Thread on stage,
  *  the admission chain, and the commands. */
@@ -386,6 +387,11 @@ function sameCast(a: readonly string[], b: readonly string[]): boolean {
  *  4. Every admitted cast member is named in at least `ADMIT_MIN_PARAGRAPHS`
  *     separate paragraphs of the window.
  *  5. No ADMIT at the thread limit.
+ *  6. A CONCLUDE of a Thread with private notes needs prose that restates one
+ *     of their sentences; otherwise it is an UPDATE. Concluding folds the notes
+ *     into entries the story model reads, and a review once concluded from an
+ *     inference: the prose had Ilse cut into a flour sack, the notes said the
+ *     notice was in the flour.
  *
  *  One decision per Thread: a CONCLUDE outranks an UPDATE of the same Thread,
  *  since the concluding rewrite carries the Thread's whole ledger anyway. */
@@ -405,12 +411,24 @@ export function applyFloors(
     }
   };
 
+  const names = Object.values(context.aliases).flat();
+  const prose = context.paragraphs.join("\n");
   for (const decision of decisions) {
     if (decision.kind !== "admit") {
-      if (open.some((thread) => thread.id === decision.threadId)) {
-        touch(decision);
-      } else {
+      const target = open.find((thread) => thread.id === decision.threadId);
+      if (!target) {
         refused.push({ decision, reason: "thread is not open" });
+      } else if (
+        decision.kind === "conclude" &&
+        restatesHidden(prose, target.latent, names) === false
+      ) {
+        refused.push({
+          decision,
+          reason: "the prose does not show what its private notes hide",
+        });
+        touch({ kind: "update", threadId: target.id });
+      } else {
+        touch(decision);
       }
       continue;
     }

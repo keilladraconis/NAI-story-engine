@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { withoutHidden } from "../../../src/core/utils/hidden-overlap";
+import {
+  hiddenWordIn,
+  withoutHidden,
+} from "../../../src/core/utils/hidden-overlap";
 
 const NAMES = ["Brisa Calloway", "Dov", "Pell", "The Marrow crossing"];
 const HIDDEN = [
@@ -70,5 +73,32 @@ describe("withoutHidden", () => {
       withoutHidden("He has given the crossing away in writing.", HIDDEN, NAMES)
         .cut,
     ).toBe("");
+  });
+});
+
+describe("hiddenWordIn", () => {
+  const PRIVATE = [
+    "The notice of transfer came in the last package of flour, and Ilse has not seen it.",
+    "Ilse finds the notice herself.",
+  ];
+  const STATE = "Ilse and Tam share the cottage. The supply boat has stopped.";
+  // "The Last Boat" is an element's name, so "last" is a name word here.
+  const CAST = ["Ilse", "Tam", "The Lighthouse Island", "The Last Boat"];
+
+  it("finds a title word only the hidden text says", () => {
+    expect(hiddenWordIn("The Deed and the Flour", PRIVATE, STATE, CAST)).toBe(
+      "flour",
+    );
+    expect(hiddenWordIn("The Notice", PRIVATE, STATE, CAST)).toBe("notic");
+  });
+
+  it("passes a title for what anyone could see", () => {
+    expect(hiddenWordIn("The Shared Cottage", PRIVATE, STATE, CAST)).toBe(null);
+    expect(hiddenWordIn("The Last Boat", PRIVATE, STATE, CAST)).toBe(null);
+  });
+
+  it("passes a word the state says too, and a name", () => {
+    expect(hiddenWordIn("The Supply Boat", PRIVATE, STATE, CAST)).toBe(null);
+    expect(hiddenWordIn("Ilse and Tam", PRIVATE, STATE, CAST)).toBe(null);
   });
 });

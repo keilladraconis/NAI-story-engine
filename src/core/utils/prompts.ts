@@ -101,7 +101,7 @@ The writer said: Hesper Vane keeps a lock on a dying canal and alone holds the s
 [CREATE CHARACTER "Corin Vane" | Her brother, ten years at the lock beside her. Clean boots on a towpath these days, and a town coat he keeps on indoors.]
 [CREATE CHARACTER "Mr Rudd" | The barge company's agent on the cut. Lodges at the Bargeman's Rest and pays for his suppers a week ahead.]
 [CREATE LOCATION "Tolland Lock House" | Damp plaster and coal smoke; one kitchen, two names on the deed. The sluice wheel stands in the yard where anyone on the towpath can see who turns it.]
-[THREAD "Half the House" | "Hesper Vane", "Corin Vane" | Hesper Vane and Corin Vane keep Tolland Lock House between them. Hesper Vane holds the only set of sluice keys. | Corin Vane has sold his half of Tolland Lock House to the barge company and been paid, to clear what he owes a bookmaker in town. Hesper Vane has not been told. | Hesper Vane floods the cut to stop the company.]`;
+[THREAD "The Lock House" | "Hesper Vane", "Corin Vane" | Hesper Vane and Corin Vane keep Tolland Lock House between them. Hesper Vane holds the only set of sluice keys. | Corin Vane has sold his half of Tolland Lock House to the barge company and been paid, to clear what he owes a bookmaker in town. Hesper Vane has not been told. | Hesper Vane floods the cut to stop the company.]`;
 
 /** What a Build reply is made to open with. GLM asked to think first often
  *  goes straight to commands, most of all once the transcript shows earlier

@@ -38,6 +38,32 @@ function contentWords(text: string, names: Set<string>): Set<string> {
   return new Set(words.map(stem));
 }
 
+function wordsOfNames(names: string[]): Set<string> {
+  return new Set(
+    names.flatMap((n) => n.toLowerCase().split(/[^a-z]+/)).filter(Boolean),
+  );
+}
+
+/** The hidden sentences long enough to match, as their content words. */
+function secretsOf(hidden: string[], nameWords: Set<string>): Set<string>[] {
+  return hidden
+    .flatMap(sentences)
+    .map((s) => contentWords(s, nameWords))
+    .filter((words) => words.size >= MIN_WORDS);
+}
+
+function restatesOne(
+  sentence: string,
+  secrets: Set<string>[],
+  nameWords: Set<string>,
+): boolean {
+  const said = contentWords(sentence, nameWords);
+  return secrets.some((secret) => {
+    const shared = [...secret].filter((w) => said.has(w)).length;
+    return shared >= MIN_WORDS && shared / secret.size >= MIN_SHARE;
+  });
+}
+
 function sentences(text: string): string[] {
   return text
     .split(/(?<=[.!?;])\s+|\n+/)
@@ -53,24 +79,14 @@ export function withoutHidden(
   hidden: string[],
   names: string[],
 ): { kept: string; cut: string } {
-  const nameWords = new Set(
-    names.flatMap((n) => n.toLowerCase().split(/[^a-z]+/)).filter(Boolean),
-  );
-  const secrets = hidden
-    .flatMap(sentences)
-    .map((s) => contentWords(s, nameWords))
-    .filter((words) => words.size >= MIN_WORDS);
+  const nameWords = wordsOfNames(names);
+  const secrets = secretsOf(hidden, nameWords);
   if (secrets.length === 0) return { kept: shown, cut: "" };
 
   const kept: string[] = [];
   const cut: string[] = [];
   for (const sentence of sentences(shown)) {
-    const said = contentWords(sentence, nameWords);
-    const restates = secrets.some((secret) => {
-      const shared = [...secret].filter((w) => said.has(w)).length;
-      return shared >= MIN_WORDS && shared / secret.size >= MIN_SHARE;
-    });
-    (restates ? cut : kept).push(sentence);
+    (restatesOne(sentence, secrets, nameWords) ? cut : kept).push(sentence);
   }
   return cut.length === 0
     ? { kept: shown, cut: "" }
@@ -86,4 +102,38 @@ export function addingOnlyNew(
 ): string {
   const { kept } = withoutHidden(offered, [held], names);
   return [held.trim(), kept.trim()].filter(Boolean).join(" ");
+}
+
+/** The first word of `title` that only the hidden text says: in `hidden` and
+ *  not in `shown`, names aside. A title is shown like a state, and one word is
+ *  enough there: "The Deed and the Flour" over a notice hidden in the flour had
+ *  the story model write a sack heavier than it should be. Null when clean. */
+export function hiddenWordIn(
+  title: string,
+  hidden: string[],
+  shown: string,
+  names: string[],
+): string | null {
+  const nameWords = wordsOfNames(names);
+  const secret = new Set(
+    hidden.flatMap((h) => [...contentWords(h, nameWords)]),
+  );
+  const said = contentWords(shown, nameWords);
+  for (const word of contentWords(title, nameWords)) {
+    if (secret.has(word) && !said.has(word)) return word;
+  }
+  return null;
+}
+
+/** Whether some sentence of `text` restates a sentence of `hidden`, or null
+ *  when no hidden sentence is long enough to tell. */
+export function restatesHidden(
+  text: string,
+  hidden: string,
+  names: string[],
+): boolean | null {
+  const nameWords = wordsOfNames(names);
+  const secrets = secretsOf([hidden], nameWords);
+  if (secrets.length === 0) return null;
+  return sentences(text).some((s) => restatesOne(s, secrets, nameWords));
 }

@@ -1410,3 +1410,42 @@ describe("a Build reply shows nothing it hides", () => {
     expect(dov?.summary).toBe("Quiet since spring.");
   });
 });
+
+describe("a Thread's title says nothing hidden", () => {
+  const build = async (thread: string) => {
+    const h = harness();
+    const dispatch = vi.fn(h.dispatch);
+    await forgeChatHandler.completion({
+      target: { type: "forgeChat", chatId: "c1", messageId: "m1" },
+      getState: h.getState,
+      dispatch,
+      accumulatedText: [
+        '[CREATE CHARACTER "Ilse" | The keeper.]',
+        '[CREATE CHARACTER "Tam" | Her brother, here for the summer.]',
+        thread,
+      ].join("\n"),
+      generationSucceeded: true,
+    } as CompletionContext<ForgeChatTarget>);
+    const actions = segmentsFromCompletion(dispatch.mock.calls).flatMap((s) =>
+      s.kind === "action" ? [s.action] : [],
+    );
+    return { action: actions[2], world: h.getState().world };
+  };
+
+  it("retitles a new Thread whose title names what it hides, after its cast", async () => {
+    const { action, world } = await build(
+      '[THREAD "The Deed and the Flour" | "Ilse", "Tam" | Ilse and Tam share the cottage. | The notice of sale came in the last package of flour. | Ilse finds the notice herself.]',
+    );
+    expect(world.threads[0].title).toBe("Ilse and Tam");
+    expect(action).toMatchObject({ status: "applied", name: "Ilse and Tam" });
+    expect(action.withheld).toContain("The Deed and the Flour");
+  });
+
+  it("keeps a title that says only what stands", async () => {
+    const { action, world } = await build(
+      '[THREAD "The Shared Cottage" | "Ilse", "Tam" | Ilse and Tam share the cottage. | The notice of sale came in the last package of flour. | Ilse finds the notice herself.]',
+    );
+    expect(world.threads[0].title).toBe("The Shared Cottage");
+    expect(action).not.toHaveProperty("withheld");
+  });
+});

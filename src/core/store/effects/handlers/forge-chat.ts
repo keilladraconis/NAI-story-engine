@@ -38,7 +38,7 @@ import type {
 } from "../../../chat-types/types";
 import { bindEntryFor, renameEntry } from "../entity-entry";
 import { SCENARIO_BUILD_PREFILL } from "../../../utils/prompts";
-import { withoutHidden } from "../../../utils/hidden-overlap";
+import { hiddenWordIn, withoutHidden } from "../../../utils/hidden-overlap";
 import { stripThinkingTags } from "../../../utils/tag-parser";
 import { DulfsFieldID, FieldID } from "../../../../config/field-definitions";
 
@@ -468,11 +468,15 @@ function hiddenIn(
 }
 
 /** The command with every sentence that restates something hidden cut from
- *  what it would show the story model: a summary, or a Thread's state. */
+ *  what it would show the story model: a summary, or a Thread's state. A new
+ *  Thread whose title names something only its private segment or its wish
+ *  says is titled after its cast instead; a rejection would lose the only
+ *  record of the secret for the turn. An existing Thread keeps its title. */
 function showingNothingHidden(
   cmd: ParsedCommand,
   hidden: string[],
   names: string[],
+  state: RootState,
 ): { command: ParsedCommand; withheld: string } {
   if (cmd.kind === "CREATE" || cmd.kind === "REVISE") {
     const { kept, cut } = withoutHidden(cmd.content, hidden, names);
@@ -480,7 +484,18 @@ function showingNothingHidden(
   }
   if (cmd.kind === "THREAD") {
     const { kept, cut } = withoutHidden(cmd.state, hidden, names);
-    return { command: cut ? { ...cmd, state: kept } : cmd, withheld: cut };
+    const isNew = !state.world.threads.some(
+      (t) => t.title.toLowerCase() === cmd.title.toLowerCase(),
+    );
+    const leaks =
+      isNew && hiddenWordIn(cmd.title, [cmd.latent, cmd.wish], kept, names);
+    const title = leaks ? cmd.memberNames.join(" and ") : cmd.title;
+    return {
+      command: { ...cmd, state: kept, title },
+      withheld: [cut, leaks ? `Title: ${cmd.title}` : ""]
+        .filter(Boolean)
+        .join(" "),
+    };
   }
   return { command: cmd, withheld: "" };
 }
@@ -519,6 +534,7 @@ async function buildForgeSegments(
       tok.command,
       hidden,
       names,
+      getState(),
     );
     const action = await executeForgeCommand(
       command,

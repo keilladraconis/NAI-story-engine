@@ -410,6 +410,41 @@ describe("the floors", () => {
     ).toEqual([{ kind: "conclude", threadId: "t1" }]);
   });
 
+  // The long lighthouse run: a review came to believe Ilse had found the
+  // notice when the prose only had her cut into the flour sack. Concluding
+  // folds the private notes into entries the story model reads.
+  describe("concluding a Thread that hides something", () => {
+    const SOLD =
+      "Pell has sold the east hives to the Cooperative and kept the money.";
+    const conclude = { kind: "conclude" as const, threadId: "t1" };
+    const threads = [thread({ latent: SOLD })];
+
+    it("is refused, as an update, when the prose does not show what was hidden", () => {
+      const result = applyFloors([conclude], { ...context, threads });
+      expect(result.accepted).toEqual([{ kind: "update", threadId: "t1" }]);
+      expect(result.refused[0].reason).toContain("private notes");
+    });
+
+    it("goes ahead when the prose shows it", () => {
+      const paragraphs = [
+        ...sustained,
+        "Ines found the bill: Pell had sold the east hives to the Cooperative and kept the money.",
+      ];
+      expect(
+        applyFloors([conclude], { ...context, threads, paragraphs }).accepted,
+      ).toEqual([conclude]);
+    });
+
+    it("goes ahead for a Thread with no private notes", () => {
+      expect(
+        applyFloors([conclude], {
+          ...context,
+          threads: [thread({ latent: "" })],
+        }).accepted,
+      ).toEqual([conclude]);
+    });
+  });
+
   it("refuses to touch a Thread that is no longer open", () => {
     const threads = [thread({ status: "concluded" })];
     expect(
