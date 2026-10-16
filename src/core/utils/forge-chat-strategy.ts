@@ -255,7 +255,10 @@ export function buildScenarioPlanStrategy(
       params: await buildModelParams({
         max_tokens: 512,
         temperature: 1.0,
-        ...(xialong ? { stop: ["</think>", "\n[ Style"] } : {}),
+        // Plan writes no bracketed line, so one is an echo of the context
+        // (GLM copied out its [NARRATIVE FOUNDATION]) or Xialong's next
+        // [ Style ] block, and the reply ends there.
+        stop: xialong ? ["</think>", "\n["] : ["\n["],
       }),
     };
   };

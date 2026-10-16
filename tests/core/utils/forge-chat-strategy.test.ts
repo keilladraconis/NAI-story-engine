@@ -349,18 +349,20 @@ describe("a Plan turn", () => {
     expect(text).not.toContain("[REJECTED LAST TURN]");
   });
 
-  it("ends on the writer's message when the creative model is GLM", async () => {
+  it("ends on the writer's message when the creative model is GLM, and stops at a bracketed line", async () => {
     const built = await buildScenarioPlanStrategy(state, chat, "p1")
       .messageFactory!();
     expect(built.messages[built.messages.length - 1]).toEqual({
       role: "user",
       content: "What about the mills?",
     });
-    expect(built.params?.stop).toBeUndefined();
+    // GLM echoed its own [NARRATIVE FOUNDATION] block under a lighthouse
+    // reply; Plan writes no bracketed line, so one ends the reply.
+    expect(built.params?.stop).toEqual(["\n["]);
   });
 
   describe("on Xialong", () => {
-    it("prefills the chat style when it is built into messages, and stops at the next style block", async () => {
+    it("prefills the chat style when it is built into messages, and stops at a bracketed line", async () => {
       // Built before the model is known; the factory reads it when it runs.
       const s = buildScenarioPlanStrategy(state, chat, "p1");
       useCreativeModel("xialong-v1");
@@ -369,7 +371,7 @@ describe("a Plan turn", () => {
         role: "assistant",
         content: XIALONG_STYLE.scenarioPlan,
       });
-      expect(built.params?.stop).toEqual(["</think>", "\n[ Style"]);
+      expect(built.params?.stop).toEqual(["</think>", "\n["]);
     });
   });
 });

@@ -39,6 +39,7 @@ All notable changes to this project will be documented in this file.
 
 - **Refining a field no longer commits the refiner's own scaffolding.** A refine shows the model the field wrapped in `=== REFINE TARGET ===` markers; shown a delimited block and asked to rewrite it, the model sometimes returned a delimited block, and those marker lines were committed as part of your ATTG or Style. They are stripped now, and the instructions say plainly that the markers are framing rather than content.
 - **Other scripts no longer change the story Story Engine reads.** Continue the scene and the Situation read the story without any script's context hook, so what another script adds for NovelAI's own generations (Op3na's `[ Style: … ]` lines, for one) stays out of Story Engine's prompts. Those scripts still run on your own generations as before.
+- **A Plan reply no longer ends with a copy of its context.** On GLM, Plan sometimes followed its paragraph with a `[NARRATIVE FOUNDATION]` list of the facts so far. Plan writes no bracketed lines, so the reply now ends where one starts.
 
 ### Removed
 
