@@ -72,7 +72,7 @@ const createBootstrapP1Factory =
         temperature: 1.0,
         min_p: 0.05,
         frequency_penalty: 0.15,
-        stop: ["</think>"],
+        stop: ["</think>", "\n#"],
       }),
     };
   };
@@ -111,7 +111,7 @@ const createBootstrapContinueFactory =
         temperature: 1.0,
         min_p: 0.05,
         frequency_penalty: 0.15,
-        stop: ["</think>", "\n***", "\n---", "\n⁂", "\n[ "],
+        stop: ["</think>", "\n***", "\n---", "\n⁂", "\n[ ", "\n#"],
       }),
     };
   };

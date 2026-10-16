@@ -20,10 +20,18 @@ type BootstrapContinueTarget = Extract<
 // line it was sent. The "\n[ " stop only catches one after a newline.
 const LEADING_TAG = /^\s*\[[^\]\n]*\]/;
 
+// Prose never starts a line with a markdown heading. One is the model writing
+// about the passage ("## Scene Analysis"), and nothing after it is story.
+const HEADING = /^#{1,6} /m;
+
+function untilHeading(text: string): string {
+  const at = text.search(HEADING);
+  return at === -1 ? text : text.slice(0, at);
+}
+
 function parseParagraphs(text: string): string[] {
   return toLastSentence(
-    stripThinkingTags(text)
-      .replace(LEADING_TAG, "")
+    untilHeading(stripThinkingTags(text).replace(LEADING_TAG, ""))
       .trim()
       .split(/\n\n+/)
       .map((p) => p.trim())

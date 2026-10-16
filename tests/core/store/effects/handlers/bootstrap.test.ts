@@ -126,4 +126,15 @@ describe("bootstrapHandler", () => {
       "Ilse polished the brass. The wick needed trimming.",
     );
   });
+
+  it("ends the opening at a heading, which is the model writing about it", async () => {
+    // The lighthouse opening ran out of tokens under its own analysis.
+    await bootstrapHandler.completion({
+      target: { type: "bootstrap" },
+      accumulatedText:
+        "He turned toward the spiral stairs.\n\n## Scene Analysis\n\nThe scene sets",
+      generationSucceeded: true,
+    } as never);
+    expect(append).toHaveBeenCalledWith("He turned toward the spiral stairs.");
+  });
 });
