@@ -88,7 +88,7 @@ const createBootstrapContinueFactory =
   async () => {
     const [prefix, storyContext] = await Promise.all([
       buildStoryEnginePrefix(getState, { excludeSections: ["storyText"] }),
-      api.v1.buildContext({ suppressScriptHooks: "self" }),
+      api.v1.buildContext({ suppressScriptHooks: "all" }),
     ]);
 
     const messages: Message[] = [

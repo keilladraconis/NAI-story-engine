@@ -122,6 +122,7 @@ Do not also enable the superpowers plugin in `.claude/settings.json` — the plu
 **Generation pipeline:**
 
 - Context is layered (`buildStoryEnginePrefix`): Foundation (ATTG, Style, Situation, Contract) and Setting → World Entries → story text, with each task's own instructions after. The chat transcript is not part of the prefix.
+- Where a task reads the story through `api.v1.buildContext`, it passes `suppressScriptHooks: "all"`, not `"self"`: another script's `onContextBuilt` rewrites the context for NovelAI's own generations, and with `"self"` Op3na's `[ Style: … ]` lines reached Continue the scene, which wrote one back onto the page.
 - The prefix's World block lists each entity as `Name: summary` under its category (`getExistingEntityItems`): a summary alone does not say whose it is. An entity with no summary is left out.
 - World Entries use two-phase generation: Phase 1 generates a list of names, Phase 2 generates detailed content per item
 - S.E.G.A. (Story Engine Generate All) fills blank fields using round-robin queueing across categories

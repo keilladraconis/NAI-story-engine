@@ -140,6 +140,18 @@ describe("bootstrapContinueRequested — Continue Scene", () => {
     expect(contents).toContain(BOOTSTRAP_CONTINUE_PROMPT);
   });
 
+  // Another script's onContextBuilt rewrites the story it is shown for its
+  // own generations; Op3na's "[ Style: … ]" lines reached this prompt and the
+  // model wrote one back onto the page.
+  it("reads the story without any script's context hook", async () => {
+    const actions = await continueWith(IDLE);
+    const submitted = actions.find((a) => a.type === generationSubmitted.type);
+    await submitted!.payload.messageFactory!();
+    expect(api.v1.buildContext).toHaveBeenLastCalledWith({
+      suppressScriptHooks: "all",
+    });
+  });
+
   it("queues its request under the id it submits", async () => {
     const actions = await continueWith(IDLE);
     const queued = actions.find((a) => a.type === requestQueued.type);

@@ -60,7 +60,7 @@ const createSituationFactory =
   async () => {
     const [prefix, storyContext] = await Promise.all([
       buildStoryEnginePrefix(getState, { excludeSections: ["foundation"] }),
-      api.v1.buildContext({ suppressScriptHooks: "self" }),
+      api.v1.buildContext({ suppressScriptHooks: "all" }),
     ]);
 
     const messages: Message[] = [
