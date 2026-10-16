@@ -718,7 +718,7 @@ That difference decides what goes where. The story model acts on whatever it is 
 
 Write three fields, in this order:
 MOVED: what the prose shows changed between the cast. One or two sentences.
-LATENT: what is unspoken, unpaid, concealed, or unknown to one of them. Write "none" when the prose shows nothing of the kind.
+LATENT: what the prose newly shows as unspoken, unpaid, concealed, or unknown to one of them. What the Thread's LATENT already says is kept as it is, so do not repeat it. Write "none" when there is nothing new.
 STATE: how things stand between them. One or two sentences, present tense, each person and thing named, no pronoun without a name beside it.
 
 The same facts, sorted:
@@ -731,7 +731,8 @@ Two lines that look alike and belong in different fields:
 
 RULES:
 - Only the prose and the Thread as it stands may supply facts. Do not add a motive or a consequence the prose does not show.
-- When a Thread is given as it currently stands, carry across what is still true. What you leave out is deleted.
+- When a Thread is given as it currently stands, carry across into STATE what is still true. What you leave out of STATE is deleted.
+- Someone learns a hidden thing only when the prose shows them learning it. Never write that someone has seen, found or been told something the prose does not show.
 - STATE never mentions the story, a scene, the reader, or this record.
 - Return the three fields and nothing else.`;
 

@@ -789,7 +789,8 @@ describe("the threadWrite arm", () => {
     expect(executed).toHaveLength(1);
     expect(h.store.getState().world.threads[0]).toMatchObject({
       state: "Pell has sold the east hives to the Cooperative.",
-      latent: "Ines does not know the price.",
+      latent:
+        "Pell has not told Ines the cooperative means to sell them. Ines does not know the price.",
     });
   });
 
@@ -857,6 +858,55 @@ describe("the threadWrite arm", () => {
 
     await drain([{ kind: "threadWrite", threadId: "t1", prose: "p" }], h.deps);
     expect(h.generate).toHaveBeenCalledTimes(1);
+  });
+
+  // The long lighthouse run: a rewrite dropped the sale and the debt from the
+  // private notes and wrote in a discovery the prose never showed. What is
+  // hidden leaves the private notes only by concluding or by the writer's hand.
+  describe("private notes are only added to", () => {
+    const HELD =
+      "Pell sold the west field to the Cooperative to clear a debt. Ines has not been told.";
+    const written = (latent: string) =>
+      says(`LATENT: ${latent}\nSTATE: Pell keeps the hives.`);
+    const run = async (latent: string) => {
+      const h = harness(
+        [thread("t1", { entityIds: ["a"], latent: HELD })],
+        [entity("a", { name: "Pell" })],
+      );
+      h.generate.mockImplementation(written(latent));
+      await drain(
+        [{ kind: "threadWrite", threadId: "t1", prose: "p" }],
+        h.deps,
+      );
+      return h.store.getState().world.threads[0];
+    };
+
+    it("keeps them whole when the write leaves them out", async () => {
+      expect((await run("none")).latent).toBe(HELD);
+      expect((await run("Ines suspects the hives.")).latent).toContain(
+        "Pell sold the west field to the Cooperative to clear a debt.",
+      );
+    });
+
+    it("adds what the write says that is new", async () => {
+      expect((await run("Ines does not know the price.")).latent).toBe(
+        `${HELD} Ines does not know the price.`,
+      );
+    });
+
+    it("does not add a sentence that restates one already there", async () => {
+      expect(
+        (
+          await run(
+            "Pell sold the west field to the Cooperative, clearing a debt.",
+          )
+        ).latent,
+      ).toBe(HELD);
+    });
+
+    it("still writes the state", async () => {
+      expect((await run("none")).state).toBe("Pell keeps the hives.");
+    });
   });
 
   it("skips a Thread the writer deleted or concluded while the write was queued", async () => {

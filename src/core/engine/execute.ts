@@ -55,6 +55,7 @@ import {
   threadStatusSet,
 } from "../store/slices/world";
 import { buildLorebookPrefillFromEntry } from "../utils/lorebook-strategy";
+import { addingOnlyNew } from "../utils/hidden-overlap";
 
 /** What the pass hands the drain.
  *
@@ -446,11 +447,18 @@ async function threadWrite(
   const now = deps.getState().world.threads.find((t) => t.id === threadId);
   if (!now || now.status !== "open") return "skipped";
 
+  // The private notes only grow. A rewrite once dropped the secret a Thread
+  // was made for and wrote in a discovery the prose never showed; what is
+  // hidden leaves them by concluding or by the writer's hand.
   deps.dispatch(
     threadLedgerUpdated({
       threadId,
       state: record.state,
-      latent: record.latent,
+      latent: addingOnlyNew(
+        now.latent,
+        record.latent,
+        castOf(deps, now.entityIds).map((m) => m.name),
+      ),
     }),
   );
   await deps.log(`[engine] thread "${thread.title}" updated: ${record.moved}`);

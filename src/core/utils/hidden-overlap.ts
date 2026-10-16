@@ -76,3 +76,14 @@ export function withoutHidden(
     ? { kept: shown, cut: "" }
     : { kept: kept.join(" "), cut: cut.join(" ") };
 }
+
+/** `held` kept whole, with each sentence of `offered` that does not restate
+ *  one of its sentences added after it. For a record that may only grow. */
+export function addingOnlyNew(
+  held: string,
+  offered: string,
+  names: string[],
+): string {
+  const { kept } = withoutHidden(offered, [held], names);
+  return [held.trim(), kept.trim()].filter(Boolean).join(" ");
+}
