@@ -16,18 +16,41 @@ type BootstrapContinueTarget = Extract<
   { type: "bootstrapContinue" }
 >;
 
-// When true, the next Continue Scene joins the last document section inline
-// rather than starting a new paragraph. Set when a generation ends mid-sentence
-// (max_tokens fired before a natural boundary). Reset on a clean end or failure.
-let continueInline = false;
+// A style tag the model writes before its prose, copying the "[ Style: … ]"
+// line it was sent. The "\n[ " stop only catches one after a newline.
+const LEADING_TAG = /^\s*\[[^\]\n]*\]/;
 
 function parseParagraphs(text: string): string[] {
-  return stripThinkingTags(text)
-    .trim()
-    .split(/\n\n+/)
-    .map((p) => p.trim())
-    .filter((p) => p.length > 0 && !/^[\*\-#=~\s]+$/.test(p))
-    .flatMap(chunkParagraph);
+  return toLastSentence(
+    stripThinkingTags(text)
+      .replace(LEADING_TAG, "")
+      .trim()
+      .split(/\n\n+/)
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0 && !/^[\*\-#=~\s]+$/.test(p))
+      .flatMap(chunkParagraph),
+  );
+}
+
+/** A passage max_tokens cut off ends mid-sentence. Keep it to its last full
+ *  sentence, so every passage ends whole and the next starts a paragraph of
+ *  its own; stitched onto a fragment, a continuation drifted instead. */
+function toLastSentence(paragraphs: string[]): string[] {
+  const last = paragraphs[paragraphs.length - 1];
+  if (last === undefined || endsAtBoundary(last)) return paragraphs;
+  const sentences = splitIntoSentences(last);
+  let whole = sentences.length;
+  while (whole > 0 && !endsAtBoundary(sentences[whole - 1])) whole--;
+  const kept = sentences.slice(0, whole).join(" ");
+  return [...paragraphs.slice(0, -1), ...(kept ? [kept] : [])];
+}
+
+/** A continuation sometimes starts over, writing again paragraphs the page
+ *  already has. Drop the ones it opens with. */
+function dropRepeated(paragraphs: string[], page: Set<string>): string[] {
+  let first = 0;
+  while (first < paragraphs.length && page.has(paragraphs[first])) first++;
+  return paragraphs.slice(first);
 }
 
 // xialong-v1 tends to emit dense wall-of-text prose regardless of prompting.
@@ -87,15 +110,8 @@ const SCENE_BREAK_TAIL = /\s*(?:\*{3,}|-{3,}|⁂)\s*$/;
  * rather than on its own line, which slips past the `\n`-prefixed stop
  * sequences and leaks the glyph into the document. This catches it either way.
  */
-function stripTrailingSceneBreak(text: string): {
-  text: string;
-  hadBreak: boolean;
-} {
-  const hadBreak = SCENE_BREAK_TAIL.test(text);
-  return {
-    text: hadBreak ? text.replace(SCENE_BREAK_TAIL, "").trimEnd() : text,
-    hadBreak,
-  };
+function stripTrailingSceneBreak(text: string): string {
+  return text.replace(SCENE_BREAK_TAIL, "").trimEnd();
 }
 
 // ─── Phase 1 handler ─────────────────────────────────────────────────────────
@@ -115,17 +131,14 @@ export const bootstrapHandler: GenerationHandlers<BootstrapTarget> = {
       return;
     }
 
-    const { text: cleaned, hadBreak } = stripTrailingSceneBreak(
-      stripThinkingTags(ctx.accumulatedText),
+    const chunks = parseParagraphs(
+      stripTrailingSceneBreak(stripThinkingTags(ctx.accumulatedText)),
     );
-    const chunks = parseParagraphs(cleaned);
     if (chunks.length > 0) {
       // append() writes the opening as real paragraphs (each newline becomes a
       // paragraph break). The engine still records one undo step per paragraph —
       // multi-paragraph single-undo isn't reachable through the document API.
       await api.v1.document.append(chunks.join("\n"));
-      // An opening cut mid-sentence is stitched onto by the next Continue Scene.
-      continueInline = !hadBreak && !endsAtBoundary(chunks[chunks.length - 1]);
     }
 
     // The stage stops here. The card now offers Continue Scene, and the writer
@@ -145,31 +158,26 @@ export const bootstrapContinueHandler: GenerationHandlers<BootstrapContinueTarge
     async completion(
       ctx: CompletionContext<BootstrapContinueTarget>,
     ): Promise<void> {
-      if (!ctx.generationSucceeded || !ctx.accumulatedText) {
-        continueInline = false;
-        return;
-      }
+      if (!ctx.generationSucceeded || !ctx.accumulatedText) return;
 
-      const { text: noBreak, hadBreak } = stripTrailingSceneBreak(
+      const noBreak = stripTrailingSceneBreak(
         stripThinkingTags(ctx.accumulatedText),
       );
       const sections = await api.v1.document.scan();
-      const lastParagraph = sections[sections.length - 1]?.section.text ?? "";
-      const paragraphs = parseParagraphs(
-        dropEchoedTail(trimStopTail(noBreak, ["\n[ "]), lastParagraph),
+      const page = sections.map((s) => s.section.text.trim());
+      const paragraphs = dropRepeated(
+        parseParagraphs(
+          dropEchoedTail(
+            trimStopTail(noBreak, ["\n[ "]),
+            page[page.length - 1] ?? "",
+          ),
+        ),
+        new Set(page),
       );
-      if (paragraphs.length === 0) {
-        if (hadBreak) continueInline = false;
-        return;
-      }
+      if (paragraphs.length === 0) return;
 
-      // A leading newline starts a fresh paragraph; after a mid-sentence cut a
-      // space stitches this onto the end of the last one instead.
-      await api.v1.document.append(
-        (continueInline ? " " : "\n") + paragraphs.join("\n"),
-      );
-      continueInline =
-        !hadBreak && !endsAtBoundary(paragraphs[paragraphs.length - 1]);
+      // The leading newline starts a paragraph of its own.
+      await api.v1.document.append("\n" + paragraphs.join("\n"));
 
       // One passage per press. No auto-chain and no cap.
     },
