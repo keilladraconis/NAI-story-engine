@@ -626,13 +626,18 @@ async function execute(
  *  drawing on, which is exactly what §3.5 and the changelog promise it will
  *  not. See `ENTRY_REWRITES_PER_PASS`.
  *
- *  **FIFO among the costly actions, and a zero-priced kind is never blocked.**
- *  When an intent the budget cannot afford is reached, every later costly
- *  intent is deferred with it rather than jumping ahead: entry rewrites are the
- *  scarce operation §3.3 is built around, and letting cheaper work overtake them
- *  would starve them. An intent kind priced at zero spends no generation, so it
- *  is exempt from both the budget check and the deferral. Only `conclude` is
- *  priced at zero: it is a status flip and a disabled entry.
+ *  **FIFO among the entry rewrites, and a Thread action is not held behind
+ *  them.** When a rewrite the budget cannot afford is reached, every later
+ *  rewrite is deferred with it rather than jumping ahead. A Thread write or
+ *  admission the bucket covers still runs: they come only from the review, one
+ *  per `reviewEvery` paragraphs, so they cannot starve the rewrites, and held
+ *  behind them they starved instead. In the lighthouse run two revises needing
+ *  1024 + the reserve waited on a bucket the writer kept below that, and the
+ *  review's 300-token write waited with them, so the Thread state the story
+ *  model reads trailed the prose by fifty paragraphs. A collision with the
+ *  writer still defers everything costly. An intent kind priced at zero spends
+ *  no generation, so it is exempt from both the budget check and the deferral.
+ *  Only `conclude` is priced at zero: it is a status flip and a disabled entry.
  *
  *  The queue passed in is never mutated. The caller writes `remaining` back to the record
  *  (§6.2) at the node it captured. */
@@ -642,7 +647,8 @@ export async function drain(
 ): Promise<DrainOutcome> {
   const executed: Intent[] = [];
   const remaining: Intent[] = [];
-  let blocked = false;
+  let colliding = false;
+  let rewritesBlocked = false;
   let rewrites = 0;
 
   // A working copy, because an arm may spawn follow-up intents (a conclusion
@@ -656,8 +662,9 @@ export async function drain(
     const cost = INTENT_MAX_TOKENS[intent.kind];
     const rewrite = isEntryRewrite(intent);
     const capped = rewrite && rewrites >= ENTRY_REWRITES_PER_PASS;
+    const blocked = colliding || (rewrite && rewritesBlocked);
     if (cost > 0 && (blocked || capped || !affords(cost))) {
-      blocked = true;
+      if (rewrite) rewritesBlocked = true;
       remaining.push(intent);
       await deps.log(
         capped
@@ -706,7 +713,7 @@ export async function drain(
       // rather than consumed, and the drain stops paying for costly work while
       // the writer is plainly mid-generation. A zero-priced intent would still
       // run: it spends no generation and so cannot collide with one.
-      blocked = true;
+      colliding = true;
       remaining.push(intent);
       await deps.log(
         `[engine] ${intentKey(intent)} collided with the writer — requeued`,

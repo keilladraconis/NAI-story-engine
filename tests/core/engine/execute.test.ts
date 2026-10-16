@@ -648,6 +648,32 @@ describe("drain — the budget", () => {
     );
   });
 
+  it("runs a Thread write the bucket covers past a rewrite it does not", async () => {
+    // In the lighthouse run the review's Thread write waited behind two
+    // deferred revises for every pass the writer kept generating, and the
+    // state the story model reads trailed the prose by fifty paragraphs.
+    budget(INTENT_MAX_TOKENS.threadWrite + TRIAGE_MAX_TOKENS + 400);
+    const h = harness(
+      [thread("t1", { entityIds: ["a"] })],
+      [entity("a", { name: "Pell" })],
+    );
+    h.generate.mockImplementation(says(WRITE));
+    const write: Intent = { kind: "threadWrite", threadId: "t1", prose: "p" };
+
+    const outcome = await drain([REVISE, write], h.deps);
+
+    expect(outcome.executed).toEqual([write]);
+    expect(outcome.remaining).toEqual([REVISE]);
+  });
+
+  it("keeps the rewrites in order behind one it cannot afford", async () => {
+    budget(INTENT_MAX_TOKENS.threadWrite + TRIAGE_MAX_TOKENS + 400);
+    const h = harness();
+    const queue: Intent[] = [REVISE, { kind: "condense", entryId: "lb1" }];
+
+    expect((await drain(queue, h.deps)).remaining).toEqual(queue);
+  });
+
   it("counts a rewrite it reached, not one that wrote", async () => {
     // A revision the model returned nothing usable for still SPENT its
     // generation: the door declined the write, the bucket did not un-debit.
