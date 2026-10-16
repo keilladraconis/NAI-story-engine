@@ -31,3 +31,18 @@ By paragraph ~79 the review had updated the Thread:
 - **Private notes replaced:** "Ilse knows Tam is planning something and that his concern about the fuel is a feint. Tam does not know that Ilse has seen the notice of sale in the flour package."
 
 Two failures in one write: the sale and the debt are gone from the record, and the Engine asserted the discovery the writer wished for, which the prose never showed. The Thread write (`THREAD_WRITE_SYSTEM`) regenerates both halves from the prose and the old record — "What you leave out is deleted" — and nothing in code protects the private notes. The old note's wording ("delivered with the last package of flour for Ilse") invited the inference.
+
+## After the fix (`91555d3`, the Engine only adds to private notes)
+
+The new build was imported into the same story and, as the writer, the private notes were restored by hand: "Tam has sold the family's share of the island to the mainland company to settle a debt on the mainland from before the summer. The notice of transfer, naming Tam as the agent of sale, came in the last package of flour, and Ilse has not seen it."
+
+Paragraphs 79–118 (Default preset, Op3na off): Tam takes the dinghy and the spare fuel out past the reef, the boat founders, Ilse swims out and drags him back, and gets him into a hot shower. On-story throughout; no new document, no sheet.
+
+The review that followed:
+
+- State: "Ilse is in the cottage with Tam. Tam is in the shower, and Ilse is helping him." Fair.
+- Private notes: the restored text kept whole, and appended: "Ilse does not know what Tam was trying to see on the reef, and Tam does not know that Ilse found the notice of sale in the flour."
+
+The secret survived; the invented discovery came back, as an addition, despite the prompt's new rule. The likely seed is the Thread's title, which the story model is shown: "The Deed and the Flour". In the opening the story model wrote the flour sack "heavier than it should" and Ilse digging into it with a knife, which no Build text asked for; the review, knowing the notice came in the flour, read that as finding it. Build's title rule is prompt-only (titles are not checked in code).
+
+Risk if left: a review that believes the secret is known can CONCLUDE the Thread, which folds the private notes into the cast's entity rewrites — shown to the story model.
