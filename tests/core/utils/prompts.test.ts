@@ -201,11 +201,14 @@ describe("the Scenario Build prompt", () => {
 
   it("shows the story model nothing that is hidden", () => {
     expect(SCENARIO_BUILD_PROMPT).toContain(
-      "The whole of it goes in the private segment of a THREAD, the deed as well as the silence about it, and in no summary and no state.",
+      "The whole of it goes in the private segment of a THREAD: the deed, the reason it was done, and the silence about it, and none of it in any summary or state.",
     );
     const { shown, private: hidden } = example();
-    expect(shown).not.toMatch(/\bsold\b|\bsale\b|\bpaid\b/);
+    expect(shown).not.toMatch(
+      /\bsold\b|\bsale\b|\bpaid\b|\bbookmaker\b|\bowes\b/,
+    );
     expect(hidden).toContain("has sold his half of Tolland Lock House");
+    expect(hidden).toContain("what he owes a bookmaker");
   });
 
   it("says a title is shown too", () => {
