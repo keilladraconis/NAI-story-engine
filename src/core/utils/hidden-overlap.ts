@@ -93,6 +93,26 @@ export function withoutHidden(
     : { kept: kept.join(" "), cut: cut.join(" ") };
 }
 
+// A sentence saying that someone does not know a thing tells the story model
+// the thing. Words alone cannot catch it: "though the current inhabitants are
+// unaware" shared one word with the sale it gave away. "Does not know how"
+// is a skill, not a secret, so knowing takes "that", "about" or "of".
+const IGNORANCE =
+  /\b(unaware|unbeknownst|unknown to|hidden from|conceal\w*|secret\w*|behind (her|his|their) back|without (telling|letting)|(has|have|had)(n't| not)( yet)? (been )?told|(does|do|did)(n't| not)( yet)? know (that|about|of)|kept in the dark)\b/i;
+
+/** `shown` with every sentence that says someone is kept from knowing taken
+ *  out. */
+export function withoutIgnorance(shown: string): { kept: string; cut: string } {
+  const all = sentences(shown);
+  const cut = all.filter((s) => IGNORANCE.test(s));
+  return cut.length === 0
+    ? { kept: shown, cut: "" }
+    : {
+        kept: all.filter((s) => !IGNORANCE.test(s)).join(" "),
+        cut: cut.join(" "),
+      };
+}
+
 /** `held` kept whole, with each sentence of `offered` that does not restate
  *  one of its sentences added after it. For a record that may only grow. */
 export function addingOnlyNew(

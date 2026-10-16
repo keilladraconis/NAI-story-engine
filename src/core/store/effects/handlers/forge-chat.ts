@@ -38,7 +38,11 @@ import type {
 } from "../../../chat-types/types";
 import { bindEntryFor, renameEntry } from "../entity-entry";
 import { SCENARIO_BUILD_PREFILL } from "../../../utils/prompts";
-import { hiddenWordIn, withoutHidden } from "../../../utils/hidden-overlap";
+import {
+  hiddenWordIn,
+  withoutHidden,
+  withoutIgnorance,
+} from "../../../utils/hidden-overlap";
 import { stripThinkingTags } from "../../../utils/tag-parser";
 import { DulfsFieldID, FieldID } from "../../../../config/field-definitions";
 
@@ -467,8 +471,24 @@ function hiddenIn(
   return { hidden: hidden.filter((h) => h.trim() !== ""), names };
 }
 
-/** The command with every sentence that restates something hidden cut from
- *  what it would show the story model: a summary, or a Thread's state. A new
+/** `shown` without what restates something hidden, and without what says
+ *  someone does not know. */
+function shownOnly(
+  shown: string,
+  hidden: string[],
+  names: string[],
+): { kept: string; cut: string } {
+  const first = withoutHidden(shown, hidden, names);
+  const second = withoutIgnorance(first.kept);
+  return {
+    kept: second.kept,
+    cut: [first.cut, second.cut].filter(Boolean).join(" "),
+  };
+}
+
+/** The command with every sentence that restates something hidden, or says
+ *  someone is kept from it, cut from what it would show the story model: a
+ *  summary, or a Thread's state. A new
  *  Thread whose title names something only its private segment or its wish
  *  says is titled after its cast instead; a rejection would lose the only
  *  record of the secret for the turn. An existing Thread keeps its title. */
@@ -479,11 +499,11 @@ function showingNothingHidden(
   state: RootState,
 ): { command: ParsedCommand; withheld: string } {
   if (cmd.kind === "CREATE" || cmd.kind === "REVISE") {
-    const { kept, cut } = withoutHidden(cmd.content, hidden, names);
+    const { kept, cut } = shownOnly(cmd.content, hidden, names);
     return { command: cut ? { ...cmd, content: kept } : cmd, withheld: cut };
   }
   if (cmd.kind === "THREAD") {
-    const { kept, cut } = withoutHidden(cmd.state, hidden, names);
+    const { kept, cut } = shownOnly(cmd.state, hidden, names);
     const isNew = !state.world.threads.some(
       (t) => t.title.toLowerCase() === cmd.title.toLowerCase(),
     );

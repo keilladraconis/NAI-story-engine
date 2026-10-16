@@ -1390,6 +1390,28 @@ describe("a Build reply shows nothing it hides", () => {
     expect(actions[0]).not.toHaveProperty("withheld");
   });
 
+  it("cuts a sentence that says someone does not know, in any words", async () => {
+    const h = harness();
+    const dispatch = vi.fn(h.dispatch);
+    await forgeChatHandler.completion({
+      target: { type: "forgeChat", chatId: "c1", messageId: "m1" },
+      getState: h.getState,
+      dispatch,
+      accumulatedText:
+        '[CREATE FACTION "The Mainland Company" | A firm buying island holdings. It now owns a share of the island, though the inhabitants are unaware.]',
+      generationSucceeded: true,
+    } as CompletionContext<ForgeChatTarget>);
+    const [action] = segmentsFromCompletion(dispatch.mock.calls).flatMap((s) =>
+      s.kind === "action" ? [s.action] : [],
+    );
+    expect(Object.values(h.getState().world.entitiesById)[0]?.summary).toBe(
+      "A firm buying island holdings.",
+    );
+    expect(action.withheld).toBe(
+      "It now owns a share of the island, though the inhabitants are unaware.",
+    );
+  });
+
   it("holds a later REVISE against what an open Thread already hides", async () => {
     const h = harness();
     const complete = (accumulatedText: string) =>

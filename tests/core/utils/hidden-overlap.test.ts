@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   hiddenWordIn,
   withoutHidden,
+  withoutIgnorance,
 } from "../../../src/core/utils/hidden-overlap";
 
 const NAMES = ["Brisa Calloway", "Dov", "Pell", "The Marrow crossing"];
@@ -73,6 +74,41 @@ describe("withoutHidden", () => {
       withoutHidden("He has given the crossing away in writing.", HIDDEN, NAMES)
         .cut,
     ).toBe("");
+  });
+});
+
+describe("withoutIgnorance", () => {
+  it("cuts a sentence that says someone is kept from knowing", () => {
+    // The lighthouse run's buyer: none of the words of the sale, all of it.
+    expect(
+      withoutIgnorance(
+        "A mainland firm. It now legally owns a share of the island, though the current inhabitants are unaware.",
+      ),
+    ).toEqual({
+      kept: "A mainland firm.",
+      cut: "It now legally owns a share of the island, though the current inhabitants are unaware.",
+    });
+  });
+
+  it.each([
+    "Ilse has not been told.",
+    "Tam hasn't told his sister.",
+    "She does not know that the boat was sold.",
+    "He doesn't know about the letter.",
+    "He sold it without telling her.",
+    "He keeps the notice in secret.",
+    "She is kept in the dark.",
+    // The second lighthouse Build, after the first form of this check:
+    "He carries a mainland debt he has kept secret.",
+    "It is now co-owned by a mainland company, a fact unknown to its keeper.",
+    "Unbeknownst to her, the share is gone.",
+  ])("cuts %s", (sentence) => {
+    expect(withoutIgnorance(sentence).cut).toBe(sentence);
+  });
+
+  it("keeps a sentence about what someone cannot do", () => {
+    const text = "Tam doesn't know how to swim. Ilse knows the reef by heart.";
+    expect(withoutIgnorance(text)).toEqual({ kept: text, cut: "" });
   });
 });
 
