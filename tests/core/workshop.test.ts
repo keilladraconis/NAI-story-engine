@@ -249,3 +249,14 @@ describe("writing a whole draft", () => {
     expect(PIECE_END.test("She left. He stayed.")).toBe(false);
   });
 });
+
+describe("toSentenceEnd", () => {
+  it("cuts a half-written sentence and keeps closing quotes", async () => {
+    const { toSentenceEnd } = await import("../../src/core/workshop/page");
+    expect(toSentenceEnd("She left. The more she swelled up,")).toBe(
+      "She left.",
+    );
+    expect(toSentenceEnd('He said, "Go." And then')).toBe('He said, "Go."');
+    expect(toSentenceEnd("No ending at all")).toBe("No ending at all");
+  });
+});

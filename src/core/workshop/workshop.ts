@@ -23,6 +23,7 @@ import {
   putOnPage,
   keepDraftAsStory,
   redraw,
+  endOnSentence,
 } from "./page";
 import { defaultDirection, findDoc, sameTarget, targetLabel } from "./targets";
 
@@ -121,22 +122,25 @@ export async function saveDraft(): Promise<void> {
 // editor.generate() costs the script nothing) until the draft is long enough,
 // the model ends the piece itself, or the writer takes over.
 
-/** Characters a draft is written to before the Draft button stops. */
+/**
+ * Characters a draft is written to before the Draft button stops. Scenes run
+ * until the model ends the scene; their length is only a cap against a scene
+ * that never ends.
+ */
 export function draftLength(state: RootState, target: Target): number {
   switch (target.kind) {
     case "vignette":
-      return 2400;
+    case "opening":
+      return 7000;
     case "startingPoint":
       return 1600;
-    case "opening":
-      return 2400;
     case "doc":
       return findDoc(state, target.docId)?.kind === "dossier" ? 3200 : 3000;
   }
 }
 
 /** Sends a Draft button makes at most, whatever the length. */
-const MAX_SENDS = 6;
+const MAX_SENDS = 10;
 /** A Send that adds less than this has ended the piece. */
 const MIN_GROWTH = 40;
 /** How long to wait for a Send to finish before giving up on it. */
@@ -176,15 +180,29 @@ export async function writeDraft(target: Target): Promise<void> {
   store.dispatch(autoDraftSet({ on: true }));
   try {
     const goal = draftLength(store.getState(), target);
+    let why = "send limit";
     for (let send = 0; send < MAX_SENDS; send++) {
       const before = (await draftText()).length;
-      if (before >= goal || run.stop || run.ended) break;
+      if (run.stop) why = "writer took over";
+      else if (run.ended) why = "scene ended";
+      else if (before >= goal) why = "length cap";
+      if (run.stop || run.ended || before >= goal) break;
       const ended = nextEnd();
       await api.v1.editor.generate();
-      if (!(await ended)) break;
+      if (!(await ended)) {
+        why = "send timed out";
+        break;
+      }
       const after = (await draftText()).length;
-      if (after - before < MIN_GROWTH) break;
+      if (after - before < MIN_GROWTH) {
+        why = "send added almost nothing";
+        break;
+      }
     }
+    api.v1.log(`writeDraft stopped: ${why}`);
+    // However the run ended (the model, the cap, a stalled Send), it ends on a
+    // whole sentence, unless the writer took over: then the page is theirs.
+    if (!run.stop) await endOnSentence();
   } catch (error) {
     toast(
       "Story Engine could not send for you; press Send to continue by hand.",

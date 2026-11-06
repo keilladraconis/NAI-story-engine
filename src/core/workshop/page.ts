@@ -243,3 +243,26 @@ export function keepDraftAsStory(): Promise<void> {
     await clearDecorations();
   });
 }
+
+/**
+ * The text up to its last sentence end (a full stop, ! or ?, with any closing
+ * quote or bracket), or the text unchanged when it has none.
+ */
+export function toSentenceEnd(text: string): string {
+  const match = text.match(/^[\s\S]*[.!?…]["'”’)\]]*/);
+  return match ? match[0] : text;
+}
+
+/** Trim a half-written last sentence off the draft. */
+export function endOnSentence(): Promise<void> {
+  return serial(async () => {
+    const ids = new Set(await currentDraftIds());
+    const last = (await sections())
+      .filter((s) => ids.has(s.sectionId) && s.section.text.trim())
+      .pop();
+    if (!last) return;
+    const trimmed = toSentenceEnd(last.section.text);
+    if (trimmed !== last.section.text)
+      await api.v1.document.updateParagraph(last.sectionId, { text: trimmed });
+  });
+}
