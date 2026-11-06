@@ -1,52 +1,20 @@
 compatibilityVersion: naiscript-1.0
 id: e6c35faa-e4f2-4c3b-af4a-d56e4c992d87
 name: Story Engine
-version: 0.14.3
+version: 0.15.0
 createdAt: 1765374901
 author: Keilla
-description: A helper for writing stories
+description: >-
+  Builds a scenario with you (brief, vignettes, starting point, canon) and
+  distills it into Memory, Author's Note and lorebook entries.
 memoryLimit: 8
-updatedAt: 1787838208
+updatedAt: 1793983583
 config:
-  - name: xialong_mode
-    prettyName: Xialong Mode
-    description: >-
-      Use Xialong v1 for all generation. Requires an Opus subscription. When
-      disabled, all generation uses GLM 4.6.
-    type: boolean
-    default: false
-  - name: sega_skip_lorebook_keys
-    prettyName: Skip Lorebook Keys (SEGA)
-    description: >-
-      When enabled, SEGA will skip automatic lorebook key generation after
-      generating entry content. Useful if you prefer to set keys manually.
-    type: boolean
-    default: false
-  - name: sega_skip_lorebook_relational_map
-    prettyName: Skip Lorebook Relational Map (SEGA)
-    description: >-
-      When enabled, SEGA will skip the relational map pass and generate keys
-      directly from entry prose. Keys quality may be lower for generic-named
-      entries without this cross-entry context pass.
-    type: boolean
-    default: false
   - name: generation_journal
     prettyName: Generation Journal
     description: >-
-      Enables the Generation Journal panel, which records all prompts and
-      responses sent during generation. Use "Copy Journal" to paste into Claude
-      for quality review.
-    type: boolean
-    default: false
-  - name: erato_compatibility
-    prettyName: Erato Compatibility
-    description: >-
-      For use with Erato. Moves the lorebook entry separator (----) from the
-      category header (unsupported by Erato) into each entry's text content.
-      Also creates a forced-activation "SE: End of Lorebook" marker entry
-      containing *** to separate lorebook from story text. You MUST manually set
-      that entry's position to 1 (the API cannot set this). On toggle, all
-      managed lorebook entries are automatically migrated.
+      Adds a Generation Journal panel that records every prompt and response
+      Story Engine sends to GLM, with a button to copy them for review.
     type: boolean
     default: false
   - name: story_engine_debug

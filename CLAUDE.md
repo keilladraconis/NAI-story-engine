@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-NAI Story Engine is a NovelAI script (.naiscript) that guides structured worldbuilding through an 8-stage pipeline: brainstorming → story prompt → world snapshot → World Entries (Characters, Systems, Locations, Factions, Situational Dynamics, Topics). Runs in NovelAI's web worker environment (QuickJS, no DOM).
+NAI Story Engine is a NovelAI script (.naiscript) that builds a **scenario** with the writer, then gets out of the way. The writer steers the story once it starts; Story Engine sets up the conditions it grows from: pressures, people, places and how they stand. It never plots.
+
+The pipeline is six stages: **Brief → Vignettes → Now → Canon → Cast → Distill**. Prose is drafted on the page by the editor's own model (Workshop Sends), kept in a free-prose **canon** outside the lorebook, checked by a GLM critic, and **distilled** into Memory, the Author's Note and lorebook entries at the end. The canon is the source of truth; the lorebook is its compiled form. Runs in NovelAI's web worker (QuickJS, no DOM).
 
 ## Commands
 
@@ -12,110 +14,79 @@ NAI Story Engine is a NovelAI script (.naiscript) that guides structured worldbu
 npm run build      # nibs build → dist/NAI-story-engine.naiscript
 npm run format     # prettier -w .
 npm run test       # vitest run
+npx tsc --noEmit   # typecheck (the build does not)
 ```
 
-**Prettier is pinned to an exact version — keep it that way.** Under a `^` range an older prettier already sitting in `node_modules` satisfies the range, so `npm install` leaves it in place and ignores the lockfile. That happened: a session formatting with 3.7.4 wrapped union types the pinned version keeps inline, which shipped as a spurious "formatting cleanup" (15fb872) and had to be reverted (ac49266). The exact pin does not help a `node_modules` installed for a _different branch_ — check out this branch over a tree installed from `main` and you still get 3.7.4, which is how a fourth session churned the same three files. Two things now prevent it. `scripts/install_pkgs.sh` — the `SessionStart` hook that installs dependencies — runs `npm ci`, not `npm install`, so every session starts from a `node_modules` rebuilt from the lockfile instead of whatever the previous branch left behind. That removes the cause. And `npm run format` runs a `preformat` guard (`npm ls prettier`) that refuses to format when the installed version does not match the pin, which catches the case anyway if you installed by hand. If format ever does rewrite files you did not touch, the formatter is wrong, not the repo — do not commit the diff.
+`npm run build` refetches `external/*.d.ts` when they are more than a day old, with Node's `fetch`, which ignores the sandbox proxy. In the sandbox, fetch the three files with `curl` (which honours the proxy) into `external/` first; then the build skips the fetch.
 
-`npm run format` deliberately calls `prettier`, not `npx prettier`. npm already puts `node_modules/.bin` first on `PATH`, so both run the same local binary; the difference is that `npx` _fetches_ prettier from the registry when it is missing locally, which is one more way to format with a version the lockfile never pinned.
+**Prettier is pinned to an exact version — keep it that way.** Under a `^` range an older prettier already in `node_modules` satisfies the range and `npm install` leaves it in place, so a session once formatted with the wrong version and shipped the churn. `scripts/install_pkgs.sh` (the `SessionStart` hook) runs `npm ci` so every session starts from the lockfile, and `npm run format` runs a `preformat` guard (`npm ls prettier`) that refuses to format with a mismatched version. If format rewrites files you did not touch, the formatter is wrong, not the repo — do not commit the diff. `npm run format` calls `prettier`, not `npx prettier`: `npx` fetches from the registry when prettier is missing locally.
 
 ## Architecture
 
-**Entry point:** `src/index.ts` — initializes GenX, registers store effects, loads persisted data, mounts UI extensions.
+**Entry:** `src/index.ts` → `start()` in `src/ui/mount.ts`: loads the story's records, starts the GLM queue, registers the editor hooks, and mounts the surfaces in **one** `api.v1.ui.register` call (a second call replaces the first).
 
-**Custom frameworks (treat as read-only):**
+**Libraries:** `nai-store` (Redux-like store: `createSlice`, `subscribeSelector`) and `nai-gen-x` (the generation queue with budget waits) are npm packages; treat them as read-only.
 
-- `nai-store.ts` (in `lib/`) — Redux-like store with `createSlice`, `dispatch`, `useSelector`, `subscribeEffect`
-- `gen-x.ts` (in `lib/`) — Generation queue engine with budget management and pub/sub state updates
-- `nai-simple-ui` (in `vendor/`) — SUI component framework. `SuiComponent` subclasses own state, themes, and `compose()` logic. `StoreWatcher` bridges the nai-store to SUI.
+**State (`src/core/store/`):** slices `canon` (brief, vignettes, starting point, documents, cast review), `workshop` (Workshop Sends switch, boundary, drafting target), `distill` (per-target records, opening kept), `chat` (facilitator transcript), `runtime` (GenX state, GLM jobs), `ui` (open stage, open document, selected lorebook entry). `persistence.ts` loads the first four from `storyStorage` (one record per slice, keys in `src/core/keys.ts`) and writes each back when its reference changes. They are **story-scoped on purpose**: undo and branching move the page, never the canon. No migrations; old keys are ignored.
 
-**State (`src/core/store/`):**
+**Two models, two budgets:**
 
-- `slices/story.ts` — Field contents and World Entry items (DULFS)
-- `slices/world.ts` — `WorldEntity` records, `WorldGroup` (Threads), forge loop flag
-- `slices/brainstorm.ts` — Chat messages
-- `slices/foundation.ts` — Shape, intent, ATTG, style fields
-- `slices/ui.ts` — Edit modes, lorebook selection state
-- `slices/runtime.ts` — Generation queue status, GenX state
-- Data persisted via `api.v1.storyStorage` under key `"kse-persist"`
+- **The editor's model** (whatever the writer uses, Xialong for most) writes all long prose: vignettes, the starting point, canon documents, the opening. It is driven by NovelAI's own Send, which costs no script budget. It gets **no instructions**: a frame shaped like a story's notes and a one-line direction.
+- **GLM** (`src/core/engine/glm.ts`, `runGlm`) does the short structured work on the script budget: the facilitator, the critic, fixes and rewrites, distilling, keys. Every call goes through one GenX queue so the header shows one state for all of it. All GLM prompts are named exports in `src/core/prompts.ts`; nothing reads prompts from `project.yaml`.
+- The UI never names a model or a budget source.
 
-**Config:** `src/config/field-definitions.ts` — `FIELD_CONFIGS` array defines all field metadata, layouts, and generation prompts. Uses `FieldID` enum and `DulfsFieldID` union type throughout.
+**The workshop (`src/core/workshop/`):**
+
+- `context.ts` — `onContextBuilt` replaces a workshop Send's messages **keeping the editor's message shape**: Xialong's native context is a system message, a user message `Relevant persistent information:⏎<Memory>⏎***⏎Write.`, and the page as the assistant prefill (`***⏎` on an empty page). Only the Memory slot, `Write.` and the prefill change; roles are matched by name. The Opening keeps NovelAI's own context and only swaps the direction in.
+- `frames.ts` — what a Send is shown in place of Memory, trimmed from the lowest priority to fit. **Limits never go in a frame**: telling a story model what must not happen puts it in context. The critic checks limits.
+- `page.ts` — the draft region: everything after the **boundary** paragraph, marked by a divider widget and tinted paragraphs. Facts measured in NovelAI (`tools/surfaces-probe.naiscript`) that it depends on:
+  - A native Send **continues the last paragraph**, so the draft always holds a paragraph of its own after the boundary.
+  - Widgets and markers **do not survive a reload**; they are redrawn from the stored boundary at startup.
+  - Deleting the boundary paragraph disposes the node widget (`dispose: sectionRemoved`); the boundary is recovered from the last draft seen.
+  - A node widget "before the first section" does not render, so on an empty page the divider is an inline widget at the draft's start.
+  - Widget content stays plain: a `row` wrapper or `display` made `createWidget` refuse its options.
+  - Page work is serialised (`serial`); code already inside the chain calls `draw()` directly, never `redraw()`, or it waits on itself.
+- `workshop.ts` — commands (switch, choose target, save, open on page) and the hooks. A Send aimed above the boundary is stopped. Changing the target or switching off is **refused while the draft holds text**, so a half-written draft never becomes something else or quietly becomes story.
+- `targets.ts` — what each target is called, its save button's wording, and its default direction (a Send with an empty direction box uses it). Directions carry the Brief's voice: Xialong ignores "the brief's voice" but follows "told in third limited, past".
+
+**Canon work (`src/core/critic.ts`):** the critic reports `KIND | text` lines; Fix and rewrite-with-an-instruction rewrite one document. A result lands **only if the document still holds the text the call started from**; otherwise the writer's newer edit wins. A review counts only while its `textHash` matches the document (`reviewCurrent`).
+
+**Distill (`src/core/distill.ts`):** targets are derived from the canon (Memory, Author's Note, World, Dramatis Personae, a profile per dossier, Locations, Relationship Map, Plot Situations), all in the `SE: Scenario` category. Each record keeps the hash of its sources and of the text written, giving four states: current, stale, hand-edited, not compiled. **A hand-edited target is never replaced without the writer confirming**, and a change of substance goes canon-first (rewrite the document, then distill). World and Dramatis Personae are Always On; profiles and locations get GLM keys; the relationship map and plots are keyed on cast names.
+
+**Facilitator (`src/core/facilitator.ts`):** one GLM chat shared by the Brief and Cast stages. It interviews and never writes canon. Update brief fills empty Brief fields and appends new notes; it never overwrites a field the writer filled.
 
 **UI (`src/ui/`):**
 
-- Components are Preact function components under `src/ui/panels/` and `src/ui/components/`, composed into `App.tsx` and mounted by `mount.ts`. They read the store via `useSlice`/`useStream` (`src/ui/bridge.ts`), thin wrappers over `useSyncExternalStore` — snapshots are correct on first render, so there's no separate "seed the initial value" step to remember.
-- The UI is Preact/JSX and re-renders from the store — **never** `updateParts`, with no exceptions. Nothing in `src/` calls it. The header used to be the one carve-out: a UIPart tree with its own diffing driver, because a click inside a `part.jsx()` did not clear the harness's user-interaction flag ("FlagB") and budget-stalled generation could only be resumed from a real `part.button()`. The runtime now sets that flag from JSX events (`click`, `dblclick`, `mousedown`/`mouseup`, `contextmenu`, `keydown`/`keyup`/`keypress`, `pointerdown`/`pointerup`, `touchstart`/`touchend`, `input`, `change`, `submit`), so `src/ui/header/Header.tsx` is an ordinary component rendered by `App` above the tab bar. Do not reintroduce a parts-and-patch surface to work around FlagB.
-- `derive()` in `src/ui/header/header-model.ts` owns the generation state machine — it is the **only** place that branches on `genx.status`, and `tests/ui/countdown.test.ts` enforces that mechanically. `Header.tsx` renders the `WidgetMode` it returns and never reads the raw status; neither does any other component. Two surfaces reading the status directly is how they drift about whether a generation is waiting, queued, or done.
-- Shared storyStorage keys and other core↔UI slot constants live in `src/core/keys.ts` (see its header comment — relocated out of the retired SUI `ui/framework/ids.ts`, which no longer exists). The handful of remaining literal UIPart ids (`kse-root`/`kse-jsx-root`/`kse-sidebar` in `mount.ts`, `OPENING_MODAL_IDS` in `header/opening-scene-modal.ts`) are local constants scoped to their own file, not a centralized registry — ordinary JSX elements need no ids of their own.
-- `src/core/utils/context-builder.ts` — Builds layered AI prompts from current state
-
-**Entity system (`src/ui/components/SeEntityCard.ts`, `SeEntityEditPane.ts`):**
-
-- `WorldEntity` has `id`, `categoryId` (`DulfsFieldID`), `lifecycle` (`"draft" | "live"`), optional `lorebookEntryId`, `name`, and `summary`.
-- **Entity summary** is a Story Engine–internal field. It is stored only in Redux, editable only in `SeEntityEditPane`, and **never synchronized with or derived from lorebook entry text**. The lorebook entry text is a separate field populated by generation.
-- **Draft entities** have no lorebook entry. The "+ Add Entity" button creates a draft — **no lorebook entry is created until the user hits Save**, so cancelling out leaves no orphaned lorebook entries behind. The edit pane still exposes every field (name, summary, category, lorebook content, keys, Always On) so users can author the full entry by hand before promoting it; only the Generate icon buttons for content/keys are hidden, since those stream into a live lorebook entry that doesn't exist yet.
-- **Live entities** have a lorebook entry (`lorebookEntryId`). Their edit pane additionally shows the Generate icon buttons next to Content and Keys. Lorebook content/keys are **only flushed to the lorebook API on Save** — not on every keystroke.
-- **Draft → live promotion:** Saving a draft entity creates a lorebook entry in the entity's current category (via `ensureCategory(entity.categoryId)`) and persists the draft name, lorebook content, keys, and Always On state that were entered in the pane. The entry id is attached via `entityLorebookEntryBound`.
-- **One entity per lorebook entry**: `entityBound` / `entitiesBoundBatch` drop any entity whose `lorebookEntryId` is already bound. Two entities over one entry would generate into it twice and list it twice in the World, and the Import wizard's Bind mints a fresh entity id per click — so the invariant is enforced in the reducer, not at the callsites.
-- **Cast**: `castAllRequested` / `entityCastRequested` effects first look for an existing unmanaged lorebook entry with a matching `displayName` (case-insensitive) and bind to it. If none found, a new entry is created in the appropriate `SE: <Category>` lorebook category with empty text (summary is not seeded into lorebook).
-- **Category**: `entity.categoryId` is a Story Engine concept — it drives sidebar organization, template selection, and the prefill `Type:` line. It is **independent of the lorebook entry's own category**: the lorebook category is where the entry lives in the user's lorebook, only assigned at creation time (`SeEntityEditPane` on save; cast/forge effects at bind time). Users commonly reorganize imported or long-running entries in their lorebook for their own preferences; Story Engine does **not** chase those moves, and `entityCategoryChanged` only updates Redux — it does not rewrite `entry.category`. `SeEntityEditPane` shows a category picker (SuiActionBar) for all entities.
-
-**Prompts:** All generation prompts are hard-coded constants in `src/core/utils/prompts.ts`. They are **not** configurable via `project.yaml`. `project.yaml` contains only non-prompt settings (model, feature flags).
-
-**Prompt policy — prompts live in `src/core/utils/prompts.ts`, not in code files and not in `project.yaml`.**
-
-- Every generation prompt is an exported string constant in `prompts.ts`. Import and use directly — no `api.v1.config.get()` for prompt fields.
-- `project.yaml` is for runtime settings only: `model`, `sega_skip_*`, `generation_journal`, `erato_compatibility`, `story_engine_debug`. Do not add prompt fields there.
-- When adding a new prompt, add it to `prompts.ts` as a named export.
-
-**Generation pipeline:**
-
-- Context is layered: System → Setting → Story Prompt → World Snapshot → Volatile Data
-- World Entries use two-phase generation: Phase 1 generates a list of names, Phase 2 generates detailed content per item
-- S.E.G.A. (Story Engine Generate All) fills blank fields using round-robin queueing across categories
-- Lorebook sync (`src/core/store/effects/lorebook-sync.ts`) manages SE-category creation and DULFS item→lorebook binding. It does **not** sync entity summaries in either direction — summaries are SE-internal only.
-- **Information hierarchy for lorebook generation: DRAFT > LOREBOOK > STATE** for the fields that actually have all three layers (notably `displayName`): prefer in-pane draft values (storyStorage slots like `EDIT_PANE_TITLE`) first, then the lorebook API entry (so imported/user-edited lorebooks override whatever Redux thinks), and only then fall back to Redux world state. **Category is a deliberate exception** — it's an SE-side classification, so managed entities resolve through `entity.categoryId` and only unmanaged entries fall back to `entry.category`. `resolveDisplayName` / `resolveCategoryName` in `src/core/utils/lorebook-strategy.ts` are the canonical implementations.
+- **Surfaces:** a sidebar panel (`sidebar/`: header, stage tabs, one component per stage), one script panel under the page (`panel/WorkshopPanel.tsx`, two rows at most: at phone width a script panel grows with its content and squeezes the page), the divider widget's content (`mount.ts`), and a lorebook panel (`lorebook/`). Context menus and toolbox options are not used: they are poor on mobile.
+- **Mobile first, one layout:** inline styles have no media queries, so every layout is flex rows that wrap. Touch targets are `TOUCH` (44px), dense lists `DENSE` (36px). State is carried by text, never colour alone.
+- **Renaming the script panel means re-sending the whole extension.** `api.v1.ui.update([{ id, name }])` removes the panel. The panel's name carries the workshop state ("Story Engine · Workshop on") so it reads even collapsed.
+- Components read the store with `useSlice`/`useStream` (`bridge.ts`), built on `useSyncExternalStore`, so the first render is already correct. Select **primitives**; a selector returning a fresh object each call loops.
+- `derive()` in `header/header-model.ts` is the **only** place that branches on `genx.status`; `tests/ui/countdown.test.ts` enforces it.
+- The UI is Preact and re-renders from the store — **never** `updateParts`. The runtime sets the user-interaction flag (FlagB) from JSX events, so no parts-and-patch surface is needed for it.
 
 ## Coding Guidelines
 
-- Read `external/script-types.d.ts` to adhere strictly to NovelAI API signatures. Avoid `any` casts, especially with API interactions.
-- Trust `.d.ts` files implicitly — do not wrap API calls in defensive existence checks unless handling a documented optional feature.
-- Use `api.v1.hooks` (not deprecated `api.v1.events`). Use `api.v1.uuid()` for ID generation.
-- No singletons/globals — prefer dependency injection wired in `src/index.ts`.
-- Be bold, don't worry about data migration or supporting legacy patterns as we iterate.
-- Adhere to the KISS Principle.
-- Follow the Boyscout Rule.
-- Bump `project.yaml` `version` at most once per pull request. Subsequent commits on the same branch should not bump it again. **Story Engine is in alpha**, so the major version is locked at `0` — `1.0` is reserved for Beta and `2.0` for the production release. That shifts the standard semver rungs down one:
-  - **Minor** — the "major"-scale changes (architecture, data model, persisted schema, generation pipeline restructure). These would normally be major bumps, but bump minor while the major is pinned at 0.
-  - **Patch** — everything else: quality and accessibility improvements, prompt tuning, UX polish, new non-structural features, and bug fixes. Normally these would split across minor and patch; under the alpha lock they all go to patch.
-- Keep `CHANGELOG.md` in step with the in-progress version on every commit that changes user-visible behavior. On the first commit that bumps the version, add a new section for it at the top of the file under the existing Keep-a-Changelog layout (`### Added / Changed / Fixed / Removed`). On subsequent commits to the same PR, trim or refine that section — merge duplicates, drop entries that were reverted, and rewrite bullets as the user-facing story sharpens. The goal is a final changelog entry that reads like a release note, not a commit log.
-
-**DRY in the UI (don't branch render paths on entity state):** Avoid duplicating component construction or splitting `compose()` into "draft vs live" / "empty vs filled" / "isFoo vs isBar" render branches. Each branch is another stale-closure surface and another place to forget when a new field is added. Prefer one render path that always builds every part, and let the parts adapt themselves: `stateProjection`/`requestIdFromProjection` on a `SeGenerationIconButton` so the same button works for drafts and live entities; helpers like `_ensureLiveEntryId` so callers (Save, Generate Content, Generate Keys) don't each reimplement the promote logic. When a callsite genuinely needs different behavior, push the difference into the leaf — never fork the row/column scaffolding above it.
+- Read `external/script-types.d.ts` for NovelAI API signatures and trust it; no defensive existence checks around documented calls. Avoid `any`.
+- Use `api.v1.hooks` (not `api.v1.events`) and `api.v1.uuid()`.
+- Keep core free of UI imports. Where core needs something from the UI (the divider's content), the UI supplies it at startup (`setWidgetContent`).
+- Be bold: no data migration, no legacy patterns. KISS. Follow the Boyscout Rule.
+- Bump `project.yaml` `version` at most once per pull request. **Story Engine is in alpha**, so the major version is locked at `0` (`1.0` is reserved for Beta, `2.0` for production): **minor** for architecture, data model, persisted schema or pipeline changes; **patch** for everything else.
+- Keep `CHANGELOG.md` in step with the in-progress version on every commit that changes user-visible behaviour, under Keep-a-Changelog headings. Refine the section as the PR goes, so it ends as a release note, not a commit log.
 
 **UI Input Patterns:**
 
-- **Design intents to be idempotent; do not add a tap debounce.** The runtime used to deliver `click` twice for a single mobile tap, and v0.14 wrapped ~40 handlers in a `useTapGuard()` hook to absorb it. That runtime bug is fixed upstream and the hook is gone (removed in 0.14.1) — do not reintroduce a timestamp debounce, and do not write handlers that only work because one is present. What stays is the structural half of the rule, which was always the real fix: carry the data an intent needs **in the action payload**, never through a shared storyStorage slot read asynchronously by the effect (a second dispatch would overwrite the slot before the first read lands), and refuse re-entry in the handler or effect when the work spans an `await` — `flushingRef` in `EntityEditPane`, `genRef` in `useGenField`, the forge effect's concurrent-session check, and the one-entity-per-lorebook-entry reducer invariant are the canonical examples. Those guard against a genuine second press, which a debounce never could.
-- **Bind text entry with `onInput`, never `onChange`.** The JSX renderer keeps native DOM semantics (Preact, not React): `input` fires per keystroke, `change` only when a modified field commits — i.e. on blur. An `onChange`-bound field therefore holds stale local state until focus leaves it, so anything reading that state before blur (a Send/Save button) sees the pre-edit value. `tests/ui/text-input-events.test.ts` guards the invariant.
+- **Design intents to be idempotent; do not add a tap debounce.** Carry the data an intent needs in its call, and refuse re-entry where the work spans an `await` (`saving` in `workshop.ts`, `once` in `critic.ts`, `running` in `distill.ts`).
+- **Bind text entry with `onInput`, never `onChange`.** `change` fires only on blur, so an `onChange`-bound field holds stale state until focus leaves it. `tests/ui/text-input-events.test.ts` guards it. Fields that write to the store track typing locally and commit on blur (`Field` in `components/kit.tsx`): never dispatch per keystroke.
+- **`disabled` is not a re-entry guard.** It is a render-time value; the guard belongs under the button.
 
-- Prefer `storageKey` on inputs for automatic persistence — avoid manual onChange handlers for simple state sync.
-- Exception: Use `onChange` callbacks alongside `storageKey` when syncing to non-UIPart targets (e.g., `api.v1.an.set()`, `api.v1.memory.set()`).
-- **Never dispatch actions in `onChange` callbacks.** The reducer overhead is too high for keystroke-frequency events.
-- **Do not call `api.v1.lorebook.updateEntry()` in `onChange`.** Lorebook writes happen at explicit commit points (e.g., clicking Save in an edit pane), not on every keystroke. `SeEntityEditPane` is the canonical example: content/keys draft in storyStorage, flushed to lorebook only on Save.
-- **`storageKey` inputs are owned by storyStorage — never use `updateParts` to set their value.** Read with `api.v1.storyStorage.get(key)`, write with `api.v1.storyStorage.set(key, value)`, clear with `api.v1.storyStorage.remove(key)`. The input reads from its storageKey automatically. Using `updateParts({ value })` on a storageKey-bound input is incorrect — the stored value and displayed value will diverge.
-- **`story:` prefix routing**: In a `storageKey` binding, `story:` is a routing directive the UI framework strips — `storageKey: "story:my-key"` persists under bare key `"my-key"` in storyStorage. `storyStorage.get("my-key")` reads the same slot; `storyStorage.get("story:my-key")` reads a literally different key and is always wrong. Never embed `story:` in storage key constants — add it only at the `storageKey` binding site. Pattern: constant = `"my-key"`, binding = `` `story:${MY_KEY}` ``, direct API = `storyStorage.get(MY_KEY)`. Use `storyStorage.remove(key)` to clear (not `set(key, null)`).
+**UI Rendering Rules:**
 
-**UI Rendering Rules (JSX tree — SUI and the UIPart header are both gone):**
-
-- **UIParts survive in exactly two places, and neither mutates.** `mount.ts` builds the panel scaffolding (`buildRoot` + the `part.jsx()` body), and `header/opening-scene-modal.ts` builds the Opening Scene modal, because `api.v1.ui.modal.open` takes a `UIPart[]` — an API constraint, not a FlagB workaround. Both construct their specs once and hand them over; parts are frozen objects, so anything that needs to change over time belongs in the Preact tree instead.
-
-- **Never swap a component's _type_ at a fixed position.** `{armed ? <AlertTriangle/> : <Trash2/>}` leaves BOTH svgs in the DOM when the re-render comes from a detached callback — a timer tick or a store subscription rather than a JSX event handler. Mount every variant and toggle `display`, or give each variant its own keyed position in a list. `ConfirmButton.tsx` and `Header.tsx`'s `WidgetIcon` are the two worked examples; the header renders every state it can be in, since all of its renders are detached.
-
-- **First render is already correct.** `useSlice`/`useStream` are built on `useSyncExternalStore`, so they return a real snapshot on mount — there is no "seed the initial value" step. Values that live outside the store need explicit help instead: `getAllowedOutput()` and the budget countdown come from a self-rescheduling `api.v1.timers` tick (`useTick` in `Header.tsx`), and `hasDocumentContent` is read once in `mount.ts` and passed to `App` as a prop so the bootstrap button's first paint carries the right label.
-
-- **`disabled` is not a re-entry guard.** It is a render-time value, so a press arriving before the re-render that sets it still gets through. Where that matters the backstop belongs underneath the button — an in-flight ref across the `await`, or an effect that refuses an id it has already queued (`EntityCard`'s regen bolt relies on the latter). See the idempotence rule under **UI Input Patterns**.
+- **Never swap a component's type at a fixed position**, including to and from `null`. `{cond ? <A/> : <B/>}` leaves both in the DOM when the re-render comes from a detached callback (a timer, a store subscription, a GLM result). Mount every variant and toggle `display`, and render lists from arrays (`(ids ? ids.split(",") : []).map(…)`). `ConfirmButton.tsx` and `Header.tsx`'s `WidgetIcon` are the worked examples.
+- **A controlled `<select>` does not snap back** when a change is refused and the store value stays the same; remount it with a key (`WorkshopPanel`).
 
 ## Key Constraints
 
-- **No DOM:** Runs in QuickJS web worker. No `setTimeout` (use `api.v1.timers`), no `console.log` (use `api.v1.log()`).
-- **NovelAI API:** Generation via `api.v1.generate()`, storage via `api.v1.storyStorage`, UI via `api.v1.ui`, config via `api.v1.config`.
-- **Strict TypeScript:** `noImplicitAny`, `noUnusedLocals`, `noUnusedParameters` enabled.
+- **No DOM:** QuickJS web worker. No `setTimeout` (use `api.v1.timers`), no `console.log` (use `api.v1.log()`).
+- **Strict TypeScript:** `noImplicitAny`, `noUnusedLocals`, `noUnusedParameters`.
 - API types: `external/script-types.d.ts` — the authoritative NovelAI API surface.
+- The probes in `tools/` record what NovelAI actually does; when an API's behaviour matters, measure it with a probe before designing around it.

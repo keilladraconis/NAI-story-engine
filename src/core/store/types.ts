@@ -1,204 +1,159 @@
-import { GenerationState, MessageFactory } from "nai-gen-x";
-import { Action } from "nai-store";
+import type { GenerationState } from "nai-gen-x";
 
-import { DulfsFieldID, FieldID } from "../../config/field-definitions";
+// ── Canon ────────────────────────────────────────────────────────────────────
 
-// App-wide dispatch type for effects
-export type AppDispatch = (action: Action) => void;
+export type StageId =
+  "brief" | "vignettes" | "now" | "canon" | "cast" | "distill";
 
-// SEGA Types
-export type SegaStage =
-  "idle" | "lorebookContent" | "lorebookKeys" | "completed";
-
-export interface SegaState {
-  stage: SegaStage;
-  statusText: string; // Current status for UI display
-  activeRequestIds: string[]; // Track SEGA-initiated requests for cancellation
-  keysCompleted: Record<string, boolean>; // entryId → true when keys generated (cleared on reset)
+export interface Brief {
+  title: string;
+  /** Genre and tags, as they would read in an ATTG line. */
+  genre: string;
+  premise: string;
+  /** Narrative perspective and tense, e.g. "Third limited, past". */
+  voice: string;
+  heat: string;
+  pace: string;
+  /** Hard and soft limits, as the writer put them. */
+  limits: string;
+  /** Free notes: desires, reactions from the Cast stage, anything else. */
+  notes: string;
 }
 
-export const WORLD_ENTRY_CATEGORIES: DulfsFieldID[] = [
-  FieldID.DramatisPersonae,
-  FieldID.UniverseSystems,
-  FieldID.Locations,
-  FieldID.Factions,
-  FieldID.SituationalDynamics,
-  FieldID.Topics,
-];
-
-export interface StoryField {
+export interface Vignette {
   id: string;
+  title: string;
+  text: string;
+}
+
+export interface StartingPoint {
+  /** What is true at the story's first message. */
+  now: string;
+  /** What the vignettes show that must be earned through play. */
+  notYet: string;
+}
+
+export type DocKind =
+  | "geography"
+  | "history"
+  | "culture"
+  | "tensions"
+  | "factions"
+  | "locations"
+  | "relationships"
+  | "plots"
+  | "system"
+  | "dossier";
+
+export type IssueKind =
+  | "contradiction"
+  | "past-the-now"
+  | "invented"
+  | "name-collision"
+  | "missing-family"
+  | "limit";
+
+export interface Issue {
+  id: string;
+  kind: IssueKind;
+  text: string;
+}
+
+export interface Review {
+  issues: Issue[];
+  /** hashText of the document text the review read. */
+  textHash: string;
+}
+
+export interface CanonDoc {
+  id: string;
+  kind: DocKind;
+  /** A dossier's title is the character's name. */
+  title: string;
+  text: string;
+  review?: Review;
+}
+
+export interface CanonState {
+  brief: Brief;
+  vignettes: Vignette[];
+  startingPoint: StartingPoint;
+  docs: CanonDoc[];
+  castReviewed: boolean;
+}
+
+// ── Workshop ─────────────────────────────────────────────────────────────────
+
+export type Target =
+  | { kind: "vignette" }
+  | { kind: "startingPoint" }
+  | { kind: "doc"; docId: string }
+  | { kind: "opening" };
+
+export interface WorkshopState {
+  on: boolean;
+  /** Section id the draft starts after; 0 = before the first section. */
+  boundary: number | null;
+  target: Target;
+}
+
+// ── Distill ──────────────────────────────────────────────────────────────────
+
+/** "memory", "an", or an entry: "entry:world", "entry:profile:<docId>", … */
+export type DistillTargetId = string;
+
+export interface DistillRecord {
+  entryId?: string;
+  /** hashText of the sources at compile time. */
+  sourceHash: string;
+  /** hashText of the text Story Engine wrote. */
+  writtenHash: string;
+}
+
+export interface DistillState {
+  records: Record<DistillTargetId, DistillRecord>;
+  openingKept: boolean;
+}
+
+// ── Chat ─────────────────────────────────────────────────────────────────────
+
+export interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
   content: string;
-  data?: Record<string, unknown>;
 }
 
-export interface StoryState {
-  fields: Record<string, StoryField>;
-  attgEnabled: boolean;
-  styleEnabled: boolean;
+export interface ChatState {
+  messages: ChatMessage[];
 }
 
-export interface LorebookUIState {
-  selectedEntryId: string | null;
-  selectedCategoryId: string | null;
-}
+// ── Runtime ──────────────────────────────────────────────────────────────────
 
-export interface UIState {
-  activeEditId: string | null;
-  inputs: Record<string, string>;
-  lorebook: LorebookUIState;
-  worldExpanded: boolean | null;
-  // The Import wizard is shown over the Story Engine tab. Store-driven so the
-  // cold-start bootstrap can open it once on first run (foundation empty +
-  // existing unmanaged content to pull in).
-  importWizardOpen: boolean;
-}
-
-export type GenerationStatus =
-  "idle" | "queued" | "generating" | "paused" | "error";
-
-export type GenerationRequestStatus =
-  "queued" | "processing" | "completed" | "cancelled";
-
-export interface GenerationRequest {
+export interface Job {
   id: string;
-  type:
-    | "list"
-    | "chat"
-    | "chatRefine"
-    | "lorebookContent"
-    | "lorebookKeys"
-    | "forgeChat"
-    | "forgeCleanup"
-    | "foundation"
-    | "entitySummary"
-    | "entitySummaryBind"
-    | "threadSummary"
-    | "bootstrap"
-    | "bootstrapContinue";
-  targetId: string;
-  status: GenerationRequestStatus;
-  prompt?: string;
-}
-
-export interface GenerationStrategy {
-  requestId: string;
-  messages?: Message[]; // Optional if using messageFactory
-  messageFactory?: MessageFactory; // JIT strategy builder
-  params?: GenerationParams; // Optional if provided by factory
-  target:
-    | { type: "chat"; chatId: string; messageId: string }
-    | { type: "chatRefine"; chatId: string; messageId: string; fieldId: string }
-    | { type: "list"; fieldId: string }
-    | { type: "lorebookContent"; entryId: string }
-    | { type: "lorebookKeys"; entryId: string }
-    | {
-        type: "forgeChat";
-        chatId: string;
-        messageId: string;
-      }
-    | {
-        type: "forgeCleanup";
-        chatId: string;
-        messageId: string;
-        discardedNames: string[];
-      }
-    | {
-        type: "foundation";
-        field:
-          "shape" | "intent" | "worldState" | "attg" | "style" | "contract";
-      }
-    | { type: "entitySummary"; entityId: string }
-    | { type: "entitySummaryBind"; entityId: string }
-    | { type: "threadSummary"; groupId: string }
-    | { type: "bootstrap" }
-    | { type: "bootstrapContinue"; iteration: number };
-  prefillBehavior: "keep" | "trim";
-  assistantPrefill?: string;
-  continuation?: { maxCalls: number };
-  minResponseLength?: number;
+  /** What the job is doing, for status lines: "Reviewing Tam". */
+  label: string;
 }
 
 export interface RuntimeState {
-  segaRunning: boolean;
-  sega: SegaState;
-  queue: GenerationRequest[];
-  activeRequest: GenerationRequest | null;
-  status: GenerationStatus;
   genx: GenerationState;
-  budgetTimeRemaining: number;
-  /** Bumped whenever the user navigates document history (undo/redo/jump). UI
-   *  that derives from document content — e.g. the bootstrap stage button —
-   *  watches this to re-derive after an undo. */
-  historyEpoch: number;
+  /** GLM jobs queued or running, oldest first. */
+  jobs: Job[];
 }
 
-// World Types (v13)
-
-export interface WorldGroup {
-  id: string;
-  title: string; // display name — e.g. "Thieves' Guild Inner Circle"
-  summary: string; // narrative description — fed into [GROUPS] generation context
-  entityIds: string[];
-  lorebookEntryId?: string; // optional: group summary synced as a lorebook entry
-}
-
-export type EntityLifecycle = "draft" | "live";
-
-export interface WorldEntity {
-  id: string;
-  categoryId: DulfsFieldID; // Character, Location, etc. — metadata
-  lorebookEntryId?: string; // lorebook entry created on Cast (live only)
-  name: string;
-  summary: string; // SE-internal only — editable in SeEntityEditPane, never synced to lorebook
-  lifecycle: EntityLifecycle; // "draft" = no lorebook entry yet; "live" = lorebook-bound
-  sourceChatId?: string; // chat session that produced this entity
-  /** Id of the assistant message that most recently created or revised this entity. Set by the forge-chat completion handler; never cleared. Used by chat-types to render inline cards under the originating turn. */
-  lastAffectingMessageId?: string;
-}
-
-export interface WorldState {
-  groups: WorldGroup[];
-  entitiesById: Record<string, WorldEntity>;
-  entityIds: string[];
-}
-
-// Foundation Types (v11)
-
-export interface ShapeData {
-  name: string; // Short label — e.g. "Slice of Life", "Tragedy"
-  description: string; // Structural logic — what this shape leans toward
-}
-
-export interface IntensityData {
-  level: string; // Short label — e.g. "Grounded", "Noir", "Cozy"
-  description: string; // What this level means for this story concretely
-}
-
-export interface ContractData {
-  required: string; // What this story MUST deliver
-  prohibited: string; // What this story must NEVER do
-  emphasis: string; // The specific texture that makes this story itself
-}
-
-export interface FoundationState {
-  shape: ShapeData | null;
-  intent: string;
-  worldState: string;
-  intensity: IntensityData | null;
-  contract: ContractData | null;
-  attg: string;
-  style: string;
-  attgSyncEnabled: boolean;
-  styleSyncEnabled: boolean;
+export interface UIState {
+  stage: StageId;
+  /** The canon document open in the Canon stage. */
+  openDocId: string | null;
+  /** The lorebook entry selected in the lorebook (for the lorebook panel). */
+  lorebookEntryId: string | null;
 }
 
 export interface RootState {
-  story: StoryState;
-  chat: import("./slices/chat").ChatSliceState;
-  ui: UIState;
+  canon: CanonState;
+  workshop: WorkshopState;
+  distill: DistillState;
+  chat: ChatState;
   runtime: RuntimeState;
-  world: WorldState;
-  foundation: FoundationState;
-  forge: import("./slices/forge").ForgeSliceState;
+  ui: UIState;
 }

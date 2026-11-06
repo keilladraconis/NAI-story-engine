@@ -9,7 +9,7 @@
 // loop. For derived objects, pass an `equals` and memoize at the call site.
 
 import { store, type RootState } from "../core/store";
-import { readStream, subscribeStream } from "../core/store/stream-buffer";
+import { readStream, subscribeStream } from "../core/engine/stream-buffer";
 
 export function sliceStore<T>(
   selector: (s: RootState) => T,

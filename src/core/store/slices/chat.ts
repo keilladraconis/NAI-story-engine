@@ -1,153 +1,29 @@
 import { createSlice } from "nai-store";
-import type { Chat, ChatMessage, ForgeSegment } from "../../chat-types/types";
+import type { ChatMessage, ChatState } from "../types";
 
-export interface ChatSliceState {
-  chats: Chat[];
-  activeChatId: string | null;
-}
-
-function makeDefaultBrainstorm(): Chat {
-  return {
-    id: api.v1.uuid(),
-    type: "brainstorm",
-    title: "Brainstorm 1",
-    subMode: "cowriter",
-    messages: [],
-    seed: { kind: "blank" },
-  };
-}
-
-const seedChat = makeDefaultBrainstorm();
-export const initialChatState: ChatSliceState = {
-  chats: [seedChat],
-  activeChatId: seedChat.id,
-};
-
-function mapChat(
-  state: ChatSliceState,
-  id: string,
-  fn: (c: Chat) => Chat,
-): ChatSliceState {
-  return { ...state, chats: state.chats.map((c) => (c.id === id ? fn(c) : c)) };
-}
+export const initialChatState: ChatState = { messages: [] };
 
 export const chatSlice = createSlice({
   name: "chat",
   initialState: initialChatState,
   reducers: {
-    chatCreated: (state, payload: { chat: Chat }) => ({
+    messageAdded: (state, message: ChatMessage) => ({
       ...state,
-      chats: [...state.chats, payload.chat],
-      activeChatId: payload.chat.id,
+      messages: [...state.messages, message],
     }),
-
-    chatRenamed: (state, payload: { id: string; title: string }) =>
-      mapChat(state, payload.id, (c) => ({ ...c, title: payload.title })),
-
-    chatSwitched: (state, payload: { id: string }) => {
-      if (!state.chats.some((c) => c.id === payload.id)) return state;
-      return { ...state, activeChatId: payload.id };
-    },
-
-    chatDeleted: (state, payload: { id: string }) => {
-      if (state.chats.length <= 1) return state;
-      const chats = state.chats.filter((c) => c.id !== payload.id);
-      const activeChatId =
-        state.activeChatId === payload.id
-          ? chats[chats.length - 1].id
-          : state.activeChatId;
-      return { ...state, chats, activeChatId };
-    },
-
-    subModeChanged: (state, payload: { id: string; subMode: string }) =>
-      mapChat(state, payload.id, (c) => ({ ...c, subMode: payload.subMode })),
-
-    messageAdded: (state, payload: { chatId: string; message: ChatMessage }) =>
-      mapChat(state, payload.chatId, (c) => ({
-        ...c,
-        messages: [...c.messages, payload.message],
-      })),
-
-    messageUpdated: (
-      state,
-      payload: { chatId: string; id: string; content: string },
-    ) =>
-      mapChat(state, payload.chatId, (c) => ({
-        ...c,
-        messages: c.messages.map((m) =>
-          m.id === payload.id ? { ...m, content: payload.content } : m,
-        ),
-      })),
-
-    messageAppended: (
-      state,
-      payload: { chatId: string; id: string; content: string },
-    ) =>
-      mapChat(state, payload.chatId, (c) => ({
-        ...c,
-        messages: c.messages.map((m) =>
-          m.id === payload.id
-            ? { ...m, content: m.content + payload.content }
-            : m,
-        ),
-      })),
-
-    messageRemoved: (state, payload: { chatId: string; id: string }) =>
-      mapChat(state, payload.chatId, (c) => ({
-        ...c,
-        messages: c.messages.filter((m) => m.id !== payload.id),
-      })),
-
-    forgeSegmentsSet: (
-      state,
-      payload: { chatId: string; id: string; segments: ForgeSegment[] },
-    ) =>
-      mapChat(state, payload.chatId, (c) => ({
-        ...c,
-        messages: c.messages.map((m) =>
-          m.id === payload.id ? { ...m, forgeSegments: payload.segments } : m,
-        ),
-      })),
-
-    messagesPrunedAfter: (state, payload: { chatId: string; id: string }) =>
-      mapChat(state, payload.chatId, (c) => {
-        const idx = c.messages.findIndex((m) => m.id === payload.id);
-        if (idx === -1) return c;
-        const target = c.messages[idx];
-        const cut = target.role === "user" ? idx + 1 : idx;
-        return { ...c, messages: c.messages.slice(0, cut) };
-      }),
-
-    refineCandidateMarked: (
-      state,
-      payload: { chatId: string; messageId: string },
-    ) =>
-      mapChat(state, payload.chatId, (c) => ({
-        ...c,
-        messages: c.messages.map((m) =>
-          m.id === payload.messageId ? { ...m, refineCandidate: true } : m,
-        ),
-      })),
+    messageUpdated: (state, p: { id: string; content: string }) => ({
+      ...state,
+      messages: state.messages.map((m) =>
+        m.id === p.id ? { ...m, content: p.content } : m,
+      ),
+    }),
+    messageRemoved: (state, p: { id: string }) => ({
+      ...state,
+      messages: state.messages.filter((m) => m.id !== p.id),
+    }),
+    chatCleared: (state) => ({ ...state, messages: [] }),
   },
 });
 
-export const chatSliceReducer = chatSlice.reducer;
-export const {
-  chatCreated,
-  chatRenamed,
-  chatSwitched,
-  chatDeleted,
-  subModeChanged,
-  messageAdded,
-  messageUpdated,
-  messageAppended,
-  messageRemoved,
-  forgeSegmentsSet,
-  messagesPrunedAfter,
-  refineCandidateMarked,
-} = chatSlice.actions;
-
-export function activeSavedChat(state: ChatSliceState): Chat | null {
-  if (!state.activeChatId) return null;
-  return state.chats.find((c) => c.id === state.activeChatId) ?? null;
-}
+export const { messageAdded, messageUpdated, messageRemoved, chatCleared } =
+  chatSlice.actions;
