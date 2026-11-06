@@ -10,7 +10,7 @@ import {
 } from "../../core/store";
 import { talk, retryReply, interviewDone } from "../../core/facilitator";
 import { useSlice, useStream } from "../bridge";
-import { SP, T } from "../style";
+import { SP, T, SCROLL } from "../style";
 import { Button, Row } from "../components/kit";
 import { ConfirmButton } from "../components/ConfirmButton";
 import { RotateCw, X } from "nai:icons/feather";
@@ -104,7 +104,7 @@ export function Facilitator() {
         style={{
           flex: 1,
           minHeight: 0,
-          overflowY: "auto",
+          ...SCROLL,
           display: "flex",
           flexDirection: "column-reverse",
           justifyContent: "flex-start",
@@ -170,6 +170,8 @@ export function Facilitator() {
             color: T.text,
             font: "inherit",
             resize: "vertical",
+            scrollbarWidth: SCROLL.scrollbarWidth,
+            scrollbarColor: SCROLL.scrollbarColor,
           }}
         />
         <Row>

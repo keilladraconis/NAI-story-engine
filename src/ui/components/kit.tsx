@@ -1,7 +1,7 @@
 // Small building blocks shared by the sidebar stages. Everything wraps: there
 // are no media queries, so one layout serves a phone and a desktop.
 
-import { DENSE, SP, T, TOUCH } from "../style";
+import { DENSE, SCROLL, SP, T, TOUCH } from "../style";
 
 type Tone = "primary" | "plain" | "quiet";
 
@@ -124,6 +124,8 @@ export function Field(props: {
     font: "inherit",
     lineHeight: 1.45,
     resize: "vertical",
+    scrollbarWidth: SCROLL.scrollbarWidth,
+    scrollbarColor: SCROLL.scrollbarColor,
   } as const;
   return (
     <label

@@ -5,7 +5,7 @@
 import type { StageId } from "../../core/store";
 import { STAGES } from "../../core/stages";
 import { useSlice } from "../bridge";
-import { T } from "../style";
+import { T, SCROLL } from "../style";
 import { Header } from "../header/Header";
 import { StageTabs } from "./StageTabs";
 import { TalkStage } from "./stages/TalkStage";
@@ -51,7 +51,7 @@ export function Sidebar() {
               flexDirection: "column",
               flex: 1,
               minHeight: 0,
-              overflowY: "auto",
+              ...SCROLL,
             }}
           >
             <Body />

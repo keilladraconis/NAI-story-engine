@@ -35,3 +35,15 @@ export const SP = {
 export const TOUCH = "44px";
 /** Minimum height for controls in dense lists. */
 export const DENSE = "36px";
+
+/**
+ * Scroll containers: thin, with a theme-coloured thumb on no track, to match
+ * NovelAI's own sidebar. NovelAI styles its scrollbars with global
+ * `::-webkit-scrollbar` rules, which do not reach into our shadow DOM, and
+ * inline styles cannot hold pseudo-elements; the standard properties can.
+ */
+export const SCROLL = {
+  overflowY: "auto",
+  scrollbarWidth: "thin",
+  scrollbarColor: `${T.bg3} transparent`,
+} as const;
