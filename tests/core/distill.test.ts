@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+  adultHeat,
+  nameKeys,
   distillTargets,
   statusOf,
   finish,
@@ -125,5 +127,22 @@ describe("keys", () => {
       "tam",
       "the lamp-room",
     ]);
+  });
+});
+
+describe("adultHeat", () => {
+  it("adds the adults line for adult heat, not for its negation", () => {
+    expect(adultHeat("Explicit")).toBe(true);
+    expect(adultHeat("Nothing explicit")).toBe(false);
+    expect(adultHeat("not sexual")).toBe(false);
+    expect(adultHeat("Tender")).toBe(false);
+  });
+});
+
+describe("nameKeys", () => {
+  it("keys a name and its first name", () => {
+    expect(nameKeys("Tam Ward")).toEqual(["tam ward", "tam"]);
+    expect(nameKeys("Ilse")).toEqual(["ilse"]);
+    expect(nameKeys("Al Bo")).toEqual(["al bo"]);
   });
 });

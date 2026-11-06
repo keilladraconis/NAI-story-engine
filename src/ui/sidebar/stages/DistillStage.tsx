@@ -92,6 +92,8 @@ function TargetRow(props: {
   );
 }
 
+const REFRESH_MS = 4000;
+
 export function DistillStage() {
   const sig = useSlice(signature);
   const list = useSlice(labels);
@@ -99,14 +101,29 @@ export function DistillStage() {
   const openingKept = useSlice((s) => s.distill.openingKept);
   const [now, setNow] = useState<Record<string, DistillStatus>>({});
 
+  // Re-read on every canon or record change, and every few seconds while the
+  // stage is open: a hand edit in the lorebook, Memory or the Author's Note
+  // happens outside the store, so nothing else would notice it.
+  const [tick, setTick] = useState(0);
   useEffect(() => {
     if (!active) return;
     let live = true;
-    void statuses(store.getState()).then((s) => live && setNow(s));
+    let timer: number | null = null;
+    void statuses(store.getState()).then((s) => {
+      if (!live) return;
+      setNow(s);
+      void api.v1.timers
+        .setTimeout(() => live && setTick((n) => n + 1), REFRESH_MS)
+        .then((id: number) => {
+          if (live) timer = id;
+          else void api.v1.timers.clearTimeout(id);
+        });
+    });
     return () => {
       live = false;
+      if (timer !== null) void api.v1.timers.clearTimeout(timer);
     };
-  }, [sig, active]);
+  }, [sig, active, tick]);
 
   const todo = Object.values(now).filter(
     (s) => s === "stale" || s === "not compiled",

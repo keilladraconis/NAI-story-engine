@@ -78,8 +78,7 @@ Line 2: the central tension of the scenario, in one sentence.`,
   an: `Write the story's style as comma-separated descriptors of the prose: perspective and tense, register, pacing, sentence feel. At most 25 words. Descriptors only, no sentence.`,
   world: `Write a digest of the world from the sources: where it is set, and whichever of history, culture, tensions, factions and systems the sources cover. Short paragraphs, each starting with a plain label and a colon ("Setting:", "History:" …). Write a paragraph only for what the sources cover; never fill in a topic they leave out. At most 350 words.`,
   dramatis: `Write one line per character in the dossiers, as "- Name (age, role): two physical details, one behavioural tell". Every dossier, no one else.`,
-  profile: `Write this character's lorebook profile in exactly this form, one field per line, filling each from the dossier:
-<Name>
+  profile: `Write this character's lorebook profile, one field per line, filling each from the dossier. The first line is the character's full name and nothing else; then these fields, in this order:
 Type: character
 Age:
 Gender:

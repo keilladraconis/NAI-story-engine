@@ -238,6 +238,12 @@ export async function statuses(
 // ── Writing ──────────────────────────────────────────────────────────────────
 
 const HEAT_WORDS = /explicit|erotic|suggestive|nsfw|sexual|adult/i;
+const NEGATED = /\b(no|not|non|nothing|never|none)\b/i;
+
+/** Does the Brief's heat call for the adults line? "Nothing explicit" does not. */
+export function adultHeat(heat: string): boolean {
+  return HEAT_WORDS.test(heat) && !NEGATED.test(heat);
+}
 
 /** Wrap compiled text the way its destination expects it. */
 export function finish(
@@ -249,7 +255,7 @@ export function finish(
     return [
       attgLine(state.canon.brief),
       compiled.trim(),
-      HEAT_WORDS.test(state.canon.brief.heat)
+      adultHeat(state.canon.brief.heat)
         ? "All characters are adults over 18."
         : "",
     ]
@@ -263,15 +269,17 @@ export function finish(
 
 /** Names that key a cast-wide entry: each name, and a first name when there is one. */
 export function castKeys(state: RootState): string[] {
-  const keys = new Set<string>();
-  for (const d of docsOf(state, "dossier")) {
-    const name = d.title.trim().toLowerCase();
-    if (!name) continue;
-    keys.add(name);
-    const first = name.split(/\s+/)[0];
-    if (first && first.length > 2) keys.add(first);
-  }
-  return [...keys];
+  return [
+    ...new Set(docsOf(state, "dossier").flatMap((d) => nameKeys(d.title))),
+  ];
+}
+
+/** A name as keys: the whole name, and the first name when it has one. */
+export function nameKeys(name: string): string[] {
+  const whole = name.trim().toLowerCase();
+  if (!whole) return [];
+  const first = whole.split(/\s+/)[0];
+  return first !== whole && first.length > 2 ? [whole, first] : [whole];
 }
 
 export function parseKeys(text: string): string[] {
@@ -318,7 +326,12 @@ async function keysFor(
       ],
     }),
   });
-  return parseKeys(reply);
+  // A profile is always keyed on the name the story will use for the character;
+  // GLM has left out the first name.
+  const names = target.id.startsWith("entry:profile:")
+    ? nameKeys(target.label)
+    : [];
+  return [...new Set([...names, ...parseKeys(reply)])];
 }
 
 async function write(
