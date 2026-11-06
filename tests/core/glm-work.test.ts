@@ -98,10 +98,15 @@ describe("the interview", () => {
     expect(interviewDone({ ...full, limits: "" })).toBe(false);
   });
 
-  it("keeps a reply to its first question", () => {
+  it("keeps a reply to its last question", () => {
     expect(oneQuestion("Noted: slow. Which tense? And who narrates?")).toBe(
-      "Noted: slow. Which tense?",
+      "Noted: slow. And who narrates?",
     );
+    expect(
+      oneQuestion(
+        "So it is about Drip? Third person past, first person present, or else?",
+      ),
+    ).toBe("Third person past, first person present, or else?");
     expect(oneQuestion("The brief is ready.")).toBe("The brief is ready.");
   });
 });

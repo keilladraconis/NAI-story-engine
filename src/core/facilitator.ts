@@ -116,10 +116,21 @@ export function withoutQuestions(text: string): string {
     .trim();
 }
 
-/** Keep a reply to its first question: one question a turn. */
+/**
+ * One question a turn: keep the last question and drop any earlier ones. The
+ * model sometimes turns its acknowledgement into a question ("So the story is
+ * about…?"), and keeping the first left the writer confirming instead of
+ * answering the real question.
+ */
 export function oneQuestion(text: string): string {
-  const at = text.indexOf("?");
-  return at === -1 ? text.trim() : text.slice(0, at + 1).trim();
+  const sentences = text.trim().split(/(?<=[.!?])\s+/);
+  const last = sentences.map((s) => s.trim().endsWith("?")).lastIndexOf(true);
+  if (last === -1) return text.trim();
+  return sentences
+    .slice(0, last + 1)
+    .filter((s, i) => i === last || !s.trim().endsWith("?"))
+    .join(" ")
+    .trim();
 }
 
 function transcript(state: RootState): Message[] {
