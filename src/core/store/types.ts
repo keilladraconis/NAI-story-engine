@@ -9,14 +9,19 @@ export interface Brief {
   title: string;
   /** Genre and tags, as they would read in an ATTG line. */
   genre: string;
+  /** Who, where, and the pressure the story lives inside, in as much depth as the talk gave. */
   premise: string;
+  /** What the story should dwell on: core focus, dynamics, scenes the world must allow. */
+  desires: string;
+  /** How the world works: its rules, tone, and what kind of beings live in it. */
+  world: string;
   /** Narrative perspective and tense, e.g. "Third limited, past". */
   voice: string;
   heat: string;
   pace: string;
   /** Hard and soft limits, as the writer put them. */
   limits: string;
-  /** Free notes: desires, reactions from the Cast stage, anything else. */
+  /** Author's notes: families, details, decisions, anything else. */
   notes: string;
 }
 

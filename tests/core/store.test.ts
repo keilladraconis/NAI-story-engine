@@ -61,7 +61,9 @@ describe("stages", () => {
             ...state.canon,
             brief: {
               ...state.canon.brief,
-              premise: "p",
+              premise: "p".repeat(300),
+              desires: "d".repeat(120),
+              world: "w".repeat(80),
               voice: "v",
               genre: "g",
               heat: "h",

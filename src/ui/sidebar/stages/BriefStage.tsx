@@ -11,11 +11,15 @@ const FIELDS: ReadonlyArray<{
   placeholder: string;
   multiline?: boolean;
 }> = [
-  { field: "title", label: "Title", placeholder: "The Keeper's Daughter" },
+  {
+    field: "title",
+    label: "Title",
+    placeholder: "A title; Talk suggests some",
+  },
   {
     field: "genre",
     label: "Genre and tags",
-    placeholder: "Literary; lighthouse, family, debt",
+    placeholder: "Genre and a few tags",
   },
   {
     field: "premise",
@@ -23,13 +27,26 @@ const FIELDS: ReadonlyArray<{
     placeholder: "Who, where, and the pressure the story lives inside.",
     multiline: true,
   },
-  { field: "voice", label: "Voice", placeholder: "Third limited, past" },
+  {
+    field: "desires",
+    label: "Desires",
+    placeholder:
+      "What the story dwells on: the core, the dynamics, scenes the world must allow.",
+    multiline: true,
+  },
+  {
+    field: "world",
+    label: "World",
+    placeholder: "How the world works: its rules, its tone, who lives in it.",
+    multiline: true,
+  },
+  { field: "voice", label: "Voice", placeholder: "Perspective and tense" },
   {
     field: "heat",
     label: "Heat",
-    placeholder: "Tender, suggestive, explicit…",
+    placeholder: "How explicit it gets",
   },
-  { field: "pace", label: "Pace", placeholder: "Slow, carried by silence" },
+  { field: "pace", label: "Pace", placeholder: "How quickly things escalate" },
   {
     field: "limits",
     label: "Limits",
@@ -39,7 +56,7 @@ const FIELDS: ReadonlyArray<{
   {
     field: "notes",
     label: "Notes",
-    placeholder: "Desires, scenes you want the world to allow, anything else.",
+    placeholder: "Families, details, decisions, anything else.",
     multiline: true,
   },
 ];
@@ -52,6 +69,7 @@ function BriefField(props: (typeof FIELDS)[number]) {
       value={value}
       placeholder={props.placeholder}
       multiline={props.multiline}
+      rows={props.field === "premise" || props.field === "desires" ? 7 : 3}
       onCommit={(v) => store.dispatch(briefUpdated({ [props.field]: v }))}
     />
   );

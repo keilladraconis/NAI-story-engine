@@ -1,12 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
-  parseBrief,
+  parseSeed,
   mergeBrief,
   nextField,
   interviewDone,
   oneQuestion,
   withoutQuestions,
-  acceptAnswer,
   answered,
   missingBrief,
 } from "../../src/core/facilitator";
@@ -16,40 +15,37 @@ import { emptyBrief } from "../../src/core/store/slices/canon";
 let n = 0;
 const makeId = () => `i${n++}`;
 
-describe("parseBrief", () => {
-  it("reads LABEL: value lines and skips empty ones", () => {
+describe("parseSeed", () => {
+  it("reads ## sections, multi-line, and skips unknown headings", () => {
     expect(
-      parseBrief(
-        "TITLE: The Keeper\nGENRE: \nPREMISE: A light.\nVOICE: Third, past\nnoise",
+      parseSeed(
+        "## TITLE\nThe Keeper\n\n## PREMISE\nIlse keeps a light.\nTam came back.\n\n## VOICE\n\n## OTHER\nx",
       ),
     ).toEqual({
       title: "The Keeper",
-      premise: "A light.",
-      voice: "Third, past",
+      premise: "Ilse keeps a light.\nTam came back.",
+      voice: "",
     });
   });
 });
 
 describe("mergeBrief", () => {
-  it("writes what the answer names, replacing an earlier value", () => {
-    const current = { ...emptyBrief, voice: "First, present" };
-    expect(mergeBrief(current, { voice: "Third, past", premise: "P" })).toEqual(
-      {
+  it("takes rewritten sections and never erases with an empty or placeholder one", () => {
+    const current = { ...emptyBrief, voice: "First, present", title: "Mine" };
+    expect(
+      mergeBrief(current, {
         voice: "Third, past",
         premise: "P",
-      },
-    );
-    expect(mergeBrief(current, { voice: "First, present" })).toEqual({});
+        title: "",
+        heat: "Unspecified",
+      }),
+    ).toEqual({ voice: "Third, past", premise: "P" });
   });
 
-  it("appends only notes the brief does not already hold", () => {
-    const current = { ...emptyBrief, notes: "night watch scenes" };
-    expect(
-      mergeBrief(current, { notes: "Night watch scenes; a storm" }),
-    ).toEqual({
-      notes: "night watch scenes; a storm",
+  it("takes None for limits only", () => {
+    expect(mergeBrief(emptyBrief, { limits: "None", pace: "None" })).toEqual({
+      limits: "None",
     });
-    expect(mergeBrief(current, { notes: "night watch scenes" })).toEqual({});
   });
 });
 
@@ -78,15 +74,25 @@ describe("rewriteTokens", () => {
 });
 
 describe("the interview", () => {
-  it("asks about the first empty field, in order", () => {
+  it("works on the first unready section, in order", () => {
     expect(nextField(emptyBrief)?.field).toBe("premise");
-    expect(nextField({ ...emptyBrief, premise: "P" })?.field).toBe("voice");
+    expect(
+      nextField({
+        ...emptyBrief,
+        premise: "x".repeat(300),
+        desires: "x".repeat(120),
+        world: "x".repeat(80),
+        genre: "G",
+      })?.field,
+    ).toBe("voice");
   });
 
   it("is done once premise, voice, genre, heat, pace and limits are set", () => {
     const full = {
       ...emptyBrief,
-      premise: "P",
+      premise: "P".repeat(300),
+      desires: "D".repeat(120),
+      world: "W".repeat(80),
       voice: "V",
       genre: "G",
       heat: "H",
@@ -129,18 +135,27 @@ describe("answers", () => {
     expect(answered("voice", "Third, past")).toBe(true);
   });
 
-  it("takes a placeholder only for the field that was asked about", () => {
-    const proposed = { premise: "P", voice: "Unspecified", limits: "None" };
-    expect(acceptAnswer(proposed, null)).toEqual({ premise: "P" });
-    expect(acceptAnswer(proposed, "limits")).toEqual({
-      premise: "P",
-      limits: "None",
-    });
+  it("keeps the talk on a thin premise before moving on", () => {
+    expect(
+      nextField({ ...emptyBrief, premise: "A jackal wishes." })?.field,
+    ).toBe("premise");
+    expect(nextField({ ...emptyBrief, premise: "x".repeat(300) })?.field).toBe(
+      "desires",
+    );
   });
 
   it("names what the brief still lacks, title included", () => {
     expect(
       missingBrief({ ...emptyBrief, premise: "P", voice: "Unspecified" }),
-    ).toEqual(["voice", "genre", "heat", "pace", "limits", "title"]);
+    ).toEqual([
+      "desires",
+      "world",
+      "genre",
+      "voice",
+      "heat",
+      "pace",
+      "limits",
+      "title",
+    ]);
   });
 });

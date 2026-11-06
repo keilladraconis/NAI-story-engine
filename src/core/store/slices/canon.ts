@@ -12,6 +12,8 @@ export const emptyBrief: Brief = {
   title: "",
   genre: "",
   premise: "",
+  desires: "",
+  world: "",
   voice: "",
   heat: "",
   pace: "",

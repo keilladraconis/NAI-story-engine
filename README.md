@@ -8,8 +8,8 @@ It never plots. A story model shown where a story is going writes the arrival; s
 
 Seven tabs in Story Engine's sidebar (under the `…` at the right of NovelAI's sidebar tabs):
 
-1. **Talk** — the **facilitator** interviews you, one question at a time, offering options when you are not sure, until the brief is filled in. Then it says so and points you on.
-2. **Brief** — what the scenario is: title, genre, premise, voice, heat, pace, limits, notes. Filled by Talk; edit anything by hand.
+1. **Talk** — the **facilitator** works the idea out with you, from whatever you bring: it offers possibilities and asks the question that matters most, while it writes the Brief as you go. When the Brief is complete it says so and points you on.
+2. **Brief** — the scenario's seed: title, genre, premise, desires (what the story dwells on), world, voice, heat, pace, limits, notes. Filled by Talk; edit anything by hand.
 3. **Vignettes** — short scenes that set the tone. They say what the scenario must allow, never what will happen.
 4. **Now** — where the story begins: what is true at the first page, and what has not happened yet.
 5. **Canon** — the world in full prose: geography, history, culture, tensions, factions, systems, a dossier per character, relationships, locations, plot pressures. A **critic** checks each document against the rest.

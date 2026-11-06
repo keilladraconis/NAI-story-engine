@@ -30,6 +30,11 @@ function briefBlock(brief: Brief): string {
   return [
     attgLine(brief),
     given(brief.premise),
+    given(brief.world) && `The world: ${given(brief.world)}`,
+    // Desires say what the scenario must allow; framed as such so a story
+    // model does not read them as things that have happened.
+    given(brief.desires) &&
+      `What this story dwells on (what it must allow, not what has happened):\n${given(brief.desires)}`,
     given(brief.voice) && `Told in: ${given(brief.voice)}.`,
     tone && `Tone: ${tone}.`,
   ]
