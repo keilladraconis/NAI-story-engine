@@ -4,7 +4,7 @@ A scenario from nothing to a first page. The example is a lighthouse on a tidal 
 
 ## 1. Talk
 
-Open Story Engine's sidebar (the `…` tab at the right of NovelAI's sidebar tabs). **Talk** is the first tab. Press **Start**: the facilitator asks one question at a time (who, where and what pressure; voice; genre; heat; pace; limits), offering options when you are not sure. Each answer goes straight into the Brief, and an answer can settle several things at once. When the brief is complete it reads it back, says so, and offers **Go to Vignettes**.
+Open Story Engine's sidebar (the `…` tab at the right of NovelAI's sidebar tabs). **Talk** is the first tab. Describe the scenario you want to build, in as much or as little as you have. The facilitator reads it into the Brief, then asks about whatever is still missing (who, where and what pressure; voice; genre; heat; pace; limits), one question at a time, offering options when you are not sure. Each answer goes straight into the Brief, and an answer can settle several things at once. When the brief is complete it reads it back, says so, and offers **Go to Vignettes**.
 
 ## 2. Brief
 

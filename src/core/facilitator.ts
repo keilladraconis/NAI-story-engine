@@ -174,15 +174,9 @@ async function reply(): Promise<void> {
               "\n\n",
             )
           : [FACILITATOR_CLOSE, brief].join("\n\n");
-        const history = transcript(state);
-        // A first turn has no transcript; the model still needs a user turn.
+        // The writer always speaks first, so the transcript ends on their turn.
         return {
-          messages: [
-            { role: "system", content: system },
-            ...(history.length
-              ? history
-              : [{ role: "user" as const, content: "Start." }]),
-          ],
+          messages: [{ role: "system", content: system }, ...transcript(state)],
         };
       },
     });
@@ -203,14 +197,13 @@ async function reply(): Promise<void> {
 let talking = false;
 
 /**
- * One turn: the writer's answer is read into the Brief, then the facilitator
- * asks about the next empty field, or closes once there is none. With no text
- * and an empty transcript, it opens the interview.
+ * One turn: the writer's message is read into the Brief, then the facilitator
+ * asks about the next empty field, or closes once there is none. The writer
+ * opens the interview by describing the scenario.
  */
 export async function talk(text: string): Promise<void> {
   const said = text.trim();
-  const fresh = !store.getState().chat.messages.length;
-  if (talking || (!said && !fresh)) return;
+  if (talking || !said) return;
   talking = true;
   try {
     if (said) {

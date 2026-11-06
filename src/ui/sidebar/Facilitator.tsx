@@ -1,5 +1,6 @@
-// The facilitator interview: one question at a time until the Brief is
-// complete, then a read-back and a pointer to Vignettes.
+// The facilitator interview. The writer opens it by describing the scenario;
+// then one question at a time until the Brief is complete, a read-back, and a
+// pointer to Vignettes.
 
 import { store, chatCleared, stageOpened } from "../../core/store";
 import { talk, interviewDone } from "../../core/facilitator";
@@ -50,24 +51,6 @@ export function Facilitator() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: SP.md }}>
       <div
-        style={{
-          display: ids ? "none" : "flex",
-          flexDirection: "column",
-          gap: SP.md,
-        }}
-      >
-        <p style={{ margin: 0, lineHeight: 1.5 }}>
-          The facilitator asks one question at a time until the brief is filled
-          in: premise, voice, genre, heat, pace and limits. Answer briefly; it
-          offers options when you are not sure.
-        </p>
-        <Row>
-          <Button tone="primary" disabled={busy} onClick={() => void talk("")}>
-            Start
-          </Button>
-        </Row>
-      </div>
-      <div
         role="log"
         aria-label="Facilitator conversation"
         style={{ display: "flex", flexDirection: "column", gap: SP.md }}
@@ -89,13 +72,14 @@ export function Facilitator() {
         rows={3}
         value={text}
         placeholder={
-          done
-            ? "Anything to change? The brief updates as you answer."
-            : "Answer…"
+          !ids
+            ? "Describe the scenario you want to build."
+            : done
+              ? "Anything to change? The brief updates as you answer."
+              : "Answer…"
         }
         onInput={(e) => setText(e.currentTarget.value ?? "")}
         style={{
-          display: ids ? "block" : "none",
           width: "100%",
           boxSizing: "border-box",
           padding: "8px",
@@ -107,19 +91,19 @@ export function Facilitator() {
           resize: "vertical",
         }}
       />
-      <div style={{ display: ids ? "block" : "none" }}>
-        <Row>
-          <Button tone="primary" onClick={send} disabled={busy}>
-            Send
-          </Button>
-          <span style={{ flex: 1 }} />
+      <Row>
+        <Button tone="primary" onClick={send} disabled={busy}>
+          Send
+        </Button>
+        <span style={{ flex: 1 }} />
+        <div style={{ display: ids ? "block" : "none" }}>
           <ConfirmButton
             title="Start the interview over (the brief is kept)"
             label="Start over"
             onConfirm={() => store.dispatch(chatCleared())}
           />
-        </Row>
-      </div>
+        </div>
+      </Row>
     </div>
   );
 }
