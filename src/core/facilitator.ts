@@ -36,8 +36,9 @@ const SEED_SECTIONS: ReadonlyArray<readonly [keyof Brief, string]> = [
 ];
 
 /**
- * What the conversation works on, in order: the substance first, the quick
- * settings after. `min` is how long a section must be before the talk moves
+ * What the conversation works on, in order: what the writer wants first (as
+ * Storifier's Desire Brief asks), then the premise and world built around it,
+ * the quick settings last. `min` is how long a section must be before the talk moves
  * on: a one-line premise is a start, not a premise.
  */
 export const INTERVIEW: ReadonlyArray<{
@@ -46,16 +47,21 @@ export const INTERVIEW: ReadonlyArray<{
   min: number;
 }> = [
   {
-    field: "premise",
-    focus:
-      "the premise: who the story is about (names, ages, situations), where, and the pressure it lives inside",
-    min: 300,
-  },
-  {
     field: "desires",
     focus:
-      "what the story should dwell on: the core focus, the dynamics between people, the scenes the world must allow",
+      "what the writer wants the story to dwell on: the experience at its core, the dynamics, the scenes they want to happen in this world",
     min: 120,
+  },
+  {
+    field: "heat",
+    focus: "how explicit it gets, from tender to explicit on the page",
+    min: 1,
+  },
+  {
+    field: "premise",
+    focus:
+      "the premise: who the story is about (names, ages, situations), where, and how things stand between them",
+    min: 300,
   },
   {
     field: "world",
@@ -65,11 +71,6 @@ export const INTERVIEW: ReadonlyArray<{
   },
   { field: "genre", focus: "the genre, and a few tags", min: 1 },
   { field: "voice", focus: "the narrative perspective and tense", min: 1 },
-  {
-    field: "heat",
-    focus: "how explicit it gets, from tender to explicit on the page",
-    min: 1,
-  },
   { field: "pace", focus: "how quickly things escalate", min: 1 },
   {
     field: "limits",
@@ -230,8 +231,8 @@ async function reply(): Promise<void> {
     const text = await runGlm({
       id: replyId,
       label: "Facilitator",
-      maxTokens: 350,
-      temperature: 0.8,
+      maxTokens: 250,
+      temperature: 0.7,
       stream: true,
       messages: async () => {
         const state = store.getState();

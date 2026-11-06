@@ -74,14 +74,19 @@ describe("rewriteTokens", () => {
 });
 
 describe("the interview", () => {
-  it("works on the first unready section, in order", () => {
-    expect(nextField(emptyBrief)?.field).toBe("premise");
+  it("asks what the writer wants first, then builds around it", () => {
+    expect(nextField(emptyBrief)?.field).toBe("desires");
+    expect(
+      nextField({ ...emptyBrief, desires: "x".repeat(120), heat: "Explicit" })
+        ?.field,
+    ).toBe("premise");
     expect(
       nextField({
         ...emptyBrief,
         premise: "x".repeat(300),
         desires: "x".repeat(120),
         world: "x".repeat(80),
+        heat: "H",
         genre: "G",
       })?.field,
     ).toBe("voice");
@@ -136,11 +141,12 @@ describe("answers", () => {
   });
 
   it("keeps the talk on a thin premise before moving on", () => {
-    expect(
-      nextField({ ...emptyBrief, premise: "A jackal wishes." })?.field,
-    ).toBe("premise");
-    expect(nextField({ ...emptyBrief, premise: "x".repeat(300) })?.field).toBe(
-      "desires",
+    const wanted = { ...emptyBrief, desires: "x".repeat(120), heat: "H" };
+    expect(nextField({ ...wanted, premise: "A jackal wishes." })?.field).toBe(
+      "premise",
+    );
+    expect(nextField({ ...wanted, premise: "x".repeat(300) })?.field).toBe(
+      "world",
     );
   });
 
@@ -149,10 +155,10 @@ describe("answers", () => {
       missingBrief({ ...emptyBrief, premise: "P", voice: "Unspecified" }),
     ).toEqual([
       "desires",
+      "heat",
       "world",
       "genre",
       "voice",
-      "heat",
       "pace",
       "limits",
       "title",
