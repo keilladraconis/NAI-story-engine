@@ -7,7 +7,7 @@ export const FACILITATOR_PROMPT = `You interview a writer to fill in the brief f
 
 Each turn:
 - Say in one short sentence what you took from the writer's last message, in their terms. No praise, no enthusiasm, no new ideas of your own.
-- Then ask exactly one question, about the field named NEXT. Make it easy to answer: when the writer may not know, offer two or three short concrete options inside the question ("Third person limited in past tense, first person present, or something else?").
+- Then ask exactly one question, about the field named NEXT. Make it easy to answer: offer two or three short concrete options inside the question, drawn from what the writer has told you ("Third person limited in past tense, first person present, or something else?"). Suggestions are welcome; deciding for the writer is not.
 - One question mark, at the end. Nothing after it.
 
 Never write scenes, plots or outcomes, and never invent facts for the writer. If the writer asks you to choose, offer options and let them pick.`;
@@ -28,7 +28,8 @@ Rules:
 - An answer can settle several fields; write each one. A field the answer does not touch gets no line.
 - VOICE is perspective and tense, e.g. "Third person limited, past tense".
 - GENRE is genre and tags, comma-separated.
-- If the writer declines or says there is none, write "None" for LIMITS and "Unspecified" for any other field asked about.
+- Never write a line for a field the writer did not address. A field the answer leaves open gets no line at all: never "Unspecified", never a guess.
+- If the writer says there are no limits, write LIMITS: None.
 - NOTES holds anything else the writer wants the scenario to allow: scenes, dynamics, people. Separate items with "; ".
 - If the answer settles nothing, write exactly: NONE
 Write nothing else.`;

@@ -3,6 +3,7 @@
 
 import { store, vignetteRemoved, vignetteUpdated } from "../../../core/store";
 import { writeDraft } from "../../../core/workshop/workshop";
+import { missingBrief } from "../../../core/facilitator";
 import { useSlice } from "../../bridge";
 import { SP, T } from "../../style";
 import {
@@ -80,6 +81,7 @@ function VignetteCard(props: { id: string }) {
 
 export function VignettesStage() {
   const ids = useSlice((s) => s.canon.vignettes.map((v) => v.id).join(","));
+  const missing = useSlice((s) => missingBrief(s.canon.brief).join(", "));
   return (
     <StageBody>
       <Hint>
@@ -88,9 +90,22 @@ export function VignettesStage() {
         it sounds right, edit it, then save it. Keep a range: tender and tense,
         private and seen.
       </Hint>
+      <p
+        style={{
+          display: missing ? "block" : "none",
+          margin: "0 0 8px",
+          fontSize: "0.85em",
+          color: T.warning,
+          lineHeight: 1.5,
+        }}
+      >
+        Finish the brief first (the Talk tab asks for it). Still missing:{" "}
+        {missing}.
+      </p>
       <Row>
         <Button
           tone="primary"
+          disabled={Boolean(missing)}
           onClick={() => void writeDraft({ kind: "vignette" })}
         >
           Draft a vignette

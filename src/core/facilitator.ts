@@ -18,6 +18,7 @@ import {
   FACILITATOR_CLOSE,
   BRIEF_EXTRACTION_PROMPT,
 } from "./prompts";
+import { given } from "./text";
 
 /** Turns of transcript a facilitator call reads. */
 const HISTORY = 12;
@@ -50,7 +51,39 @@ export const INTERVIEW: ReadonlyArray<{ field: keyof Brief; ask: string }> = [
     field: "limits",
     ask: "hard and soft limits: what the story must never do, or none",
   },
+  {
+    field: "title",
+    ask: "a title; suggest three short titles drawn from the premise",
+  },
 ];
+
+/**
+ * Does a field hold a real answer? "Unspecified" never does; "None" does for
+ * limits only, where it is a real answer.
+ */
+export function answered(field: keyof Brief, value: string): boolean {
+  if (given(value)) return true;
+  return field === "limits" && /^none\.?$/i.test(value.trim());
+}
+
+/**
+ * Keep what an answer may set: a real value for any field, and a "None" or
+ * "Unspecified" only for the field that was just asked about (a writer can
+ * decline a question, never one they were not asked).
+ */
+export function acceptAnswer(
+  proposed: Partial<Brief>,
+  asked: keyof Brief | null,
+): Partial<Brief> {
+  const out: Partial<Brief> = {};
+  for (const [key, value] of Object.entries(proposed) as [
+    keyof Brief,
+    string,
+  ][]) {
+    if (given(value) || key === asked) out[key] = value;
+  }
+  return out;
+}
 
 export function formatBrief(brief: Brief): string {
   return BRIEF_LINES.map(
@@ -60,7 +93,14 @@ export function formatBrief(brief: Brief): string {
 
 /** The next field the interview asks about, or null when the brief is complete. */
 export function nextField(brief: Brief): (typeof INTERVIEW)[number] | null {
-  return INTERVIEW.find((q) => !brief[q.field].trim()) ?? null;
+  return INTERVIEW.find((q) => !answered(q.field, brief[q.field])) ?? null;
+}
+
+/** The Brief fields still unanswered, as their names: "voice", "title". */
+export function missingBrief(brief: Brief): string[] {
+  return INTERVIEW.filter((q) => !answered(q.field, brief[q.field])).map(
+    (q) => q.field,
+  );
 }
 
 export function interviewDone(brief: Brief): boolean {
@@ -131,9 +171,13 @@ export function mergeBrief(
 /** Read the writer's latest answer into the Brief. */
 async function readAnswer(answer: string): Promise<void> {
   const state = store.getState();
-  const asked =
+  const question =
     [...state.chat.messages].reverse().find((m) => m.role === "assistant")
       ?.content ?? "";
+  // The field the question was about; none when the writer is opening.
+  const askedField = question
+    ? (nextField(state.canon.brief)?.field ?? null)
+    : null;
   const text = await runGlm({
     id: api.v1.uuid(),
     label: "Reading your answer",
@@ -144,12 +188,15 @@ async function readAnswer(answer: string): Promise<void> {
         { role: "system", content: BRIEF_EXTRACTION_PROMPT },
         {
           role: "user",
-          content: `THE BRIEF:\n${formatBrief(store.getState().canon.brief)}\n\nTHE FACILITATOR ASKED:\n${asked || "(nothing yet)"}\n\nTHE WRITER ANSWERED:\n${answer}`,
+          content: `THE BRIEF:\n${formatBrief(store.getState().canon.brief)}\n\nTHE FACILITATOR ASKED:\n${question || "(nothing yet)"}\n\nTHE WRITER ANSWERED:\n${answer}`,
         },
       ],
     }),
   });
-  const patch = mergeBrief(store.getState().canon.brief, parseBrief(text));
+  const patch = mergeBrief(
+    store.getState().canon.brief,
+    acceptAnswer(parseBrief(text), askedField),
+  );
   if (Object.keys(patch).length) store.dispatch(briefUpdated(patch));
 }
 

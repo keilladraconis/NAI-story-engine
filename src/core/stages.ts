@@ -51,7 +51,7 @@ export function stageDone(state: RootState, stage: StageId): boolean {
     case "talk":
       return interviewDone(canon.brief);
     case "brief":
-      return Boolean(canon.brief.premise.trim() && canon.brief.voice.trim());
+      return interviewDone(canon.brief);
     case "vignettes":
       return canon.vignettes.length > 0;
     case "now":

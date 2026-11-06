@@ -50,7 +50,7 @@ describe("workshop", () => {
 });
 
 describe("stages", () => {
-  it("needs premise and voice for the brief", () => {
+  it("needs every interview field for the brief", () => {
     const state = init();
     expect(stageDone(state, "brief")).toBe(false);
     expect(
@@ -59,7 +59,16 @@ describe("stages", () => {
           ...state,
           canon: {
             ...state.canon,
-            brief: { ...state.canon.brief, premise: "p", voice: "v" },
+            brief: {
+              ...state.canon.brief,
+              premise: "p",
+              voice: "v",
+              genre: "g",
+              heat: "h",
+              pace: "p",
+              limits: "None",
+              title: "t",
+            },
           },
         },
         "brief",

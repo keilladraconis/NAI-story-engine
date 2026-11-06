@@ -6,6 +6,9 @@ import {
   interviewDone,
   oneQuestion,
   withoutQuestions,
+  acceptAnswer,
+  answered,
+  missingBrief,
 } from "../../src/core/facilitator";
 import { parseIssues, rewriteTokens } from "../../src/core/critic";
 import { emptyBrief } from "../../src/core/store/slices/canon";
@@ -89,6 +92,7 @@ describe("the interview", () => {
       heat: "H",
       pace: "Slow",
       limits: "None",
+      title: "T",
     };
     expect(interviewDone(full)).toBe(true);
     expect(interviewDone({ ...full, limits: "" })).toBe(false);
@@ -109,5 +113,29 @@ describe("withoutQuestions", () => {
         "The brief is ready. Shall we go on? Next is Vignettes.",
       ),
     ).toBe("The brief is ready. Next is Vignettes.");
+  });
+});
+
+describe("answers", () => {
+  it("never counts Unspecified as answered, and None only for limits", () => {
+    expect(answered("voice", "Unspecified")).toBe(false);
+    expect(answered("title", "None")).toBe(false);
+    expect(answered("limits", "None")).toBe(true);
+    expect(answered("voice", "Third, past")).toBe(true);
+  });
+
+  it("takes a placeholder only for the field that was asked about", () => {
+    const proposed = { premise: "P", voice: "Unspecified", limits: "None" };
+    expect(acceptAnswer(proposed, null)).toEqual({ premise: "P" });
+    expect(acceptAnswer(proposed, "limits")).toEqual({
+      premise: "P",
+      limits: "None",
+    });
+  });
+
+  it("names what the brief still lacks, title included", () => {
+    expect(
+      missingBrief({ ...emptyBrief, premise: "P", voice: "Unspecified" }),
+    ).toEqual(["voice", "genre", "heat", "pace", "limits", "title"]);
   });
 });
