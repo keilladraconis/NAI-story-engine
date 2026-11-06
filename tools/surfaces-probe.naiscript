@@ -1,0 +1,245 @@
+/*---
+compatibilityVersion: naiscript-1.0
+id: 8c2e51f7-4b9d-4e0a-a6c3-27f0d9e4b815
+name: Surfaces Probe
+version: 0.1.3
+description: Does the beta UI's plan hold? JSX in a lorebook panel and a widget, renaming a script panel, a draft boundary widget and tinted draft paragraphs, and where a Send generates.
+memoryLimit: 8
+---*/
+
+// Each question, and what the report says:
+//
+// 1. Rename. "Rename panel" changes the script panel's name with
+//    api.v1.ui.update. Look at the collapsed panel's label.
+// 2. Lorebook JSX. Open the lorebook, select an entry, open Script. A JSX
+//    component should show the selected entry's id.
+// 3. Boundary widget. "Workshop on" stores the last paragraph as the boundary
+//    and puts a node widget after it, holding plain parts (text, button) and a
+//    JSX part (button). Each button logs. Edit or delete the boundary paragraph:
+//    the widget's onChange events are logged.
+// 4. Tint. Paragraphs after the boundary get a node marker, refreshed after
+//    every generation.
+// 5. Position. Every generation logs its generationPosition next to the
+//    boundary, so a Send's target can be compared with the draft region.
+
+const PANEL_ID = "surfaces-probe-panel";
+
+// --- report -----------------------------------------------------------------
+
+let lines = [];
+const listeners = new Set();
+function log(line) {
+  lines = [...lines, line].slice(-40);
+  api.v1.log(line);
+  listeners.forEach((listener) => listener());
+}
+function useLines() {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const listener = () => setTick((tick) => tick + 1);
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+  }, []);
+  return lines;
+}
+
+// --- boundary, widget, tint ---------------------------------------------------
+
+let boundary = null; // section id the draft starts after; 0 = before the first
+let widget = null;
+let markers = [];
+
+async function lastStorySection() {
+  const ids = await api.v1.document.sectionIds();
+  const text = await api.v1.document.textFromSelection();
+  return text.trim() ? ids[ids.length - 1] : 0;
+}
+
+async function draftSections() {
+  const ids = await api.v1.document.sectionIds();
+  if (boundary === null) return [];
+  if (boundary === 0) return ids;
+  const at = ids.indexOf(boundary);
+  return at === -1 ? [] : ids.slice(at + 1);
+}
+
+function WidgetButton() {
+  return h(
+    "button",
+    {
+      type: "button",
+      onClick: () => log("WIDGET jsx button clicked"),
+      style: { minHeight: "36px", padding: "0 12px", cursor: "pointer" },
+    },
+    "Save vignette (jsx)",
+  );
+}
+
+async function workshopOn() {
+  if (boundary !== null) return log("ON already on");
+  boundary = await lastStorySection();
+  const label = () =>
+    api.v1.ui.part.text({ text: "Story Engine draft · Vignette", noTemplate: true });
+  const partButton = () =>
+    api.v1.ui.part.button({
+      text: "Save vignette (part)",
+      callback: () => log("WIDGET part button clicked"),
+    });
+  const jsxButton = () =>
+    api.v1.ui.part.jsx({ onMount: (elem) => render(h(WidgetButton, null), elem) });
+  const onChange = (event) =>
+    log(
+      event.type === "dispose"
+        ? `WIDGET disposed: ${event.reason}`
+        : `WIDGET moved: ${JSON.stringify(event.info)}`,
+    );
+  // Richest first; the first shape the editor accepts stays on the page.
+  const variants = [
+    ["text+button+jsx, onChange", { content: [label(), partButton(), jsxButton()], onChange }],
+    ["text+button, onChange", { content: [label(), partButton()], onChange }],
+    ["text+jsx", { content: [label(), jsxButton()] }],
+    ["text+button", { content: [label(), partButton()] }],
+    ["text, onChange", { content: [label()], onChange }],
+    ["text", { content: [label()] }],
+    ["text, sectionId as string", { content: [label()], sectionId: String(boundary) }],
+  ];
+  for (const [name, options] of variants) {
+    try {
+      widget = await api.v1.editor.decorations.createWidget({
+        type: "node",
+        sectionId: boundary,
+        ...options,
+      });
+      log(`ON ok: ${name} (boundary=${boundary} widget=${widget.id})`);
+      break;
+    } catch (error) {
+      log(`ON rejected: ${name}`);
+    }
+  }
+  // A Send continues the last paragraph (0.1.2: it wrote onto the boundary
+  // paragraph), so give the draft a paragraph of its own to start in.
+  if (boundary === 0) await api.v1.document.appendParagraph({ text: "" });
+  else await api.v1.document.insertParagraphAfter(boundary, { text: "" });
+  log(`ON draft paragraph(s): ${JSON.stringify(await draftSections())}`);
+  await tint();
+}
+
+async function workshopOff() {
+  if (widget) await widget.dispose();
+  await Promise.all(markers.map((marker) => marker.dispose()));
+  widget = null;
+  markers = [];
+  boundary = null;
+  log("OFF");
+}
+
+async function tint() {
+  await Promise.all(markers.map((marker) => marker.dispose()));
+  const ids = await draftSections();
+  markers = ids.length
+    ? await api.v1.editor.decorations.createMarkers(
+        ids.map((sectionId) => ({
+          type: "node",
+          sectionId,
+          style: { backgroundColor: "rgba(242, 185, 90, 0.08)" },
+        })),
+      )
+    : [];
+  log(`TINT ${ids.length} draft paragraph(s)`);
+}
+
+// --- rename -------------------------------------------------------------------
+
+let renamed = false;
+async function rename() {
+  renamed = !renamed;
+  // A bare {id, name} update removed the panel (0.1.2), so send it whole.
+  await api.v1.ui.update([
+    probePanel(renamed ? "Surfaces · Workshop on" : "Surfaces Probe"),
+  ]);
+  log(`RENAME ${renamed ? "Surfaces · Workshop on" : "Surfaces Probe"}`);
+}
+
+// --- generation position ------------------------------------------------------
+
+api.v1.hooks.register("onGenerationRequested", (params) => {
+  log(
+    `REQ scripted=${params.scriptInitiated} inline=${!!params.inlineGeneration} ` +
+      `position=${JSON.stringify(params.generationPosition ?? null)} boundary=${boundary}`,
+  );
+});
+api.v1.hooks.register("onGenerationEnd", () => {
+  if (boundary !== null) void tint();
+});
+
+// --- panels -------------------------------------------------------------------
+
+function Panel() {
+  const report = useLines();
+  const button = (label, action) =>
+    h(
+      "button",
+      {
+        type: "button",
+        onClick: () => {
+          log(`CLICK ${label}`);
+          Promise.resolve()
+            .then(action)
+            .catch((error) => log(`ERROR ${label}: ${error && error.message ? error.message : error}`));
+        },
+        style: { minHeight: "40px", padding: "0 12px", cursor: "pointer" },
+      },
+      label,
+    );
+  return h(
+    "div",
+    { style: { display: "flex", flexDirection: "column", gap: "8px", padding: "8px" } },
+    h(
+      "div",
+      { style: { display: "flex", flexWrap: "wrap", gap: "8px" } },
+      button("Workshop on", workshopOn),
+      button("Workshop off", workshopOff),
+      button("Tint", tint),
+      button("Rename panel", rename),
+      button("Send", () => api.v1.editor.generate()),
+    ),
+    h("pre", { style: { whiteSpace: "pre-wrap", margin: 0, fontSize: "12px", userSelect: "text" } }, report.join("\n")),
+  );
+}
+
+let selected = "none";
+const selectionListeners = new Set();
+api.v1.hooks.register("onLorebookEntrySelected", (params) => {
+  selected = params.entryId ?? `category ${params.categoryId ?? "?"}`;
+  selectionListeners.forEach((listener) => listener());
+  log(`LOREBOOK selected ${selected}`);
+});
+
+function LorebookPanel() {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const listener = () => setTick((tick) => tick + 1);
+    selectionListeners.add(listener);
+    return () => selectionListeners.delete(listener);
+  }, []);
+  return h("div", { style: { padding: "8px" } }, `JSX in the lorebook panel. Selected: ${selected}`);
+}
+
+function probePanel(name) {
+  return api.v1.ui.extension.scriptPanel({
+    id: PANEL_ID,
+    name,
+    content: [api.v1.ui.part.jsx({ onMount: (elem) => render(h(Panel, null), elem) })],
+  });
+}
+
+api.v1.ui.register([
+  probePanel("Surfaces Probe"),
+  api.v1.ui.extension.lorebookPanel({
+    id: "surfaces-probe-lorebook",
+    name: "Surfaces Probe",
+    content: [api.v1.ui.part.jsx({ onMount: (elem) => render(h(LorebookPanel, null), elem) })],
+  }),
+]);
+
+void api.v1.permissions.request(["editorDecorations", "documentEdit"], "Draws the draft boundary.");
