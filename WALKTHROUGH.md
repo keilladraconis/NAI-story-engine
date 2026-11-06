@@ -2,30 +2,30 @@
 
 A scenario from nothing to a first page. The example is a lighthouse on a tidal island, kept by Ilse, whose brother Tam has come back from the mainland with new boots and no account of himself.
 
-## 1. Brief
+## 1. Talk
 
-Open Story Engine's sidebar (the `…` tab at the right of NovelAI's sidebar tabs). The **Brief** tab is first.
+Open Story Engine's sidebar (the `…` tab at the right of NovelAI's sidebar tabs). **Talk** is the first tab. Press **Start**: the facilitator asks one question at a time (who, where and what pressure; voice; genre; heat; pace; limits), offering options when you are not sure. Each answer goes straight into the Brief, and an answer can settle several things at once. When the brief is complete it reads it back, says so, and offers **Go to Vignettes**.
 
-Write what you have. Premise and voice are what everything else is built from:
+## 2. Brief
+
+The same fields, to read and edit by hand. Premise and voice are what everything else is built from:
 
 - **Premise:** _Ilse keeps the light on a tidal island off a northern coast, as her father did. Her brother Tam came back from the mainland in spring with good boots and no explanation._
 - **Voice:** _Third limited, past_
 
-The rest can wait, or you can talk it through with the facilitator below the form: tell it what you have in mind, answer its questions, and press **Update brief** when the conversation has settled something. It fills the fields you left empty and adds to your notes; it never overwrites what you wrote.
-
 **Limits** are what the story must never do. They are kept out of everything the story model reads (telling a model what must not happen puts it in front of it) and checked by the critic instead.
 
-## 2. Vignettes
+## 3. Vignettes
 
 Vignettes are short scenes that set the tone. They are anchors, not events: what the scenario must allow, never what will happen.
 
-Press **Draft a vignette**. Under the page, the **Story Engine** panel now reads _Workshop Sends: on_, with a picker set to _Vignette_, a direction box and **Save vignette**. Type a direction if you want one:
+Press **Draft a vignette**. Workshop Sends switch on and Story Engine presses Send for you until the scene is done (about a page, or sooner if the scene ends itself); **Stop writing** in the panel under the page stops it. To steer, type a direction in that panel first:
 
 > _At supper Ilse notices Tam's new boots and does not ask about them._
 
-Press NovelAI's **Send**. The scene appears below the divider. Retry until it sounds right, edit it, and press **Save vignette**. Make a few, and keep a range: tender and tense, private and seen.
+The scene appears below the divider. Press Send to continue it, Retry to replace the last piece, edit it by hand, and press **Save vignette**. Make a few, and keep a range: tender and tense, private and seen.
 
-## 3. Now
+## 4. Now
 
 Where the story begins. Without it, the canon starts wherever its prose is most vivid, and a vignette's ending becomes the opening.
 
@@ -34,7 +34,7 @@ Press **Draft on page** and Send: the draft comes under two headings, **Now** an
 > _Now: Tam has been home six weeks. He pays for the supply boat in coin. Ilse has not asked where it comes from._
 > _Not yet: anything a vignette shows already settled between them._
 
-## 4. Canon
+## 5. Canon
 
 The world in full prose. **+ Add** a document (pick its kind; dossiers and systems take a name), open it, and press **Draft on page**. Send, continue with more Sends, edit, and save. Each document is written as of Now.
 
@@ -42,11 +42,11 @@ Still needed lists what the canon lacks: geography, culture, tensions, relations
 
 Press **Critique** on a document, or **Review all**. The critic lists real problems only: a contradiction with another document, a Not-yet state written as already true, an invented fact the brief rules out, two people with one name, a character whose family is not answered, a crossed limit. **Fix** resolves one problem and nothing else; **Dismiss** if you disagree. **Rewrite** changes a document as you say (_make Tam two years older_). Edit the text by hand any time.
 
-## 5. Cast
+## 6. Cast
 
-Every dossier, the protagonist's included, and how they stand with each other, read together. Talk it through with the facilitator: who do you want scenes with, who is missing, what misfires? Add dossiers here, then **Mark the cast reviewed**.
+Every dossier, the protagonist's included, and how they stand with each other, read together: who do you want scenes with, who is missing, what misfires? Add dossiers here, then **Mark the cast reviewed**.
 
-## 6. Distill
+## 7. Distill
 
 The canon compiled into what the story model reads:
 

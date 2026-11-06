@@ -10,6 +10,7 @@ import {
   chooseTarget,
   saveDraft,
   setDirection,
+  stopWriting,
 } from "../../core/workshop/workshop";
 import {
   KIND_ORDER,
@@ -58,6 +59,7 @@ export function WorkshopPanel() {
   const options = useSlice(optionsSignature);
   const save = useSlice((s) => saveLabel(s, s.workshop.target));
   const placeholder = useSlice((s) => defaultDirection(s, s.workshop.target));
+  const writing = useSlice((s) => s.runtime.autoDraft);
   const [text, setText] = useState("");
   // Bumped when a target change is refused: the select already shows the new
   // value, and an unchanged store value would not repaint it, so remount it.
@@ -154,9 +156,25 @@ export function WorkshopPanel() {
           }}
         />
         <button
+          onClick={stopWriting}
+          style={{
+            ...control,
+            display: writing ? "block" : "none",
+            flex: "1 1 140px",
+            padding: "0 12px",
+            background: T.bg2,
+            color: T.text,
+            border: `1px solid ${T.bg3}`,
+            cursor: "pointer",
+          }}
+        >
+          Stop writing
+        </button>
+        <button
           onClick={() => void saveDraft()}
           style={{
             ...control,
+            display: writing ? "none" : "block",
             flex: "1 1 140px",
             padding: "0 12px",
             background: T.textHeadings,

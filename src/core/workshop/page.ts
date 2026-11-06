@@ -54,10 +54,23 @@ export async function draftText(): Promise<string> {
   const ids = new Set(await currentDraftIds());
   if (!ids.size) return "";
   const all = await sections();
-  return all
-    .filter((s) => ids.has(s.sectionId))
-    .map((s) => s.section.text)
-    .join("\n")
+  return withoutTrailingBreak(
+    all
+      .filter((s) => ids.has(s.sectionId))
+      .map((s) => s.section.text)
+      .join("\n"),
+  );
+}
+
+/**
+ * Trim a draft, dropping a scene break or the start of a bracketed line at its
+ * end: what is left when a Draft button stops the model as it begins the next
+ * piece.
+ */
+export function withoutTrailingBreak(text: string): string {
+  return text
+    .trim()
+    .replace(/\n\s*(\*{3}|⁂|-{3}|\[[^\]\n]*)\s*$/, "")
     .trim();
 }
 

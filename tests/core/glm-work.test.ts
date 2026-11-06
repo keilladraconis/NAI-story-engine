@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { parseBrief, mergeBrief } from "../../src/core/facilitator";
+import {
+  parseBrief,
+  mergeBrief,
+  nextField,
+  interviewDone,
+  oneQuestion,
+  withoutQuestions,
+} from "../../src/core/facilitator";
 import { parseIssues, rewriteTokens } from "../../src/core/critic";
 import { emptyBrief } from "../../src/core/store/slices/canon";
 
@@ -21,11 +28,15 @@ describe("parseBrief", () => {
 });
 
 describe("mergeBrief", () => {
-  it("fills empty fields and never overwrites the writer's", () => {
-    const current = { ...emptyBrief, title: "Mine" };
-    expect(mergeBrief(current, { title: "Theirs", premise: "P" })).toEqual({
-      premise: "P",
-    });
+  it("writes what the answer names, replacing an earlier value", () => {
+    const current = { ...emptyBrief, voice: "First, present" };
+    expect(mergeBrief(current, { voice: "Third, past", premise: "P" })).toEqual(
+      {
+        voice: "Third, past",
+        premise: "P",
+      },
+    );
+    expect(mergeBrief(current, { voice: "First, present" })).toEqual({});
   });
 
   it("appends only notes the brief does not already hold", () => {
@@ -60,5 +71,43 @@ describe("rewriteTokens", () => {
   it("grows with the text and stays under the output bucket", () => {
     expect(rewriteTokens("a".repeat(300))).toBe(400);
     expect(rewriteTokens("a".repeat(100000))).toBe(2000);
+  });
+});
+
+describe("the interview", () => {
+  it("asks about the first empty field, in order", () => {
+    expect(nextField(emptyBrief)?.field).toBe("premise");
+    expect(nextField({ ...emptyBrief, premise: "P" })?.field).toBe("voice");
+  });
+
+  it("is done once premise, voice, genre, heat, pace and limits are set", () => {
+    const full = {
+      ...emptyBrief,
+      premise: "P",
+      voice: "V",
+      genre: "G",
+      heat: "H",
+      pace: "Slow",
+      limits: "None",
+    };
+    expect(interviewDone(full)).toBe(true);
+    expect(interviewDone({ ...full, limits: "" })).toBe(false);
+  });
+
+  it("keeps a reply to its first question", () => {
+    expect(oneQuestion("Noted: slow. Which tense? And who narrates?")).toBe(
+      "Noted: slow. Which tense?",
+    );
+    expect(oneQuestion("The brief is ready.")).toBe("The brief is ready.");
+  });
+});
+
+describe("withoutQuestions", () => {
+  it("drops questions from a closing reply", () => {
+    expect(
+      withoutQuestions(
+        "The brief is ready. Shall we go on? Next is Vignettes.",
+      ),
+    ).toBe("The brief is ready. Next is Vignettes.");
   });
 });

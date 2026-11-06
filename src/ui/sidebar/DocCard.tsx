@@ -12,7 +12,7 @@ import {
 import { reviewCurrent } from "../../core/stages";
 import { review, fix, rewriteWith } from "../../core/critic";
 import { deleteDoc } from "../../core/canon";
-import { openOnPage } from "../../core/workshop/workshop";
+import { openOnPage, writeDraft } from "../../core/workshop/workshop";
 import { useSlice } from "../bridge";
 import { DENSE, SP, T } from "../style";
 import { Button, Field, Row, Status } from "../components/kit";
@@ -185,7 +185,9 @@ export function DocCard(props: { id: string }) {
             dense
             tone="primary"
             onClick={() =>
-              void openOnPage({ kind: "doc", docId: doc.id }, doc.text)
+              void (hasText
+                ? openOnPage({ kind: "doc", docId: doc.id }, doc.text)
+                : writeDraft({ kind: "doc", docId: doc.id }))
             }
           >
             {hasText ? "Open on page" : "Draft on page"}

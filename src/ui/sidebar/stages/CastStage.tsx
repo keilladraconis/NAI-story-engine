@@ -14,7 +14,6 @@ import {
 } from "../../components/kit";
 import { DocCard } from "../DocCard";
 import { AddDoc } from "./CanonStage";
-import { Facilitator } from "../Facilitator";
 
 const idsOf = (kind: "dossier" | "relationships") => (s: RootState) =>
   s.canon.docs
@@ -51,8 +50,6 @@ export function CastStage() {
           + Relationships
         </Button>
       </div>
-      <SectionTitle>Talk it through</SectionTitle>
-      <Facilitator stage="cast" />
       <SectionTitle>Gate</SectionTitle>
       <Row>
         <Button

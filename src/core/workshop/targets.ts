@@ -2,6 +2,7 @@
 // the direction a Send uses when the writer typed none.
 
 import type { CanonDoc, DocKind, RootState, Target } from "../store/types";
+import { given } from "../text";
 
 export interface KindMeta {
   /** Plural or collective heading for the Canon list: "Locations". */
@@ -134,7 +135,7 @@ export function saveLabel(state: RootState, target: Target): string {
 
 /** ", told in third limited, past" from the Brief's voice, or "". */
 function toldIn(state: RootState): string {
-  const voice = state.canon.brief.voice.trim().replace(/\.$/, "");
+  const voice = given(state.canon.brief.voice).replace(/\.$/, "");
   return voice
     ? `, told in ${voice.charAt(0).toLowerCase()}${voice.slice(1)}`
     : "";

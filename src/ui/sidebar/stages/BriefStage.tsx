@@ -1,10 +1,9 @@
-// Brief: what the scenario is, in the writer's terms. Filled by hand, or from
-// the facilitator chat below it.
+// Brief: what the scenario is, in the writer's terms. Filled by the Talk
+// interview or by hand.
 
 import { store, briefUpdated, type Brief } from "../../../core/store";
 import { useSlice } from "../../bridge";
-import { Field, Hint, SectionTitle, StageBody } from "../../components/kit";
-import { Facilitator } from "../Facilitator";
+import { Field, Hint, StageBody } from "../../components/kit";
 
 const FIELDS: ReadonlyArray<{
   field: keyof Brief;
@@ -62,14 +61,12 @@ export function BriefStage() {
   return (
     <StageBody>
       <Hint>
-        What the scenario is. Premise and voice are what the rest is built from;
-        the other fields can wait.
+        What the scenario is. The Talk tab fills these in by interview; edit
+        anything here by hand.
       </Hint>
       {FIELDS.map((f) => (
         <BriefField key={f.field} {...f} />
       ))}
-      <SectionTitle>Talk it through</SectionTitle>
-      <Facilitator stage="brief" />
     </StageBody>
   );
 }

@@ -1,7 +1,8 @@
-// The facilitator chat, shared by the Brief and Cast stages: one transcript.
+// The facilitator interview: one question at a time until the Brief is
+// complete, then a read-back and a pointer to Vignettes.
 
-import { store, chatCleared } from "../../core/store";
-import { talk, updateBrief } from "../../core/facilitator";
+import { store, chatCleared, stageOpened } from "../../core/store";
+import { talk, interviewDone } from "../../core/facilitator";
 import { useSlice, useStream } from "../bridge";
 import { SP, T } from "../style";
 import { Button, Row } from "../components/kit";
@@ -20,72 +21,81 @@ function Bubble(props: { id: string }) {
       style={{
         alignSelf: mine ? "flex-end" : "flex-start",
         maxWidth: "88%",
-        display: "flex",
-        flexDirection: "column",
-        gap: SP.xs,
+        padding: "8px 10px",
+        borderRadius: "10px",
+        background: mine ? T.bg3 : T.bg2,
+        lineHeight: 1.5,
+        whiteSpace: "pre-wrap",
+        userSelect: "text",
       }}
     >
-      {mine ? null : (
-        <span style={{ fontSize: "0.75em", fontWeight: "bold", opacity: 0.7 }}>
-          Facilitator
-        </span>
-      )}
-      <div
-        style={{
-          padding: "8px 10px",
-          borderRadius: "10px",
-          background: mine ? T.bg3 : T.bg2,
-          lineHeight: 1.5,
-          whiteSpace: "pre-wrap",
-          userSelect: "text",
-        }}
-      >
-        {text || "…"}
-      </div>
+      {text || "…"}
     </div>
   );
 }
 
-export function Facilitator(props: { stage: "brief" | "cast" }) {
+export function Facilitator() {
   const ids = useSlice((s) => s.chat.messages.map((m) => m.id).join(","));
   const busy = useSlice((s) => s.runtime.jobs.length > 0);
+  const done = useSlice((s) => interviewDone(s.canon.brief));
   const [text, setText] = useState("");
 
   const send = () => {
     const said = text.trim();
     if (!said) return;
     setText("");
-    void talk(said, props.stage);
+    void talk(said);
   };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: SP.md }}>
       <div
+        style={{
+          display: ids ? "none" : "flex",
+          flexDirection: "column",
+          gap: SP.md,
+        }}
+      >
+        <p style={{ margin: 0, lineHeight: 1.5 }}>
+          The facilitator asks one question at a time until the brief is filled
+          in: premise, voice, genre, heat, pace and limits. Answer briefly; it
+          offers options when you are not sure.
+        </p>
+        <Row>
+          <Button tone="primary" disabled={busy} onClick={() => void talk("")}>
+            Start
+          </Button>
+        </Row>
+      </div>
+      <div
         role="log"
         aria-label="Facilitator conversation"
         style={{ display: "flex", flexDirection: "column", gap: SP.md }}
       >
-        <span
-          style={{
-            display: ids ? "none" : "inline",
-            fontSize: "0.85em",
-            opacity: 0.7,
-          }}
-        >
-          Tell the facilitator what you have in mind; it asks what the scenario
-          still needs.
-        </span>
         {(ids ? ids.split(",") : []).map((id) => (
           <Bubble key={id} id={id} />
         ))}
       </div>
+      <div style={{ display: ids && done && !busy ? "flex" : "none" }}>
+        <Button
+          tone="primary"
+          onClick={() => store.dispatch(stageOpened({ stage: "vignettes" }))}
+        >
+          Go to Vignettes
+        </Button>
+      </div>
       <textarea
-        aria-label="Message to the facilitator"
+        aria-label="Answer"
         rows={3}
         value={text}
-        placeholder="Reply…"
+        placeholder={
+          done
+            ? "Anything to change? The brief updates as you answer."
+            : "Answer…"
+        }
         onInput={(e) => setText(e.currentTarget.value ?? "")}
         style={{
+          display: ids ? "block" : "none",
           width: "100%",
           boxSizing: "border-box",
           padding: "8px",
@@ -97,20 +107,19 @@ export function Facilitator(props: { stage: "brief" | "cast" }) {
           resize: "vertical",
         }}
       />
-      <Row>
-        <Button tone="primary" onClick={send} disabled={busy}>
-          Send
-        </Button>
-        <Button onClick={() => void updateBrief()} disabled={busy || !ids}>
-          Update brief
-        </Button>
-        <span style={{ flex: 1 }} />
-        <ConfirmButton
-          title="Clear the conversation"
-          label="Clear"
-          onConfirm={() => store.dispatch(chatCleared())}
-        />
-      </Row>
+      <div style={{ display: ids ? "block" : "none" }}>
+        <Row>
+          <Button tone="primary" onClick={send} disabled={busy}>
+            Send
+          </Button>
+          <span style={{ flex: 1 }} />
+          <ConfirmButton
+            title="Start the interview over (the brief is kept)"
+            label="Start over"
+            onConfirm={() => store.dispatch(chatCleared())}
+          />
+        </Row>
+      </div>
     </div>
   );
 }

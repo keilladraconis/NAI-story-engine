@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 NAI Story Engine is a NovelAI script (.naiscript) that builds a **scenario** with the writer, then gets out of the way. The writer steers the story once it starts; Story Engine sets up the conditions it grows from: pressures, people, places and how they stand. It never plots.
 
-The pipeline is six stages: **Brief → Vignettes → Now → Canon → Cast → Distill**. Prose is drafted on the page by the editor's own model (Workshop Sends), kept in a free-prose **canon** outside the lorebook, checked by a GLM critic, and **distilled** into Memory, the Author's Note and lorebook entries at the end. The canon is the source of truth; the lorebook is its compiled form. Runs in NovelAI's web worker (QuickJS, no DOM).
+The pipeline is seven stages: **Talk → Brief → Vignettes → Now → Canon → Cast → Distill**. Prose is drafted on the page by the editor's own model (Workshop Sends), kept in a free-prose **canon** outside the lorebook, checked by a GLM critic, and **distilled** into Memory, the Author's Note and lorebook entries at the end. The canon is the source of truth; the lorebook is its compiled form. Runs in NovelAI's web worker (QuickJS, no DOM).
 
 ## Commands
 
@@ -53,7 +53,9 @@ npx tsc --noEmit   # typecheck (the build does not)
 
 **Distill (`src/core/distill.ts`):** targets are derived from the canon (Memory, Author's Note, World, Dramatis Personae, a profile per dossier, Locations, Relationship Map, Plot Situations), all in the `SE: Scenario` category. Each record keeps the hash of its sources and of the text written, giving four states: current, stale, hand-edited, not compiled. **A hand-edited target is never replaced without the writer confirming**, and a change of substance goes canon-first (rewrite the document, then distill). World and Dramatis Personae are Always On; profiles and locations get GLM keys; the relationship map and plots are keyed on cast names.
 
-**Facilitator (`src/core/facilitator.ts`):** one GLM chat shared by the Brief and Cast stages. It interviews and never writes canon. Update brief fills empty Brief fields and appends new notes; it never overwrites a field the writer filled.
+**Facilitator (`src/core/facilitator.ts`):** the Talk tab. A goal-driven interview: each turn, the writer's answer is read into the Brief first (an extraction call; the latest answer replaces a field), then the facilitator asks **one** question about the next empty field in `INTERVIEW`, with options. **The code decides when it is over** (`interviewDone`), and the closing turn uses its own prompt (`FACILITATOR_CLOSE`): beside "ask exactly one question", a "now ask nothing" line lost. `oneQuestion` and `withoutQuestions` enforce both on the text. It never writes canon. Unanswered fields recorded as "Unspecified"/"None" are dropped from frames by `given()`.
+
+**Draft buttons (`writeDraft` in `workshop.ts`):** press NovelAI's Send for the writer with `api.v1.editor.generate()` until the draft reaches `draftLength`, a Send adds almost nothing, or (for scenes only) the model starts a scene break or heading, which `onResponse` stops. A Send the writer makes themselves (`scriptInitiated: false`) ends the run.
 
 **UI (`src/ui/`):**
 

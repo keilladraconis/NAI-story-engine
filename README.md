@@ -6,14 +6,15 @@ It never plots. A story model shown where a story is going writes the arrival; s
 
 ## How it works
 
-Six stages, as tabs in Story Engine's sidebar (under the `…` at the right of NovelAI's sidebar tabs):
+Seven tabs in Story Engine's sidebar (under the `…` at the right of NovelAI's sidebar tabs):
 
-1. **Brief** — what the scenario is: title, genre, premise, voice, heat, pace, limits. Fill it in, or talk it through with the **facilitator**, a chat that asks what the scenario still needs, then press **Update brief**.
-2. **Vignettes** — short scenes that set the tone. They say what the scenario must allow, never what will happen.
-3. **Now** — where the story begins: what is true at the first page, and what has not happened yet.
-4. **Canon** — the world in full prose: geography, history, culture, tensions, factions, systems, a dossier per character, relationships, locations, plot pressures. A **critic** checks each document against the rest.
-5. **Cast** — read the cast together, talk it through, and mark it reviewed.
-6. **Distill** — compile the canon into Memory, the Author's Note and lorebook entries; then draft the opening.
+1. **Talk** — the **facilitator** interviews you, one question at a time, offering options when you are not sure, until the brief is filled in. Then it says so and points you on.
+2. **Brief** — what the scenario is: title, genre, premise, voice, heat, pace, limits, notes. Filled by Talk; edit anything by hand.
+3. **Vignettes** — short scenes that set the tone. They say what the scenario must allow, never what will happen.
+4. **Now** — where the story begins: what is true at the first page, and what has not happened yet.
+5. **Canon** — the world in full prose: geography, history, culture, tensions, factions, systems, a dossier per character, relationships, locations, plot pressures. A **critic** checks each document against the rest.
+6. **Cast** — read the cast together and mark it reviewed.
+7. **Distill** — compile the canon into Memory, the Author's Note and lorebook entries; then draft the opening.
 
 A tab gets a ✓ when its stage is done. The order is a suggestion; open any tab at any time.
 
@@ -21,7 +22,7 @@ A tab gets a ✓ when its stage is done. The order is a suggestion; open any tab
 
 The writing happens in NovelAI's editor, with NovelAI's own Send, on the story model you already use.
 
-Open the **Story Engine** panel under the page and switch **Workshop Sends** on. A divider appears: everything below it is a draft, not part of the story. Pick what you are drafting, optionally type a direction, and press Send. Retry until it sounds right, edit it by hand, then press **Save** (it names what it saves: "Save vignette", "Save dossier"). The draft is filed and the page clears for the next one.
+Open the **Story Engine** panel under the page and switch **Workshop Sends** on. A divider appears: everything below it is a draft, not part of the story. The sidebar's Draft buttons write a whole draft for you, pressing Send until it is done; or pick what you are drafting, optionally type a direction, and press Send yourself, a piece at a time. Retry until it sounds right, edit it by hand, then press **Save** (it names what it saves: "Save vignette", "Save dossier"). The draft is filed and the page clears for the next one.
 
 This works below a story that is already on the page; the story above the divider is left alone. Switch Workshop Sends off when you are done drafting (save or clear the draft first).
 

@@ -67,6 +67,12 @@ describe("stages", () => {
     ).toBe(true);
   });
 
+  it("finishes Talk when the interview is done, and starts there", () => {
+    const state = init();
+    expect(state.ui.stage).toBe("talk");
+    expect(stageDone(state, "talk")).toBe(false);
+  });
+
   it("lists the canon still needed, a dossier included", () => {
     expect(missingKinds(init())).toContain("dossier");
     expect(missingKinds(init())).toContain("geography");

@@ -223,3 +223,29 @@ describe("targets", () => {
     expect(sameTarget({ kind: "vignette" }, { kind: "opening" })).toBe(false);
   });
 });
+
+describe("given", () => {
+  it("treats Unspecified and None as left open", async () => {
+    const { given } = await import("../../src/core/text");
+    expect(given("Unspecified")).toBe("");
+    expect(given(" none. ")).toBe("");
+    expect(given("Literary")).toBe("Literary");
+  });
+});
+
+describe("writing a whole draft", () => {
+  it("drops a scene break or a half-started bracket at the draft's end", async () => {
+    const { withoutTrailingBreak } =
+      await import("../../src/core/workshop/page");
+    expect(withoutTrailingBreak("She left.\n\n***")).toBe("She left.");
+    expect(withoutTrailingBreak("She left.\n[ Chap")).toBe("She left.");
+    expect(withoutTrailingBreak("She left.")).toBe("She left.");
+  });
+
+  it("knows the model has started the next piece", async () => {
+    const { PIECE_END } = await import("../../src/core/workshop/workshop");
+    expect(PIECE_END.test("She left.\n***")).toBe(true);
+    expect(PIECE_END.test("She left.\n[ Chapter 2")).toBe(true);
+    expect(PIECE_END.test("She left. He stayed.")).toBe(false);
+  });
+});

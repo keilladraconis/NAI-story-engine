@@ -8,14 +8,16 @@ Story Engine is rebuilt around a new idea: it sets up a **scenario** with you an
 
 ### Added
 
-- **Six stages in the sidebar: Brief → Vignettes → Now → Canon → Cast → Distill.** Each tab gets a check when its stage is done. The order is the advised one; any tab opens at any time.
+- **Seven tabs in the sidebar: Talk → Brief → Vignettes → Now → Canon → Cast → Distill.** Each tab gets a check when its stage is done. The order is the advised one; any tab opens at any time.
 - **Workshop Sends.** A switch in the Story Engine panel under the page turns NovelAI's own Send into a workshop Send: it drafts the vignette, starting point or canon document you pick, on the page, below a divider marked "Story Engine draft · not part of the story". Retry rejects a draft, you edit it by hand, and the save button files it ("Save vignette", "Save dossier"…) and clears the page. Drafting uses whatever story model you have selected. It works below a story already on the page; the story above the divider is left alone, and a Send that would write into it is stopped.
 - **A direction box** steers each Send ("at supper Ilse notices Tam's new boots and does not ask"). Left empty, each kind of draft has a sensible default.
-- **Brief**: title, genre, premise, voice, heat, pace, limits and notes, filled by hand or with the **facilitator**, a chat that interviews you about what the scenario still needs. **Update brief** fills empty fields from the conversation and never overwrites what you wrote.
+- **Talk**: the **facilitator** interviews you for the brief, one question at a time, with options when you are not sure. Your answers fill the Brief as you go, and when it is complete the facilitator reads it back and points you to Vignettes.
+- **Brief**: title, genre, premise, voice, heat, pace, limits and notes, to edit by hand.
+- **Draft buttons write the whole draft**: Story Engine presses Send for you until a vignette, starting point, document or opening is done, then hands it to you to Retry and edit. Press Send yourself, or **Stop writing**, to take over.
 - **Vignettes**: short scenes that set the tone, kept as anchors for everything after. They say what the scenario must allow, never what will happen.
 - **Now**: where the story begins, as two ledgers: what is true at the first page, and what has not happened yet.
 - **Canon**: the world in full prose (geography, history, culture, tensions, factions, systems, a dossier per character, relationships, locations, plot pressures), drafted on the page. A **critic** checks each document against the brief, the starting point and the rest, and lists problems: contradictions, a "not yet" written as already true, invented facts, name collisions, a character's family left unanswered, crossed limits. **Fix** resolves one problem; **Rewrite** changes a document as you ask.
-- **Cast**: the dossiers and relationships read together with the facilitator, then marked reviewed.
+- **Cast**: the dossiers and relationships read together, then marked reviewed.
 - **Distill**: the canon compiled into Memory (title and genre line, protagonist, central tension), the Author's Note (`[ Style: … ]`) and lorebook entries in an `SE: Scenario` category (World, Dramatis Personae, a profile per character, Locations, Relationship Map, Plot Situations), with keys. Nothing is invented in the compiling. Each target shows whether it is current, stale (the canon changed), hand-edited or not compiled yet.
 - **Your edits are kept.** Edit a compiled entry, Memory or the Author's Note by hand, and Story Engine leaves it alone; replacing it with a fresh distill asks first.
 - **A Story Engine tab in the lorebook** for every entry Story Engine compiled: what it was compiled from, its state, re-distill, and a box that rewrites the canon behind it and then distills it again.

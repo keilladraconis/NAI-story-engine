@@ -7,6 +7,8 @@ import {
   startingPointSet,
   docTextSet,
   openingKeptSet,
+  autoDraftSet,
+  type RootState,
   type Target,
 } from "../store";
 import { firstLine } from "../text";
@@ -114,10 +116,84 @@ export async function saveDraft(): Promise<void> {
   }
 }
 
-/** Turn Workshop Sends on and point them at a target. */
-export async function draftOnPage(target: Target): Promise<void> {
+// ── Writing a whole draft ────────────────────────────────────────────────────
+// A Draft button presses NovelAI's own Send for the writer (a scripted
+// editor.generate() costs the script nothing) until the draft is long enough,
+// the model ends the piece itself, or the writer takes over.
+
+/** Characters a draft is written to before the Draft button stops. */
+export function draftLength(state: RootState, target: Target): number {
+  switch (target.kind) {
+    case "vignette":
+      return 2400;
+    case "startingPoint":
+      return 1600;
+    case "opening":
+      return 2400;
+    case "doc":
+      return findDoc(state, target.docId)?.kind === "dossier" ? 3200 : 3000;
+  }
+}
+
+/** Sends a Draft button makes at most, whatever the length. */
+const MAX_SENDS = 6;
+/** A Send that adds less than this has ended the piece. */
+const MIN_GROWTH = 40;
+/** How long to wait for a Send to finish before giving up on it. */
+const SEND_TIMEOUT_MS = 120000;
+/** A line the model starts when it has finished the piece: a scene break or a heading. */
+export const PIECE_END = /\n\s*(\*\*\*|⁂|---|\[ |#)/;
+
+let run: { stop: boolean; ended: boolean } | null = null;
+let onEnd: (() => void) | null = null;
+
+/** Resolves when the current Send ends, or after a timeout; false if it timed out. */
+function nextEnd(): Promise<boolean> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const settle = (ok: boolean) => {
+      if (settled) return;
+      settled = true;
+      onEnd = null;
+      resolve(ok);
+    };
+    onEnd = () => settle(true);
+    void api.v1.timers.setTimeout(() => settle(false), SEND_TIMEOUT_MS);
+  });
+}
+
+/** Stop a Draft button's run after the Send under way. */
+export function stopWriting(): void {
+  if (run) run.stop = true;
+}
+
+/** Turn Workshop Sends on, point them at a target, and write the whole draft. */
+export async function writeDraft(target: Target): Promise<void> {
+  if (run) return;
   await turnOn();
-  await chooseTarget(target);
+  if (!(await chooseTarget(target))) return;
+  run = { stop: false, ended: false };
+  store.dispatch(autoDraftSet({ on: true }));
+  try {
+    const goal = draftLength(store.getState(), target);
+    for (let send = 0; send < MAX_SENDS; send++) {
+      const before = (await draftText()).length;
+      if (before >= goal || run.stop || run.ended) break;
+      const ended = nextEnd();
+      await api.v1.editor.generate();
+      if (!(await ended)) break;
+      const after = (await draftText()).length;
+      if (after - before < MIN_GROWTH) break;
+    }
+  } catch (error) {
+    toast(
+      "Story Engine could not send for you; press Send to continue by hand.",
+    );
+    api.v1.log(`writeDraft: ${String(error)}`);
+  } finally {
+    run = null;
+    store.dispatch(autoDraftSet({ on: false }));
+  }
 }
 
 /**
@@ -154,6 +230,8 @@ export function registerWorkshopHooks(): void {
   });
 
   api.v1.hooks.register("onGenerationRequested", async (params) => {
+    // The writer pressed Send or Retry themselves: they have taken over.
+    if (run && !params.scriptInitiated) run.stop = true;
     const { workshop } = store.getState();
     const position = params.generationPosition;
     if (!workshop.on || workshop.boundary === null || !position) return;
@@ -165,7 +243,30 @@ export function registerWorkshopHooks(): void {
     return { stopGeneration: true };
   });
 
+  // While a Draft button runs, a scene break or heading ends the piece: the
+  // model has started the next one.
+  const streamed = new Map<string, string>();
+  api.v1.hooks.register("onResponse", (params) => {
+    const kind = store.getState().workshop.target.kind;
+    // Documents use headings and rules of their own; only scenes end this way.
+    if (!run || (kind !== "vignette" && kind !== "opening")) return;
+    const sofar =
+      (streamed.get(params.continuityId) ?? "") + params.text.join("");
+    if (params.final) {
+      streamed.delete(params.continuityId);
+      return;
+    }
+    streamed.set(params.continuityId, sofar);
+    if (PIECE_END.test(sofar)) {
+      run.ended = true;
+      streamed.delete(params.continuityId);
+      return { stopGeneration: true };
+    }
+    return undefined;
+  });
+
   api.v1.hooks.register("onGenerationEnd", () => {
+    onEnd?.();
     if (store.getState().workshop.on) void redraw();
   });
 

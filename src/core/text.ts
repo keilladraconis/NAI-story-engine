@@ -26,3 +26,9 @@ export function firstLine(text: string, max = 60): string {
   const line = text.trim().split("\n")[0]?.trim() ?? "";
   return line.length > max ? `${line.slice(0, max - 1)}…` : line;
 }
+
+/** A Brief value as given, or "" when the writer left it open ("Unspecified", "None"). */
+export function given(value: string): string {
+  const v = value.trim();
+  return /^(unspecified|none|n\/a)\.?$/i.test(v) ? "" : v;
+}

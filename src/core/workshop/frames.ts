@@ -7,6 +7,7 @@
 
 import type { Brief, CanonDoc, RootState, Target } from "../store/types";
 import { KINDS } from "./targets";
+import { given } from "../text";
 
 /** Characters a frame may hold before its lowest-priority parts are dropped. */
 export const FRAME_BUDGET = 16000;
@@ -14,22 +15,22 @@ export const FRAME_BUDGET = 16000;
 /** `[ Title: …; Genre: … ]` from the Brief, or "" when both are empty. */
 export function attgLine(brief: Brief): string {
   // `;` separates the line's fields, so a writer's `;` inside one becomes `,`.
-  const clean = (s: string) => s.trim().replace(/\s*;\s*/g, ", ");
+  const clean = (s: string) => given(s).replace(/\s*;\s*/g, ", ");
   const parts = [
-    brief.title.trim() && `Title: ${clean(brief.title)}`,
-    brief.genre.trim() && `Genre: ${clean(brief.genre)}`,
+    clean(brief.title) && `Title: ${clean(brief.title)}`,
+    clean(brief.genre) && `Genre: ${clean(brief.genre)}`,
   ].filter(Boolean);
   return parts.length ? `[ ${parts.join("; ")} ]` : "";
 }
 
 function briefBlock(brief: Brief): string {
-  const tone = [brief.heat.trim(), brief.pace.trim()]
+  const tone = [given(brief.heat), given(brief.pace)]
     .filter(Boolean)
     .join("; ");
   return [
     attgLine(brief),
-    brief.premise.trim(),
-    brief.voice.trim() && `Told in: ${brief.voice.trim()}.`,
+    given(brief.premise),
+    given(brief.voice) && `Told in: ${given(brief.voice)}.`,
     tone && `Tone: ${tone}.`,
   ]
     .filter(Boolean)

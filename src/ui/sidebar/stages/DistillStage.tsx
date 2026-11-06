@@ -10,7 +10,7 @@ import {
   distillAll,
   type DistillStatus,
 } from "../../../core/distill";
-import { draftOnPage } from "../../../core/workshop/workshop";
+import { writeDraft } from "../../../core/workshop/workshop";
 import { store } from "../../../core/store";
 import { hashText } from "../../../core/text";
 import { useSlice } from "../../bridge";
@@ -165,7 +165,7 @@ export function DistillStage() {
       <Row>
         <Button
           tone={openingKept ? "plain" : "primary"}
-          onClick={() => void draftOnPage({ kind: "opening" })}
+          onClick={() => void writeDraft({ kind: "opening" })}
         >
           {openingKept ? "✓ Opening kept · draft another" : "Draft the opening"}
         </Button>

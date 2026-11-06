@@ -3,8 +3,10 @@
 
 import type { CanonDoc, DocKind, RootState, StageId } from "./store/types";
 import { hashText } from "./text";
+import { interviewDone } from "./facilitator";
 
 export const STAGES: ReadonlyArray<{ id: StageId; label: string }> = [
+  { id: "talk", label: "Talk" },
   { id: "brief", label: "Brief" },
   { id: "vignettes", label: "Vignettes" },
   { id: "now", label: "Now" },
@@ -46,6 +48,8 @@ export function openIssueCount(state: RootState): number {
 export function stageDone(state: RootState, stage: StageId): boolean {
   const { canon } = state;
   switch (stage) {
+    case "talk":
+      return interviewDone(canon.brief);
     case "brief":
       return Boolean(canon.brief.premise.trim() && canon.brief.voice.trim());
     case "vignettes":

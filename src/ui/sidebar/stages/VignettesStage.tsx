@@ -2,7 +2,7 @@
 // never what will happen.
 
 import { store, vignetteRemoved, vignetteUpdated } from "../../../core/store";
-import { draftOnPage } from "../../../core/workshop/workshop";
+import { writeDraft } from "../../../core/workshop/workshop";
 import { useSlice } from "../../bridge";
 import { SP, T } from "../../style";
 import {
@@ -91,7 +91,7 @@ export function VignettesStage() {
       <Row>
         <Button
           tone="primary"
-          onClick={() => void draftOnPage({ kind: "vignette" })}
+          onClick={() => void writeDraft({ kind: "vignette" })}
         >
           Draft a vignette
         </Button>

@@ -2,7 +2,7 @@ import { createSlice } from "nai-store";
 import type { StageId, UIState } from "../types";
 
 export const initialUIState: UIState = {
-  stage: "brief",
+  stage: "talk",
   openDocId: null,
   lorebookEntryId: null,
 };

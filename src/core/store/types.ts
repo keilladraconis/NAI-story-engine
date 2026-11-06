@@ -3,7 +3,7 @@ import type { GenerationState } from "nai-gen-x";
 // ── Canon ────────────────────────────────────────────────────────────────────
 
 export type StageId =
-  "brief" | "vignettes" | "now" | "canon" | "cast" | "distill";
+  "talk" | "brief" | "vignettes" | "now" | "canon" | "cast" | "distill";
 
 export interface Brief {
   title: string;
@@ -139,6 +139,8 @@ export interface RuntimeState {
   genx: GenerationState;
   /** GLM jobs queued or running, oldest first. */
   jobs: Job[];
+  /** A Draft button is sending on the writer's behalf until the draft is done. */
+  autoDraft: boolean;
 }
 
 export interface UIState {

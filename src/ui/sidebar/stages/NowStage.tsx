@@ -3,7 +3,7 @@
 // Now, and no document may write a Not-yet state as present.
 
 import { store, startingPointSet } from "../../../core/store";
-import { draftOnPage, openOnPage } from "../../../core/workshop/workshop";
+import { writeDraft, openOnPage } from "../../../core/workshop/workshop";
 import { useSlice } from "../../bridge";
 import { Button, Field, Hint, Row, StageBody } from "../../components/kit";
 
@@ -30,7 +30,7 @@ export function NowStage() {
                   { kind: "startingPoint" },
                   `Now\n${now.trim()}\n\nNot yet\n${notYet.trim()}`,
                 )
-              : draftOnPage({ kind: "startingPoint" }))
+              : writeDraft({ kind: "startingPoint" }))
           }
         >
           {hasText ? "Open on page" : "Draft on page"}

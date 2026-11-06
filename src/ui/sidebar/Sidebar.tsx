@@ -8,6 +8,7 @@ import { useSlice } from "../bridge";
 import { T } from "../style";
 import { Header } from "../header/Header";
 import { StageTabs } from "./StageTabs";
+import { TalkStage } from "./stages/TalkStage";
 import { BriefStage } from "./stages/BriefStage";
 import { VignettesStage } from "./stages/VignettesStage";
 import { NowStage } from "./stages/NowStage";
@@ -16,6 +17,7 @@ import { CastStage } from "./stages/CastStage";
 import { DistillStage } from "./stages/DistillStage";
 
 const BODIES: Record<StageId, () => preact.VNode> = {
+  talk: TalkStage,
   brief: BriefStage,
   vignettes: VignettesStage,
   now: NowStage,
