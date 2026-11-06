@@ -295,13 +295,3 @@ export function talk(text: string): Promise<void> {
     await reply();
   });
 }
-
-/** Replace the last reply with a fresh one. */
-export function retryReply(): Promise<void> {
-  return turn(async () => {
-    const last = store.getState().chat.messages.at(-1);
-    if (last?.role !== "assistant") return;
-    store.dispatch(messageRemoved({ id: last.id }));
-    await reply();
-  });
-}

@@ -1,23 +1,20 @@
 // The Talk tab's chat. Laid out like the old chat: a `column-reverse` list, so
 // the newest message sits at the bottom and the scroll stays pinned there as
 // turns arrive with no scroll code, and the composer pinned under it.
+//
+// The chat is a working conversation, not a record: no per-message actions.
+// Keep talking, or Clear it to start anew; the Brief holds what was settled.
 
-import {
-  store,
-  chatCleared,
-  messageRemoved,
-  stageOpened,
-} from "../../core/store";
-import { talk, retryReply, interviewDone } from "../../core/facilitator";
+import { store, chatCleared, stageOpened } from "../../core/store";
+import { talk, interviewDone } from "../../core/facilitator";
 import { useSlice, useStream } from "../bridge";
 import { SP, T, SCROLL } from "../style";
 import { Button, Row } from "../components/kit";
 import { ConfirmButton } from "../components/ConfirmButton";
-import { RotateCw, X } from "nai:icons/feather";
+/** Messages shown at once; Show more reveals this many more. */
+export const PAGE = 25;
 
-const ICON = 14;
-
-function Bubble(props: { id: string; last: boolean; busy: boolean }) {
+function Bubble(props: { id: string }) {
   const message = useSlice((s) =>
     s.chat.messages.find((m) => m.id === props.id),
   );
@@ -25,14 +22,12 @@ function Bubble(props: { id: string; last: boolean; busy: boolean }) {
   if (!message) return null;
   const mine = message.role === "user";
   const text = streaming ?? message.content;
-  const canRetry = props.last && !mine && !props.busy;
   return (
     <div
       style={{
         display: "flex",
         flexDirection: "column",
         alignItems: mine ? "flex-end" : "flex-start",
-        gap: SP.xs,
       }}
     >
       <div
@@ -48,24 +43,6 @@ function Bubble(props: { id: string; last: boolean; busy: boolean }) {
       >
         {text || "…"}
       </div>
-      <div style={{ display: "flex", gap: "14px", opacity: 0.7 }}>
-        <div style={{ display: canRetry ? "block" : "none" }}>
-          <ConfirmButton
-            title="Retry this reply"
-            icon={RotateCw}
-            size={ICON}
-            resetKey={props.id}
-            onConfirm={() => void retryReply()}
-          />
-        </div>
-        <ConfirmButton
-          title="Delete this message"
-          icon={X}
-          size={ICON}
-          resetKey={props.id}
-          onConfirm={() => store.dispatch(messageRemoved({ id: props.id }))}
-        />
-      </div>
     </div>
   );
 }
@@ -75,6 +52,11 @@ export function Facilitator() {
   const busy = useSlice((s) => s.runtime.jobs.length > 0);
   const done = useSlice((s) => interviewDone(s.canon.brief));
   const [text, setText] = useState("");
+  const count = ids ? ids.split(",").length : 0;
+  // How many of the newest messages are shown. A new message (or a cleared
+  // chat) brings the horizon back to one page.
+  const [shown, setShown] = useState(PAGE);
+  useEffect(() => setShown(PAGE), [count]);
 
   const send = () => {
     const said = text.trim();
@@ -87,7 +69,8 @@ export function Facilitator() {
   // Newest first, because the column is reversed. Keyed by index: keyed
   // reconciliation scrambled the order on the insert-at-front each new
   // message causes; index keys patch positionally (as the old chat found).
-  const reversed = list.slice().reverse();
+  const reversed = list.slice().reverse().slice(0, shown);
+  const hidden = count - reversed.length;
 
   return (
     <div
@@ -121,8 +104,18 @@ export function Facilitator() {
           </Button>
         </div>
         {reversed.map((id, i) => (
-          <Bubble key={i} id={id} last={i === 0} busy={busy} />
+          <Bubble key={i} id={id} />
         ))}
+        <div
+          style={{
+            display: hidden > 0 ? "flex" : "none",
+            justifyContent: "center",
+          }}
+        >
+          <Button dense tone="quiet" onClick={() => setShown(shown + PAGE)}>
+            {`Show ${Math.min(PAGE, hidden)} more`}
+          </Button>
+        </div>
         <p
           style={{
             display: ids ? "none" : "block",
