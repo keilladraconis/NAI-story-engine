@@ -150,6 +150,27 @@ describe("rounds", () => {
     ]);
   });
 
+  it("reads question lines written without ###", () => {
+    const round = parseRound(
+      [
+        "LEAD: Let's define the boundaries.",
+        "LIMITS: What are your hard limits? | any",
+        "- No vore.",
+        "- No scat.",
+        "TITLE: Which title feels right?",
+        "- A Serperior's Indulgence",
+        "- Regal Appetites",
+      ].join("\n"),
+    );
+    expect(round.questions.map((q) => [q.header, q.question, q.multi])).toEqual(
+      [
+        ["LIMITS", "What are your hard limits?", true],
+        ["TITLE", "Which title feels right?", false],
+      ],
+    );
+    expect(round.questions[0].options[0].label).toBe("No vore.");
+  });
+
   it("answers with the picks, skipping unanswered questions", () => {
     const { questions } = parseRound(text);
     expect(

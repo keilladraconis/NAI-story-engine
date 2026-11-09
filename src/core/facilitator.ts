@@ -166,10 +166,11 @@ export function withoutQuestions(text: string): string {
 }
 
 /**
- * Read a round: `LEAD:` is said to the writer, each `### header | question`
- * (ending `| any` for multiple picks) takes the `- option | meaning` lines
- * under it. `READING:` is the model thinking aloud and is dropped. A question
- * with fewer than two options is dropped.
+ * Read a round: `LEAD:` is said to the writer, each question line takes the
+ * `- option | meaning` lines under it. A question line is `### header |
+ * question`, or (as GLM sometimes writes it) `HEADER: question?`; ending it
+ * with `| any` allows several picks. `READING:` is the model thinking aloud
+ * and is dropped. A question with fewer than two options is dropped.
  */
 export function parseRound(text: string): {
   lead: string;
@@ -180,27 +181,42 @@ export function parseRound(text: string): {
   let current: Question | null = null;
   for (const raw of text.split("\n")) {
     const line = raw.trim();
-    const lead1 = line.match(/^LEAD:\s*(.*)$/i);
-    const head = line.match(/^#{2,4}\s*(.+)$/);
+    if (!line || /^READING:/i.test(line)) continue;
+    const leadLine = line.match(/^LEAD:\s*(.*)$/i);
     const option = line.match(/^[-*•]\s*(.+)$/);
-    if (lead1) lead = lead1[1].trim();
-    else if (head) {
-      const parts = head[1].split("|").map((p) => p.trim());
-      const multi = parts.length > 2 && /^any\b/i.test(parts[parts.length - 1]);
-      if (multi) parts.pop();
-      current = {
-        header: parts[0],
-        question: parts.slice(1).join(" ") || parts[0],
-        options: [],
-        multi,
-      };
-      questions.push(current);
-    } else if (option && current) {
+    const head = line.match(/^#{2,4}\s*(.+)$/);
+    if (leadLine) lead = leadLine[1].trim();
+    else if (option && current) {
       const [label, ...rest] = option[1].split("|").map((p) => p.trim());
       if (label) current.options.push({ label, description: rest.join(" ") });
+    } else if (head || (!option && line.includes("?"))) {
+      current = question(head ? head[1] : line);
+      questions.push(current);
     }
   }
   return { lead, questions: questions.filter((q) => q.options.length >= 2) };
+}
+
+/** One question line: "header | question | any" or "HEADER: question?". */
+function question(line: string): Question {
+  const parts = line.split("|").map((p) => p.trim());
+  const multi = parts.length > 1 && /^any\b/i.test(parts[parts.length - 1]);
+  if (multi) parts.pop();
+  if (parts.length > 1) {
+    return {
+      header: parts[0],
+      question: parts.slice(1).join(" "),
+      options: [],
+      multi,
+    };
+  }
+  const named = parts[0].match(/^([^:?]{1,40}):\s*(.+)$/);
+  return {
+    header: named ? named[1].trim() : parts[0],
+    question: named ? named[2].trim() : parts[0],
+    options: [],
+    multi,
+  };
 }
 
 /** The writer's picks on a round, as their answer: "Heat: Explicit graphic". */
@@ -288,12 +304,18 @@ async function round(replyId: string): Promise<void> {
   const text = await runGlm({
     id: api.v1.uuid(),
     label: "Facilitator",
-    maxTokens: 1500,
+    maxTokens: 1200,
     temperature: 0.8,
     messages: async () => {
       const state = store.getState();
       const brief = state.canon.brief;
-      const needed = INTERVIEW.filter((q) => !ready(q, brief))
+      // The first round always asks what the story dwells on: the seed fills
+      // Desires from the opening's summary, which names the genre, not which
+      // of its flavours the writer wants.
+      const first = !state.chat.messages.some((m) => m.questions?.length);
+      const needed = INTERVIEW.filter(
+        (q) => !ready(q, brief) || (first && q.field === "desires"),
+      )
         .map((q) => `- ${q.focus}`)
         .join("\n");
       const system = [
