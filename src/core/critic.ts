@@ -48,8 +48,41 @@ const KINDS: readonly IssueKind[] = [
   "limit",
 ];
 
-/** Parse `KIND | text` lines. Unknown kinds and `NONE` yield nothing. */
-export function parseIssues(text: string, makeId: () => string): Issue[] {
+/** Lowercase, one space, plain quotes: for finding a quote in a document. */
+const plain = (text: string): string =>
+  text
+    .toLowerCase()
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/**
+ * Whether an issue is about the document under review: its first quote (the
+ * words at fault) must be the document's own. The critic reads the whole
+ * canon, and a problem it quoted from another document was filed on the
+ * wrong one; that document's own review reports it. An issue without a quote
+ * is kept.
+ */
+export function quotesDoc(issue: string, docText: string): boolean {
+  const quote = /["\u201c]([^"\u201c\u201d]{4,})["\u201d]/.exec(issue)?.[1];
+  if (!quote) return true;
+  // An elided quote ("the first words... the last") is checked piece by piece.
+  return quote
+    .split(/\.\.\.|\u2026/)
+    .map((piece) => plain(piece).replace(/^[\s,.;:]+|[\s,.;:]+$/g, ""))
+    .filter((piece) => piece.length >= 4)
+    .every((piece) => plain(docText).includes(piece));
+}
+
+/**
+ * Parse `KIND | text` lines. Unknown kinds and `NONE` yield nothing; with the
+ * document's text, so do issues quoting another document (`quotesDoc`).
+ */
+export function parseIssues(
+  text: string,
+  makeId: () => string,
+  docText?: string,
+): Issue[] {
   const issues: Issue[] = [];
   for (const line of text.split("\n")) {
     const at = line.indexOf("|");
@@ -60,8 +93,9 @@ export function parseIssues(text: string, makeId: () => string): Issue[] {
       .toLowerCase()
       .replace(/^[-*\s]+/, "") as IssueKind;
     const body = line.slice(at + 1).trim();
-    if (KINDS.includes(kind) && body)
-      issues.push({ id: makeId(), kind, text: body });
+    if (!KINDS.includes(kind) || !body) continue;
+    if (docText !== undefined && !quotesDoc(body, docText)) continue;
+    issues.push({ id: makeId(), kind, text: body });
   }
   return issues;
 }
@@ -120,7 +154,10 @@ export function review(docId: string): Promise<void> {
     store.dispatch(
       docReviewed({
         id: docId,
-        review: { issues: parseIssues(reply, () => api.v1.uuid()), textHash },
+        review: {
+          issues: parseIssues(reply, () => api.v1.uuid(), now.text),
+          textHash,
+        },
       }),
     );
   });

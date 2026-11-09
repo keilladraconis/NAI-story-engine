@@ -10,7 +10,7 @@ import {
   answered,
   missingBrief,
 } from "../../src/core/facilitator";
-import { parseIssues, rewriteTokens } from "../../src/core/critic";
+import { parseIssues, quotesDoc, rewriteTokens } from "../../src/core/critic";
 import { parseOffers } from "../../src/core/offers";
 import { firstLine } from "../../src/core/text";
 import { parsePlan } from "../../src/core/build";
@@ -67,6 +67,32 @@ describe("parseIssues", () => {
 
   it("reads NONE as no issues", () => {
     expect(parseIssues("NONE", makeId)).toEqual([]);
+  });
+
+  it("drops an issue whose words at fault are another document's", () => {
+    const doc =
+      "Satiety and Growth: this lifestyle, while pursued willingly, has no negative costs.";
+    const issues = parseIssues(
+      [
+        `contradiction | "The Body (The Internal Opposition)" in the Factions document opposes "has no negative costs".`,
+        `contradiction | "This lifestyle, while pursued   willingly, has no negative costs" disagrees with Factions.`,
+        `contradiction | “Satiety and Growth: this lifestyle… no negative costs” is too strong.`,
+        "missing-family | Nick's siblings are not named.",
+      ].join("\n"),
+      makeId,
+      doc,
+    );
+    expect(issues.map((i) => i.text.slice(0, 20))).toEqual([
+      `"This lifestyle, whi`,
+      "“Satiety and Growth:",
+      "Nick's siblings are ",
+    ]);
+  });
+});
+
+describe("quotesDoc", () => {
+  it("keeps an issue without a quote", () => {
+    expect(quotesDoc("the family is missing", "anything")).toBe(true);
   });
 });
 
