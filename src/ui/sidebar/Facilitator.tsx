@@ -4,17 +4,142 @@
 //
 // The chat is a working conversation, not a record: no per-message actions.
 // Keep talking, or Clear it to start anew; the Brief holds what was settled.
+//
+// The facilitator asks in rounds of multiple-choice questions. Only the
+// newest round takes picks; Send answers it with the picks and anything typed.
 
-import { store, chatCleared, stageOpened } from "../../core/store";
-import { talk, interviewDone } from "../../core/facilitator";
+import {
+  store,
+  chatCleared,
+  stageOpened,
+  optionPicked,
+} from "../../core/store";
+import { talk, interviewDone, answerText } from "../../core/facilitator";
 import { useSlice, useStream } from "../bridge";
-import { SP, T, SCROLL } from "../style";
+import { SP, T, SCROLL, TOUCH } from "../style";
 import { Button, Row } from "../components/kit";
 import { ConfirmButton } from "../components/ConfirmButton";
 /** Messages shown at once; Show more reveals this many more. */
 export const PAGE = 25;
 
-function Bubble(props: { id: string }) {
+function Choice(props: {
+  id: string;
+  question: number;
+  label: string;
+  description: string;
+  live: boolean;
+}) {
+  const picked = useSlice(
+    (s) =>
+      s.chat.messages
+        .find((m) => m.id === props.id)
+        ?.picks?.[props.question]?.includes(props.label) ?? false,
+  );
+  return (
+    <button
+      aria-pressed={picked}
+      disabled={!props.live}
+      onClick={() =>
+        store.dispatch(
+          optionPicked({
+            id: props.id,
+            question: props.question,
+            label: props.label,
+          }),
+        )
+      }
+      style={{
+        flex: "1 1 140px",
+        minHeight: TOUCH,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "flex-start",
+        gap: SP.xs,
+        padding: "6px 10px",
+        borderRadius: "8px",
+        border: `1px solid ${picked ? T.textHeadings : T.bg3}`,
+        background: picked ? T.bg3 : T.bg1,
+        color: T.text,
+        font: "inherit",
+        textAlign: "left",
+        cursor: props.live ? "pointer" : "default",
+        opacity: props.live || picked ? 1 : 0.6,
+      }}
+    >
+      <span style={{ fontWeight: "bold" }}>
+        {picked ? `✓ ${props.label}` : props.label}
+      </span>
+      <span
+        style={{
+          display: props.description ? "block" : "none",
+          fontSize: "0.8em",
+          opacity: 0.75,
+          lineHeight: 1.35,
+        }}
+      >
+        {props.description}
+      </span>
+    </button>
+  );
+}
+
+/** A round's questions, each with its options as wrapping choices. */
+function Round(props: { id: string; live: boolean }) {
+  const message = useSlice((s) =>
+    s.chat.messages.find((m) => m.id === props.id),
+  );
+  const questions = message?.questions ?? [];
+  return (
+    <div
+      style={{
+        display: questions.length ? "flex" : "none",
+        flexDirection: "column",
+        gap: SP.lg,
+        width: "100%",
+        whiteSpace: "normal",
+      }}
+    >
+      {questions.map((q, i) => (
+        <div
+          key={i}
+          role="group"
+          aria-label={q.header}
+          style={{ display: "flex", flexDirection: "column", gap: SP.sm }}
+        >
+          <div style={{ lineHeight: 1.4 }}>
+            <span
+              style={{
+                display: "block",
+                fontSize: "0.75em",
+                fontWeight: "bold",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                opacity: 0.75,
+              }}
+            >
+              {q.multi ? `${q.header} · pick any` : q.header}
+            </span>
+            {q.question}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: SP.sm }}>
+            {q.options.map((o, j) => (
+              <Choice
+                key={j}
+                id={props.id}
+                question={i}
+                label={o.label}
+                description={o.description}
+                live={props.live}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Bubble(props: { id: string; live: boolean }) {
   const message = useSlice((s) =>
     s.chat.messages.find((m) => m.id === props.id),
   );
@@ -32,7 +157,10 @@ function Bubble(props: { id: string }) {
     >
       <div
         style={{
-          maxWidth: "88%",
+          maxWidth: message.questions?.length ? "100%" : "88%",
+          display: "flex",
+          flexDirection: "column",
+          gap: SP.md,
           padding: "8px 10px",
           borderRadius: mine ? "12px 12px 0 12px" : "12px 12px 12px 0",
           background: mine ? T.bg3 : T.bg2,
@@ -41,7 +169,14 @@ function Bubble(props: { id: string }) {
           userSelect: "text",
         }}
       >
-        {text || "…"}
+        <span
+          style={{
+            display: text || !message.questions?.length ? "inline" : "none",
+          }}
+        >
+          {text || "…"}
+        </span>
+        <Round id={props.id} live={props.live} />
       </div>
     </div>
   );
@@ -51,6 +186,14 @@ export function Facilitator() {
   const ids = useSlice((s) => s.chat.messages.map((m) => m.id).join(","));
   const busy = useSlice((s) => s.runtime.jobs.length > 0);
   const done = useSlice((s) => interviewDone(s.canon.brief));
+  // The newest message, when it is a round still waiting for its answer.
+  const liveRound = useSlice((s) => {
+    const last = s.chat.messages[s.chat.messages.length - 1];
+    return last?.questions?.length ? last.id : "";
+  });
+  const answer = useSlice((s) =>
+    answerText(s.chat.messages.find((m) => m.id === liveRound)),
+  );
   const [text, setText] = useState("");
   const count = ids ? ids.split(",").length : 0;
   // How many of the newest messages are shown. A new message (or a cleared
@@ -59,7 +202,7 @@ export function Facilitator() {
   useEffect(() => setShown(PAGE), [count]);
 
   const send = () => {
-    const said = text.trim();
+    const said = [answer, text.trim()].filter(Boolean).join("\n\n");
     if (!said) return;
     setText("");
     void talk(said);
@@ -104,7 +247,7 @@ export function Facilitator() {
           </Button>
         </div>
         {reversed.map((id, i) => (
-          <Bubble key={i} id={id} />
+          <Bubble key={i} id={id} live={id === liveRound && !busy} />
         ))}
         <div
           style={{
@@ -125,8 +268,8 @@ export function Facilitator() {
           }}
         >
           Start with whatever you have: a premise, a character, a feeling, five
-          words. The facilitator works it into a scenario with you and keeps the
-          Brief as you go.
+          words. The facilitator asks a few rounds of questions to pick from,
+          and keeps the Brief as you go.
         </p>
       </div>
       <div
@@ -148,7 +291,9 @@ export function Facilitator() {
               ? "Describe the scenario you want to build."
               : done
                 ? "Anything to change? The Brief updates as you talk."
-                : "Reply…"
+                : liveRound
+                  ? "Pick above, and add anything in your own words."
+                  : "Reply…"
           }
           onInput={(e) => setText(e.currentTarget.value ?? "")}
           style={{
@@ -169,7 +314,7 @@ export function Facilitator() {
         />
         <Row>
           <Button tone="primary" onClick={send} disabled={busy}>
-            Send
+            {answer ? "Answer" : "Send"}
           </Button>
           <span style={{ flex: 1 }} />
           <div style={{ display: ids ? "block" : "none" }}>

@@ -122,10 +122,24 @@ export interface DistillState {
 
 // ── Chat ─────────────────────────────────────────────────────────────────────
 
+/** One multiple-choice question in a facilitator round. */
+export interface Question {
+  /** A short label, used as the answer's name: "Heat", "Nick's awareness". */
+  header: string;
+  question: string;
+  options: { label: string; description: string }[];
+  /** Any number of options may be picked (limits), not just one. */
+  multi: boolean;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
+  /** A round of questions the writer answers by picking. */
+  questions?: Question[];
+  /** The labels picked, per question. */
+  picks?: string[][];
 }
 
 export interface ChatState {

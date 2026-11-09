@@ -4,7 +4,8 @@ import {
   mergeBrief,
   nextField,
   interviewDone,
-  oneQuestion,
+  parseRound,
+  answerText,
   withoutQuestions,
   answered,
   missingBrief,
@@ -74,12 +75,11 @@ describe("rewriteTokens", () => {
 });
 
 describe("the interview", () => {
-  it("asks what the writer wants first, then builds around it", () => {
-    expect(nextField(emptyBrief)?.field).toBe("desires");
+  it("asks for the frame first, then builds around it", () => {
+    expect(nextField(emptyBrief)?.field).toBe("heat");
     expect(
-      nextField({ ...emptyBrief, desires: "x".repeat(120), heat: "Explicit" })
-        ?.field,
-    ).toBe("premise");
+      nextField({ ...emptyBrief, voice: "V", heat: "Explicit" })?.field,
+    ).toBe("desires");
     expect(
       nextField({
         ...emptyBrief,
@@ -87,9 +87,10 @@ describe("the interview", () => {
         desires: "x".repeat(120),
         world: "x".repeat(80),
         heat: "H",
-        genre: "G",
+        voice: "V",
+        pace: "P",
       })?.field,
-    ).toBe("voice");
+    ).toBe("limits");
   });
 
   it("is done once premise, voice, genre, heat, pace and limits are set", () => {
@@ -108,17 +109,58 @@ describe("the interview", () => {
     expect(interviewDone(full)).toBe(true);
     expect(interviewDone({ ...full, limits: "" })).toBe(false);
   });
+});
 
-  it("keeps a reply to its last question", () => {
-    expect(oneQuestion("Noted: slow. Which tense? And who narrates?")).toBe(
-      "Noted: slow. And who narrates?",
-    );
+describe("rounds", () => {
+  const text = [
+    "READING: An expansion story; the sentience model is open.",
+    "LEAD: A few things to pin down.",
+    "### Heat | How explicit should it get?",
+    "- Tender | No explicit content",
+    "- Explicit graphic | Detailed and raw",
+    "### Hard limits | Anything you never want? | any",
+    "- No vore | No swallowing whole",
+    "- No scat",
+    "### Broken | A question with one option",
+    "- Only",
+  ].join("\n");
+
+  it("reads the lead and the questions, and drops the reading", () => {
+    const round = parseRound(text);
+    expect(round.lead).toBe("A few things to pin down.");
+    expect(round.questions).toEqual([
+      {
+        header: "Heat",
+        question: "How explicit should it get?",
+        options: [
+          { label: "Tender", description: "No explicit content" },
+          { label: "Explicit graphic", description: "Detailed and raw" },
+        ],
+        multi: false,
+      },
+      {
+        header: "Hard limits",
+        question: "Anything you never want?",
+        options: [
+          { label: "No vore", description: "No swallowing whole" },
+          { label: "No scat", description: "" },
+        ],
+        multi: true,
+      },
+    ]);
+  });
+
+  it("answers with the picks, skipping unanswered questions", () => {
+    const { questions } = parseRound(text);
     expect(
-      oneQuestion(
-        "So it is about Drip? Third person past, first person present, or else?",
-      ),
-    ).toBe("Third person past, first person present, or else?");
-    expect(oneQuestion("The brief is ready.")).toBe("The brief is ready.");
+      answerText({
+        id: "m",
+        role: "assistant",
+        content: "",
+        questions,
+        picks: [[], ["No vore", "No scat"]],
+      }),
+    ).toBe("Hard limits: No vore, No scat");
   });
 });
 
@@ -141,7 +183,12 @@ describe("answers", () => {
   });
 
   it("keeps the talk on a thin premise before moving on", () => {
-    const wanted = { ...emptyBrief, desires: "x".repeat(120), heat: "H" };
+    const wanted = {
+      ...emptyBrief,
+      desires: "x".repeat(120),
+      heat: "H",
+      voice: "V",
+    };
     expect(nextField({ ...wanted, premise: "A jackal wishes." })?.field).toBe(
       "premise",
     );
@@ -154,13 +201,13 @@ describe("answers", () => {
     expect(
       missingBrief({ ...emptyBrief, premise: "P", voice: "Unspecified" }),
     ).toEqual([
-      "desires",
       "heat",
-      "world",
-      "genre",
       "voice",
+      "desires",
+      "world",
       "pace",
       "limits",
+      "genre",
       "title",
     ]);
   });
