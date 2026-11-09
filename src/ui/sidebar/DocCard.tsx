@@ -1,5 +1,8 @@
-// One canon document: a row that opens into its text, its review, and the ways
-// to change it. Shared by the Canon and Cast stages.
+// One canon document: a header row, a body that unfolds under it with the
+// text and the ways to change it, and its open issues listed last (Fix,
+// Dismiss, Open). Open unfolds the body in place, just above the issues, since
+// NovelAI gives a script no way to scroll to it. Shared by the Canon and Cast
+// stages.
 
 import {
   store,
@@ -13,9 +16,10 @@ import { reviewCurrent } from "../../core/stages";
 import { review, fix, rewriteWith } from "../../core/critic";
 import { deleteDoc } from "../../core/canon";
 import { openOnPage, writeDraft } from "../../core/workshop/workshop";
+import { KINDS } from "../../core/workshop/targets";
 import { useSlice } from "../bridge";
 import { DENSE, SP, T } from "../style";
-import { Button, Field, Row, Status } from "../components/kit";
+import { Button, Field, Pill, Row } from "../components/kit";
 import { ConfirmButton } from "../components/ConfirmButton";
 
 export function docStatus(doc: CanonDoc): {
@@ -30,7 +34,10 @@ export function docStatus(doc: CanonDoc): {
     : { tone: "good", text: "✓ reviewed" };
 }
 
-function Issues(props: { doc: CanonDoc }) {
+const toggle = (id: string, open: boolean) =>
+  store.dispatch(docOpened({ id: open ? null : id }));
+
+function Issues(props: { doc: CanonDoc; open: boolean }) {
   const { doc } = props;
   const issues = reviewCurrent(doc) ? (doc.review?.issues ?? []) : [];
   return (
@@ -38,10 +45,10 @@ function Issues(props: { doc: CanonDoc }) {
       style={{
         listStyle: "none",
         margin: 0,
-        padding: 0,
+        padding: `0 8px 8px`,
         display: issues.length ? "flex" : "none",
         flexDirection: "column",
-        gap: SP.sm,
+        gap: SP.md,
       }}
     >
       {issues.map((issue) => (
@@ -50,19 +57,47 @@ function Issues(props: { doc: CanonDoc }) {
           style={{
             background: T.bg,
             borderRadius: "6px",
-            padding: "8px",
+            borderLeft: `3px solid ${T.warning}`,
+            padding: "8px 10px",
             lineHeight: 1.45,
+            display: "flex",
+            flexDirection: "column",
+            gap: SP.md,
           }}
         >
-          <strong style={{ color: T.warning }}>{issue.kind}. </strong>
-          <span style={{ userSelect: "text" }}>{issue.text}</span>
+          <span>
+            <span
+              style={{
+                color: T.warning,
+                fontSize: "0.72em",
+                fontWeight: "bold",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+              }}
+            >
+              {issue.kind}
+            </span>
+            <span
+              style={{
+                display: "block",
+                marginTop: SP.xs,
+                userSelect: "text",
+                fontSize: "0.92em",
+              }}
+            >
+              {issue.text}
+            </span>
+          </span>
           <Row>
-            <Button dense onClick={() => void fix(doc.id, issue)}>
+            <Button
+              dense
+              tone="primary"
+              onClick={() => void fix(doc.id, issue)}
+            >
               Fix
             </Button>
             <Button
               dense
-              tone="quiet"
               onClick={() =>
                 store.dispatch(
                   issueDismissed({ docId: doc.id, issueId: issue.id }),
@@ -70,6 +105,13 @@ function Issues(props: { doc: CanonDoc }) {
               }
             >
               Dismiss
+            </Button>
+            <Button
+              dense
+              tone="quiet"
+              onClick={() => toggle(doc.id, props.open)}
+            >
+              {props.open ? "Close ▴" : "Open ▾"}
             </Button>
           </Row>
         </li>
@@ -114,37 +156,40 @@ function Rewrite(props: { docId: string }) {
   );
 }
 
-/**
- * `issues: false` leaves the review's issues out of the card: the Canon stage
- * lists every issue at its top, and a second copy pushed the text down.
- */
-export function DocCard(props: { id: string; issues?: boolean }) {
+export function DocCard(props: { id: string }) {
   const doc = useSlice((s) => s.canon.docs.find((d) => d.id === props.id));
   const open = useSlice((s) => s.ui.openDocId === props.id);
   if (!doc) return null;
   const status = docStatus(doc);
   const named = doc.kind === "dossier" || doc.kind === "system";
   const hasText = Boolean(doc.text.trim());
+  const accent =
+    status.tone === "warn"
+      ? T.warning
+      : status.tone === "good"
+        ? T.good
+        : T.bg3;
 
   return (
     <article
       style={{
+        background: T.bg1,
         border: `1px solid ${open ? T.bg3 : "transparent"}`,
-        background: open ? T.bg1 : "transparent",
+        borderLeft: `3px solid ${accent}`,
         borderRadius: "8px",
-        marginBottom: SP.xs,
+        marginBottom: SP.md,
       }}
     >
       <button
         aria-expanded={open}
-        onClick={() => store.dispatch(docOpened({ id: open ? null : doc.id }))}
+        onClick={() => toggle(doc.id, open)}
         style={{
           width: "100%",
-          minHeight: "40px",
+          minHeight: DENSE,
           display: "flex",
           alignItems: "center",
           gap: SP.md,
-          padding: "0 8px",
+          padding: "4px 8px",
           background: "none",
           border: "none",
           color: T.text,
@@ -153,6 +198,9 @@ export function DocCard(props: { id: string; issues?: boolean }) {
           cursor: "pointer",
         }}
       >
+        <span aria-hidden="true" style={{ width: "1em", opacity: 0.6 }}>
+          {open ? "▾" : "▸"}
+        </span>
         <span
           style={{
             flex: 1,
@@ -160,18 +208,32 @@ export function DocCard(props: { id: string; issues?: boolean }) {
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
+            fontWeight: "bold",
           }}
         >
           {doc.title}
+          <span
+            style={{
+              display: named ? "inline" : "none",
+              marginLeft: SP.md,
+              fontWeight: "normal",
+              fontSize: "0.8em",
+              opacity: 0.6,
+            }}
+          >
+            {KINDS[doc.kind].noun}
+          </span>
         </span>
-        <Status tone={status.tone}>{status.text}</Status>
+        <Pill tone={status.tone === "dim" ? undefined : status.tone}>
+          {status.text}
+        </Pill>
       </button>
       <div
         style={{
           display: open ? "flex" : "none",
           flexDirection: "column",
           gap: SP.md,
-          padding: `0 8px 8px`,
+          padding: `${SP.sm} 8px 8px`,
         }}
       >
         {named ? (
@@ -205,9 +267,6 @@ export function DocCard(props: { id: string; issues?: boolean }) {
             onConfirm={() => void deleteDoc(doc.id)}
           />
         </Row>
-        <div style={{ display: props.issues === false ? "none" : "block" }}>
-          <Issues doc={doc} />
-        </div>
         <div style={{ display: hasText ? "block" : "none" }}>
           <Rewrite docId={doc.id} />
         </div>
@@ -219,6 +278,7 @@ export function DocCard(props: { id: string; issues?: boolean }) {
           onCommit={(text) => store.dispatch(docTextSet({ id: doc.id, text }))}
         />
       </div>
+      <Issues doc={doc} open={open} />
     </article>
   );
 }

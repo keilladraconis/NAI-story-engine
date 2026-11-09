@@ -79,6 +79,38 @@ export function SectionTitle(props: { children: preact.ComponentChildren }) {
   );
 }
 
+/** A small rounded label: a status or a kind. Its text carries the meaning. */
+export function Pill(props: {
+  children: string;
+  tone?: "good" | "warn" | "cool" | "dim";
+}) {
+  const color =
+    props.tone === "good"
+      ? T.good
+      : props.tone === "warn"
+        ? T.warning
+        : props.tone === "cool"
+          ? T.cool
+          : T.text;
+  return (
+    <span
+      style={{
+        display: props.children ? "inline-block" : "none",
+        padding: "1px 8px",
+        borderRadius: "999px",
+        background: T.bg2,
+        color,
+        opacity: props.tone ? 1 : 0.75,
+        fontSize: "0.75em",
+        lineHeight: 1.6,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {props.children}
+    </span>
+  );
+}
+
 /**
  * A section that folds: a heading button (▸ closed, ▾ open, and aria-expanded)
  * with an optional summary, over its body. Folding keeps a long stage short;
@@ -87,19 +119,24 @@ export function SectionTitle(props: { children: preact.ComponentChildren }) {
 export function Fold(props: {
   title: string;
   summary?: string;
+  tone?: "good" | "warn" | "cool" | "dim";
   open: boolean;
   onToggle: () => void;
   children: preact.ComponentChildren;
 }) {
   return (
-    <section>
+    <section
+      style={{
+        borderTop: `1px solid ${T.bg3}`,
+        paddingBottom: props.open ? SP.lg : 0,
+      }}
+    >
       <button
         aria-expanded={props.open}
         onClick={props.onToggle}
         style={{
           width: "100%",
-          minHeight: DENSE,
-          margin: `${SP.sm} 0 0`,
+          minHeight: TOUCH,
           padding: 0,
           display: "flex",
           alignItems: "center",
@@ -113,20 +150,22 @@ export function Fold(props: {
         }}
       >
         <span
+          aria-hidden="true"
+          style={{ width: "1em", textAlign: "center", opacity: 0.6 }}
+        >
+          {props.open ? "▾" : "▸"}
+        </span>
+        <span
           style={{
-            fontSize: "0.75em",
+            fontFamily: T.fontHeadings,
             fontWeight: "bold",
-            letterSpacing: "0.06em",
-            textTransform: "uppercase",
-            opacity: 0.75,
+            color: T.textHeadings,
           }}
         >
-          {`${props.open ? "▾" : "▸"} ${props.title}`}
+          {props.title}
         </span>
         <span style={{ flex: 1 }} />
-        <span style={{ fontSize: "0.78em", opacity: 0.7 }}>
-          {props.summary ?? ""}
-        </span>
+        <Pill tone={props.tone}>{props.summary ?? ""}</Pill>
       </button>
       <div style={{ display: props.open ? "block" : "none" }}>
         {props.children}

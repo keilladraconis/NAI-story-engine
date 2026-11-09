@@ -26,7 +26,6 @@ import {
   StageBody,
 } from "../../components/kit";
 import { DocCard } from "../DocCard";
-import { IssueList } from "../IssueList";
 import { BuildCanon } from "../BuildCanon";
 
 const summary = (s: RootState): string => {
@@ -36,14 +35,12 @@ const summary = (s: RootState): string => {
   return `${reviewed} of ${withText.length} reviewed · ${issues} ${issues === 1 ? "issue" : "issues"}`;
 };
 
-/** `kind\tid,id` lines, in the order the stage lists them. */
-const groups = (s: RootState): string =>
-  KIND_ORDER.map((kind) => {
-    const ids = s.canon.docs.filter((d) => d.kind === kind).map((d) => d.id);
-    return ids.length ? `${kind}\t${ids.join(",")}` : "";
-  })
-    .filter(Boolean)
-    .join("\n");
+/** Every document's id, in the order the stage lists them. */
+const ids = (s: RootState): string =>
+  [...s.canon.docs]
+    .sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind))
+    .map((d) => d.id)
+    .join(",");
 
 export function AddDoc(props: { kinds?: readonly DocKind[] }) {
   const kinds = props.kinds ?? KIND_ORDER;
@@ -106,45 +103,6 @@ export function AddDoc(props: { kinds?: readonly DocKind[] }) {
   );
 }
 
-/** One kind's documents, folded to a summary line until opened. */
-function KindGroup(props: { kind: DocKind; ids: string }) {
-  const { kind } = props;
-  const holdsOpen = useSlice((s) => {
-    const open = s.canon.docs.find((d) => d.id === s.ui.openDocId);
-    return open?.kind === kind;
-  });
-  const summary = useSlice((s) => {
-    const docs = s.canon.docs.filter((d) => d.kind === kind);
-    const issues = docs.reduce(
-      (n, d) => n + (reviewCurrent(d) ? (d.review?.issues.length ?? 0) : 0),
-      0,
-    );
-    const empty = docs.filter((d) => !d.text.trim()).length;
-    if (empty) return `${empty} empty`;
-    if (issues) return `${issues} ${issues === 1 ? "issue" : "issues"}`;
-    return docs.every(reviewCurrent) ? "✓" : "not reviewed";
-  });
-  const [toggled, setToggled] = useState(false);
-  // Open while toggled open, or while it holds the open document (Open on
-  // an issue unfolds it). Folding it closes that document too.
-  const open = toggled || holdsOpen;
-  return (
-    <Fold
-      title={KINDS[kind].heading}
-      summary={summary}
-      open={open}
-      onToggle={() => {
-        if (open && holdsOpen) store.dispatch(docOpened({ id: null }));
-        setToggled(!open);
-      }}
-    >
-      {props.ids.split(",").map((id) => (
-        <DocCard key={id} id={id} issues={false} />
-      ))}
-    </Fold>
-  );
-}
-
 export function CanonStage() {
   const line = useSlice(summary);
   const missing = useSlice((s) =>
@@ -152,29 +110,33 @@ export function CanonStage() {
       .map((k) => KINDS[k].heading)
       .join(", "),
   );
-  const list = useSlice(groups);
+  const list = useSlice(ids);
   const issueCount = useSlice(openIssueCount);
+  const docOpen = useSlice((s) =>
+    s.canon.docs.some((d) => d.id === s.ui.openDocId),
+  );
   const building = useSlice(
     (s) => s.runtime.build.running || s.runtime.plan.length > 0,
   );
-  // null: follow the canon (open while there is something to do there).
+  // null: follow the canon (open while there is something to build).
   const [buildFold, setBuildFold] = useState<boolean | null>(null);
-  const [issuesFold, setIssuesFold] = useState<boolean | null>(null);
   const [docsFold, setDocsFold] = useState(true);
   const buildOpen = buildFold ?? (Boolean(missing) || building);
-  const issuesOpen = issuesFold ?? issueCount > 0;
+  // An opened document (from the lorebook, or a new one) unfolds the list.
+  const docsOpen = docsFold || docOpen;
 
   return (
     <StageBody>
       <Hint>
-        The world in full prose: the source of truth. Plan the canon, pick the
-        documents, and Build drafts each on the page and saves it; the critic
-        then checks them all against the brief, the starting point and each
-        other. Work through the issues, and edit anything by hand.
+        The world in full prose: the source of truth. Plan and Build drafts each
+        document on the page; the critic then checks them against the brief, the
+        starting point and each other. Work through the issues under each
+        document, and edit anything by hand.
       </Hint>
       <Fold
         title="Build"
         summary={missing ? `${missing.split(", ").length} kinds needed` : "✓"}
+        tone={missing ? "warn" : "good"}
         open={buildOpen}
         onToggle={() => setBuildFold(!buildOpen)}
       >
@@ -191,34 +153,27 @@ export function CanonStage() {
         </p>
       </Fold>
       <Fold
-        title="Issues"
-        summary={line}
-        open={issuesOpen}
-        onToggle={() => setIssuesFold(!issuesOpen)}
+        title="Documents"
+        summary={issueCount ? `${issueCount} to fix` : list ? "✓" : "none yet"}
+        tone={issueCount ? "warn" : list ? "good" : undefined}
+        open={docsOpen}
+        onToggle={() => {
+          if (docsOpen && docOpen) store.dispatch(docOpened({ id: null }));
+          setDocsFold(!docsOpen);
+        }}
       >
         <Row>
-          <span style={{ flex: 1, fontSize: "0.85em", opacity: 0.8 }}>
-            {issueCount
-              ? "Fix, dismiss, or open the document."
-              : "No open issues."}
+          <span style={{ flex: 1, fontSize: "0.85em", opacity: 0.75 }}>
+            {line}
           </span>
           <Button dense onClick={() => void reviewAll()}>
             Review all
           </Button>
         </Row>
-        <div style={{ height: SP.sm }} />
-        <IssueList />
-      </Fold>
-      <Fold
-        title="Documents"
-        summary={list ? `${list.split("\n").length} kinds` : "none yet"}
-        open={docsFold}
-        onToggle={() => setDocsFold(!docsFold)}
-      >
-        {(list ? list.split("\n") : []).map((group) => {
-          const [kind, ids] = group.split("\t");
-          return <KindGroup key={kind} kind={kind as DocKind} ids={ids} />;
-        })}
+        <div style={{ height: SP.md }} />
+        {(list ? list.split(",") : []).map((id) => (
+          <DocCard key={id} id={id} />
+        ))}
         <SectionTitle>Add a document</SectionTitle>
         <AddDoc />
       </Fold>
