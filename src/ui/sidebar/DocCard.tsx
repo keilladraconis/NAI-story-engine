@@ -187,7 +187,7 @@ export function DocCard(props: { id: string }) {
             onClick={() =>
               void (hasText
                 ? openOnPage({ kind: "doc", docId: doc.id }, doc.text)
-                : writeDraft({ kind: "doc", docId: doc.id }))
+                : writeDraft({ kind: "doc", docId: doc.id }, undefined, true))
             }
           >
             {hasText ? "Open on page" : "Draft on page"}

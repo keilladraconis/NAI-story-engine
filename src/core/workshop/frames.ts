@@ -23,7 +23,12 @@ export function attgLine(brief: Brief): string {
   return parts.length ? `[ ${parts.join("; ")} ]` : "";
 }
 
-function briefBlock(brief: Brief): string {
+/**
+ * The Brief as a frame shows it. For notes (`notes`), the narrative voice is
+ * left out: "Told in: third limited" next to "write the geography" drew a
+ * scene, in the first person even.
+ */
+function briefBlock(brief: Brief, notes = false): string {
   const tone = [given(brief.heat), given(brief.pace)]
     .filter(Boolean)
     .join("; ");
@@ -35,7 +40,7 @@ function briefBlock(brief: Brief): string {
     // model does not read them as things that have happened.
     given(brief.desires) &&
       `What this story dwells on (what it must allow, not what has happened):\n${given(brief.desires)}`,
-    given(brief.voice) && `Told in: ${given(brief.voice)}.`,
+    !notes && given(brief.voice) && `Told in: ${given(brief.voice)}.`,
     tone && `Tone: ${tone}.`,
   ]
     .filter(Boolean)
@@ -91,11 +96,12 @@ export function buildFrame(state: RootState, target: Target): string {
       const others = state.canon.docs
         .filter((d) => d.id !== target.docId && d.text.trim())
         .map(docBlock);
+      // No vignettes: they are prose scenes, and next to them a document
+      // was written as one. The critic still checks documents against them.
       return fit([
-        brief,
+        briefBlock(state.canon.brief, true),
         startingBlock(state),
         ...others,
-        vignettesBlock(state),
       ]);
     }
     case "opening":

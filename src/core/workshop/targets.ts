@@ -18,7 +18,7 @@ export const KINDS: Record<DocKind, KindMeta> = {
     heading: "Geography",
     noun: "geography",
     direction:
-      "Write the geography of where this story is staged: places, distances, what can be seen and heard from where.",
+      "Write the geography of where this story is staged: what lies where, how far apart, how one gets between them.",
   },
   history: {
     heading: "History",
@@ -170,7 +170,9 @@ export function defaultDirection(state: RootState, target: Target): string {
     case "doc": {
       const doc = findDoc(state, target.docId);
       if (!doc) return "Write.";
-      return KINDS[doc.kind].direction.replace("{title}", doc.title);
+      // A document is reference notes; said outright, or the story model
+      // writes it as a scene.
+      return `${KINDS[doc.kind].direction.replace("{title}", doc.title)} Write it as a reference entry in plain statements, not as a scene.`;
     }
   }
 }

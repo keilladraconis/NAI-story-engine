@@ -3,6 +3,8 @@ import {
   replaceContext,
   directOnly,
   EMPTY_PAGE_PREFILL,
+  LORE_PREFILL,
+  opener,
 } from "../../src/core/workshop/context";
 import {
   draftIds,
@@ -57,6 +59,18 @@ describe("replaceContext", () => {
   it("prefills an empty draft the way NovelAI prefills an empty page", () => {
     const out = replaceContext(NATIVE, "F", "D", "");
     expect(out[2]).toEqual({ role: "assistant", content: EMPTY_PAGE_PREFILL });
+  });
+
+  it("opens notes with the lore divider and their title, scenes with the prose one", () => {
+    expect(opener({ kind: "doc", docId: "a" }, "Geography")).toBe(
+      `${LORE_PREFILL}Geography\n`,
+    );
+    expect(opener({ kind: "vignette" }, "Vignette")).toBe(EMPTY_PAGE_PREFILL);
+    const lore = opener({ kind: "doc", docId: "a" }, "Geography");
+    const out = replaceContext(NATIVE, "F", "D", "", lore);
+    expect(out[2]).toEqual({ role: "assistant", content: "----\nGeography\n" });
+    const going = replaceContext(NATIVE, "F", "D", "The river.", lore);
+    expect(going[2].content).toBe("----\nGeography\nThe river.");
   });
 
   it("puts the direction before the prefill when the native context has no user message", () => {
@@ -192,6 +206,17 @@ describe("frames", () => {
     const frame = buildFrame(state, { kind: "doc", docId: "a" });
     expect(frame).toContain("GEO-TEXT");
     expect(frame).not.toContain("TAM-TEXT");
+  });
+
+  it("gives a document no prose to imitate: no vignettes, no narrative voice", () => {
+    const state = withCanon({
+      brief: { ...emptyBrief, premise: "P", voice: "Third limited, past." },
+      vignettes: [{ id: "v", title: "t", text: "VIGNETTE" }],
+      docs: [{ id: "a", kind: "geography", title: "Geography", text: "" }],
+    });
+    const frame = buildFrame(state, { kind: "doc", docId: "a" });
+    expect(frame).not.toContain("VIGNETTE");
+    expect(frame).not.toContain("Told in");
   });
 
   it("labels vignettes as tone, not events", () => {

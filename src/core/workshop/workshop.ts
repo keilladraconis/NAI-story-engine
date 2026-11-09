@@ -15,8 +15,8 @@ import {
 } from "../store";
 import { firstLine } from "../text";
 import { offer } from "../offers";
-import { buildFrame } from "./frames";
-import { replaceContext, directOnly } from "./context";
+import { buildFrame, docHeading } from "./frames";
+import { replaceContext, directOnly, opener } from "./context";
 import { inDraft, splitStartingPoint } from "./draft-region";
 import {
   turnOn,
@@ -298,6 +298,13 @@ export async function replaceOnPage(
   await putOnPage(text);
 }
 
+/** The title a notes draft is opened under: "Geography", "Cecile (dossier)". */
+function targetTitle(state: RootState, target: Target): string {
+  if (target.kind !== "doc") return targetLabel(state, target);
+  const doc = findDoc(state, target.docId);
+  return doc ? docHeading(doc) : "";
+}
+
 // ── Hooks ────────────────────────────────────────────────────────────────────
 
 export function registerWorkshopHooks(): void {
@@ -313,6 +320,7 @@ export function registerWorkshopHooks(): void {
             buildFrame(store.getState(), target),
             directionFor(target),
             await draftText(),
+            opener(target, targetTitle(store.getState(), target)),
           );
     return { messages, stopFurtherScripts: true };
   });
