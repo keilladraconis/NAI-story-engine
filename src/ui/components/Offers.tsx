@@ -52,7 +52,12 @@ export function Offers(props: {
     if (kind === "startingPoint") {
       void writeStartingPoint([pitch ?? "", note].join(" "));
     } else {
-      void writeDraft({ kind }, vignetteDirection(state, pitch ?? "", note));
+      // Drafting again means "this instead": it replaces the last draft.
+      void writeDraft(
+        { kind },
+        vignetteDirection(state, pitch ?? "", note),
+        true,
+      );
     }
     setNote("");
   };

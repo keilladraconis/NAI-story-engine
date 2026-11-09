@@ -196,14 +196,18 @@ export function stopWriting(): void {
 /**
  * Turn Workshop Sends on, point them at a target, and write the whole draft.
  * A `direction` replaces what is in the box; without one the box is kept.
+ * With `replace`, a draft of the same target is cleared first (drafting from
+ * an offer means "write this instead"); otherwise the run continues it.
  */
 export async function writeDraft(
   target: Target,
   direction?: string,
+  replace = false,
 ): Promise<void> {
   if (run) return;
   await turnOn();
   if (!(await chooseTarget(target))) return;
+  if (replace) await clearDraft();
   if (direction !== undefined) presetDirection(direction);
   run = { stop: false, ended: false };
   store.dispatch(autoDraftSet({ on: true }));
@@ -259,6 +263,33 @@ export async function openOnPage(target: Target, text: string): Promise<void> {
     toast("Save or clear the draft first.");
     return;
   }
+  await putOnPage(text);
+}
+
+/**
+ * May a new draft of `target` take the page? Yes unless an unsaved draft of
+ * another target is there: replacing it would lose work the writer did not
+ * mean to give up. Toasts when not.
+ */
+export async function mayReplace(target: Target): Promise<boolean> {
+  const { workshop } = store.getState();
+  if (!workshop.on || sameTarget(workshop.target, target)) return true;
+  if (!(await draftText())) return true;
+  toast(
+    `Save or clear the ${targetLabel(store.getState(), workshop.target).toLowerCase()} draft first.`,
+  );
+  return false;
+}
+
+/** Put a text on the page in place of the target's draft. */
+export async function replaceOnPage(
+  target: Target,
+  text: string,
+): Promise<void> {
+  if (!(await mayReplace(target))) return;
+  await turnOn();
+  if (!(await chooseTarget(target))) return;
+  await clearDraft();
   await putOnPage(text);
 }
 

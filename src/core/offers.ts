@@ -8,8 +8,7 @@
 import { store, offersSet, type Offer, type OfferKind } from "./store";
 import { runGlm, Cancelled } from "./engine/glm";
 import { OFFER_PROMPT, START_OFFER_PROMPT, START_PROMPT } from "./prompts";
-import { openOnPage } from "./workshop/workshop";
-import { draftText } from "./workshop/page";
+import { mayReplace, replaceOnPage } from "./workshop/workshop";
 import { formatBrief, interviewDone, parseRound } from "./facilitator";
 
 /** Per kind: the call's job label (its tab shows it while it runs) and prompt. */
@@ -120,10 +119,7 @@ let starting = false;
 export async function writeStartingPoint(chosen: string): Promise<void> {
   if (starting || !chosen.trim()) return;
   // Checked before the call, so a draft in the way does not waste it.
-  if (store.getState().workshop.on && (await draftText())) {
-    void api.v1.ui.toast("Save or clear the draft first.", { type: "info" });
-    return;
-  }
+  if (!(await mayReplace({ kind: "startingPoint" }))) return;
   starting = true;
   try {
     const text = await runGlm({
@@ -141,7 +137,9 @@ export async function writeStartingPoint(chosen: string): Promise<void> {
         ],
       }),
     });
-    if (text.trim()) await openOnPage({ kind: "startingPoint" }, text.trim());
+    // Drafting again means "this instead": it replaces the last draft.
+    if (text.trim())
+      await replaceOnPage({ kind: "startingPoint" }, text.trim());
   } catch (error) {
     if (!(error instanceof Cancelled)) {
       void api.v1.ui.toast("Could not write the starting point.", {
