@@ -277,6 +277,7 @@ describe("writing a whole draft", () => {
     expect(withoutTrailingBreak("She left.\n\n***")).toBe("She left.");
     expect(withoutTrailingBreak("She left.\n[ Chap")).toBe("She left.");
     expect(withoutTrailingBreak("She left.")).toBe("She left.");
+    expect(withoutTrailingBreak("The river.\n----")).toBe("The river.");
   });
 
   it("knows the model has started the next piece", async () => {
@@ -284,6 +285,15 @@ describe("writing a whole draft", () => {
     expect(PIECE_END.test("She left.\n***")).toBe(true);
     expect(PIECE_END.test("She left.\n[ Chapter 2")).toBe(true);
     expect(PIECE_END.test("She left. He stayed.")).toBe(false);
+  });
+
+  it("ends a document at the next block's divider, never at a heading or list", async () => {
+    const { DOC_END, pieceEnd } =
+      await import("../../src/core/workshop/workshop");
+    const doc = "## Pressures\n- 4. The couch\n- 5. The scale\n----\nCulture";
+    expect(pieceEnd(doc, DOC_END)).toBe(doc.indexOf("\n----"));
+    expect(pieceEnd("## Pressures\n- 4. The couch", DOC_END)).toBe(-1);
+    expect(pieceEnd("----\n\nScene (write this as", DOC_END)).toBe(0);
   });
 });
 

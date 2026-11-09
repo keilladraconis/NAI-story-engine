@@ -149,7 +149,7 @@ export async function saveDraft(): Promise<void> {
  * until the model ends the scene; their length is only a cap against a scene
  * that never ends.
  */
-export function draftLength(state: RootState, target: Target): number {
+export function draftLength(target: Target): number {
   switch (target.kind) {
     case "vignette":
     case "opening":
@@ -157,18 +157,33 @@ export function draftLength(state: RootState, target: Target): number {
     case "startingPoint":
       return 1600;
     case "doc":
-      return findDoc(state, target.docId)?.kind === "dossier" ? 3200 : 3000;
+      // A document ends itself with `----` (the next lore block); the cap
+      // only guards against one that never does. At 3000 a list was cut off.
+      return 12000;
   }
 }
 
 /** Sends a Draft button makes at most, whatever the length. */
-const MAX_SENDS = 10;
+const MAX_SENDS = 16;
 /** A Send that adds less than this has ended the piece. */
 const MIN_GROWTH = 40;
 /** How long to wait for a Send to finish before giving up on it. */
 const SEND_TIMEOUT_MS = 120000;
-/** A line the model starts when it has finished the piece: a scene break or a heading. */
-export const PIECE_END = /\n\s*(\*\*\*|⁂|---|\[ |#)/;
+/** A line the model starts when it has finished a scene: a scene break or a heading. */
+export const PIECE_END = /(^|\n)\s*(\*\*\*|⁂|---|\[ |#)/;
+/**
+ * A line the model starts when it has finished a document: the next block's
+ * divider. Headings and lists are part of a document, so only dividers count.
+ * A Send continuing a finished paragraph can open with the divider itself, so
+ * the start of the text counts as a line start.
+ */
+export const DOC_END = /(^|\n)\s*(----|\*\*\*|⁂)/;
+
+/** Where the text the model is writing has ended, or -1: `marker` matched. */
+export function pieceEnd(text: string, marker: RegExp): number {
+  const found = marker.exec(text);
+  return found ? found.index : -1;
+}
 
 let run: { stop: boolean; ended: boolean } | null = null;
 let onEnd: (() => void) | null = null;
@@ -214,7 +229,7 @@ export async function writeDraft(
   run = { stop: false, ended: false };
   store.dispatch(autoDraftSet({ on: true }));
   try {
-    const goal = draftLength(store.getState(), target);
+    const goal = draftLength(target);
     let why = "send limit";
     for (let send = 0; send < MAX_SENDS; send++) {
       const before = (await draftText()).length;
@@ -240,10 +255,14 @@ export async function writeDraft(
       }
     }
     api.v1.log(`writeDraft stopped: ${why}`);
-    // However the run ended (the model, the cap, a stalled Send), it ends on a
-    // whole sentence, unless the writer took over: then the page is theirs.
+    // The writer took over: the page is theirs.
     if (run.stop) return false;
-    await endOnSentence();
+    // Cut off (the cap, a stalled Send): end on a whole sentence. A piece the
+    // model ended itself is whole, and trimming would cut a last list item
+    // that has no full stop.
+    if (why !== "scene ended" && why !== "send added almost nothing") {
+      await endOnSentence();
+    }
     return true;
   } catch (error) {
     toast(
@@ -339,26 +358,33 @@ export function registerWorkshopHooks(): void {
     return { stopGeneration: true };
   });
 
-  // While a Draft button runs, a scene break or heading ends the piece: the
-  // model has started the next one.
+  // A document ends at the next block's divider, on any workshop Send; a scene
+  // ends at a scene break or heading while a Draft button runs. The marker is
+  // cut from the text, and the Send stopped: the model has started the next
+  // piece.
   const streamed = new Map<string, string>();
   api.v1.hooks.register("onResponse", (params) => {
-    const kind = store.getState().workshop.target.kind;
-    // Documents use headings and rules of their own; only scenes end this way.
-    if (!run || (kind !== "vignette" && kind !== "opening")) return;
-    const sofar =
-      (streamed.get(params.continuityId) ?? "") + params.text.join("");
-    if (params.final) {
-      streamed.delete(params.continuityId);
-      return;
-    }
-    streamed.set(params.continuityId, sofar);
-    if (PIECE_END.test(sofar)) {
-      run.ended = true;
-      streamed.delete(params.continuityId);
-      return { stopGeneration: true };
-    }
-    return undefined;
+    const { workshop } = store.getState();
+    const kind = workshop.target.kind;
+    const marker =
+      workshop.on && kind === "doc"
+        ? DOC_END
+        : run && (kind === "vignette" || kind === "opening")
+          ? PIECE_END
+          : null;
+    if (!marker) return;
+    const before = streamed.get(params.continuityId) ?? "";
+    const chunk = params.text.join("");
+    if (params.final) streamed.delete(params.continuityId);
+    else streamed.set(params.continuityId, before + chunk);
+    const end = pieceEnd(before + chunk, marker);
+    if (end === -1) return undefined;
+    if (run) run.ended = true;
+    streamed.delete(params.continuityId);
+    return {
+      text: [chunk.slice(0, Math.max(0, end - before.length))],
+      stopGeneration: true,
+    };
   });
 
   api.v1.hooks.register("onGenerationEnd", () => {

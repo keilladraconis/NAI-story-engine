@@ -1,7 +1,12 @@
 // Canon: free-prose documents, the source of truth everything is distilled
 // from. Drafted on the page, checked by the critic.
 
-import type { DocKind, RootState } from "../../../core/store";
+import {
+  store,
+  docOpened,
+  type DocKind,
+  type RootState,
+} from "../../../core/store";
 import {
   missingKinds,
   openIssueCount,
@@ -14,12 +19,14 @@ import { useSlice } from "../../bridge";
 import { DENSE, SP, T } from "../../style";
 import {
   Button,
+  Fold,
   Hint,
   Row,
   SectionTitle,
   StageBody,
 } from "../../components/kit";
 import { DocCard } from "../DocCard";
+import { IssueList } from "../IssueList";
 import { BuildCanon } from "../BuildCanon";
 
 const summary = (s: RootState): string => {
@@ -99,6 +106,45 @@ export function AddDoc(props: { kinds?: readonly DocKind[] }) {
   );
 }
 
+/** One kind's documents, folded to a summary line until opened. */
+function KindGroup(props: { kind: DocKind; ids: string }) {
+  const { kind } = props;
+  const holdsOpen = useSlice((s) => {
+    const open = s.canon.docs.find((d) => d.id === s.ui.openDocId);
+    return open?.kind === kind;
+  });
+  const summary = useSlice((s) => {
+    const docs = s.canon.docs.filter((d) => d.kind === kind);
+    const issues = docs.reduce(
+      (n, d) => n + (reviewCurrent(d) ? (d.review?.issues.length ?? 0) : 0),
+      0,
+    );
+    const empty = docs.filter((d) => !d.text.trim()).length;
+    if (empty) return `${empty} empty`;
+    if (issues) return `${issues} ${issues === 1 ? "issue" : "issues"}`;
+    return docs.every(reviewCurrent) ? "✓" : "not reviewed";
+  });
+  const [toggled, setToggled] = useState(false);
+  // Open while toggled open, or while it holds the open document (Open on
+  // an issue unfolds it). Folding it closes that document too.
+  const open = toggled || holdsOpen;
+  return (
+    <Fold
+      title={KINDS[kind].heading}
+      summary={summary}
+      open={open}
+      onToggle={() => {
+        if (open && holdsOpen) store.dispatch(docOpened({ id: null }));
+        setToggled(!open);
+      }}
+    >
+      {props.ids.split(",").map((id) => (
+        <DocCard key={id} id={id} issues={false} />
+      ))}
+    </Fold>
+  );
+}
+
 export function CanonStage() {
   const line = useSlice(summary);
   const missing = useSlice((s) =>
@@ -107,6 +153,16 @@ export function CanonStage() {
       .join(", "),
   );
   const list = useSlice(groups);
+  const issueCount = useSlice(openIssueCount);
+  const building = useSlice(
+    (s) => s.runtime.build.running || s.runtime.plan.length > 0,
+  );
+  // null: follow the canon (open while there is something to do there).
+  const [buildFold, setBuildFold] = useState<boolean | null>(null);
+  const [issuesFold, setIssuesFold] = useState<boolean | null>(null);
+  const [docsFold, setDocsFold] = useState(true);
+  const buildOpen = buildFold ?? (Boolean(missing) || building);
+  const issuesOpen = issuesFold ?? issueCount > 0;
 
   return (
     <StageBody>
@@ -114,41 +170,58 @@ export function CanonStage() {
         The world in full prose: the source of truth. Plan the canon, pick the
         documents, and Build drafts each on the page and saves it; the critic
         then checks them all against the brief, the starting point and each
-        other. Read them, Fix what it found, and edit anything by hand.
+        other. Work through the issues, and edit anything by hand.
       </Hint>
-      <SectionTitle>Build</SectionTitle>
-      <BuildCanon />
-      <Row>
-        <span style={{ flex: 1, fontSize: "0.85em", opacity: 0.8 }}>
-          {line}
-        </span>
-        <Button dense onClick={() => void reviewAll()}>
-          Review all
-        </Button>
-      </Row>
-      <p
-        style={{
-          display: missing ? "block" : "none",
-          margin: `${SP.md} 0 0`,
-          fontSize: "0.85em",
-          color: T.warning,
-        }}
+      <Fold
+        title="Build"
+        summary={missing ? `${missing.split(", ").length} kinds needed` : "✓"}
+        open={buildOpen}
+        onToggle={() => setBuildFold(!buildOpen)}
       >
-        Still needed: {missing}.
-      </p>
-      {(list ? list.split("\n") : []).map((group) => {
-        const [kind, ids] = group.split("\t");
-        return (
-          <section key={kind}>
-            <SectionTitle>{KINDS[kind as DocKind].heading}</SectionTitle>
-            {ids.split(",").map((id) => (
-              <DocCard key={id} id={id} />
-            ))}
-          </section>
-        );
-      })}
-      <SectionTitle>Add a document</SectionTitle>
-      <AddDoc />
+        <BuildCanon />
+        <p
+          style={{
+            display: missing ? "block" : "none",
+            margin: `${SP.md} 0 0`,
+            fontSize: "0.85em",
+            color: T.warning,
+          }}
+        >
+          Still needed: {missing}.
+        </p>
+      </Fold>
+      <Fold
+        title="Issues"
+        summary={line}
+        open={issuesOpen}
+        onToggle={() => setIssuesFold(!issuesOpen)}
+      >
+        <Row>
+          <span style={{ flex: 1, fontSize: "0.85em", opacity: 0.8 }}>
+            {issueCount
+              ? "Fix, dismiss, or open the document."
+              : "No open issues."}
+          </span>
+          <Button dense onClick={() => void reviewAll()}>
+            Review all
+          </Button>
+        </Row>
+        <div style={{ height: SP.sm }} />
+        <IssueList />
+      </Fold>
+      <Fold
+        title="Documents"
+        summary={list ? `${list.split("\n").length} kinds` : "none yet"}
+        open={docsFold}
+        onToggle={() => setDocsFold(!docsFold)}
+      >
+        {(list ? list.split("\n") : []).map((group) => {
+          const [kind, ids] = group.split("\t");
+          return <KindGroup key={kind} kind={kind as DocKind} ids={ids} />;
+        })}
+        <SectionTitle>Add a document</SectionTitle>
+        <AddDoc />
+      </Fold>
     </StageBody>
   );
 }

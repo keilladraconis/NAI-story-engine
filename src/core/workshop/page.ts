@@ -70,7 +70,7 @@ export async function draftText(): Promise<string> {
 export function withoutTrailingBreak(text: string): string {
   return text
     .trim()
-    .replace(/\n\s*(\*{3}|⁂|-{3}|\[[^\]\n]*)\s*$/, "")
+    .replace(/\n\s*(\*{3}|⁂|-{3,}|\[[^\]\n]*)\s*$/, "")
     .trim();
 }
 

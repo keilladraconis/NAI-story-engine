@@ -79,6 +79,62 @@ export function SectionTitle(props: { children: preact.ComponentChildren }) {
   );
 }
 
+/**
+ * A section that folds: a heading button (▸ closed, ▾ open, and aria-expanded)
+ * with an optional summary, over its body. Folding keeps a long stage short;
+ * the body stays mounted and is hidden with `display`.
+ */
+export function Fold(props: {
+  title: string;
+  summary?: string;
+  open: boolean;
+  onToggle: () => void;
+  children: preact.ComponentChildren;
+}) {
+  return (
+    <section>
+      <button
+        aria-expanded={props.open}
+        onClick={props.onToggle}
+        style={{
+          width: "100%",
+          minHeight: DENSE,
+          margin: `${SP.sm} 0 0`,
+          padding: 0,
+          display: "flex",
+          alignItems: "center",
+          gap: SP.md,
+          background: "none",
+          border: "none",
+          color: T.text,
+          font: "inherit",
+          textAlign: "left",
+          cursor: "pointer",
+        }}
+      >
+        <span
+          style={{
+            fontSize: "0.75em",
+            fontWeight: "bold",
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+            opacity: 0.75,
+          }}
+        >
+          {`${props.open ? "▾" : "▸"} ${props.title}`}
+        </span>
+        <span style={{ flex: 1 }} />
+        <span style={{ fontSize: "0.78em", opacity: 0.7 }}>
+          {props.summary ?? ""}
+        </span>
+      </button>
+      <div style={{ display: props.open ? "block" : "none" }}>
+        {props.children}
+      </div>
+    </section>
+  );
+}
+
 export function Hint(props: { children: preact.ComponentChildren }) {
   return (
     <p

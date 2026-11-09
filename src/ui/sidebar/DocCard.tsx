@@ -114,7 +114,11 @@ function Rewrite(props: { docId: string }) {
   );
 }
 
-export function DocCard(props: { id: string }) {
+/**
+ * `issues: false` leaves the review's issues out of the card: the Canon stage
+ * lists every issue at its top, and a second copy pushed the text down.
+ */
+export function DocCard(props: { id: string; issues?: boolean }) {
   const doc = useSlice((s) => s.canon.docs.find((d) => d.id === props.id));
   const open = useSlice((s) => s.ui.openDocId === props.id);
   if (!doc) return null;
@@ -201,7 +205,9 @@ export function DocCard(props: { id: string }) {
             onConfirm={() => void deleteDoc(doc.id)}
           />
         </Row>
-        <Issues doc={doc} />
+        <div style={{ display: props.issues === false ? "none" : "block" }}>
+          <Issues doc={doc} />
+        </div>
         <div style={{ display: hasText ? "block" : "none" }}>
           <Rewrite docId={doc.id} />
         </div>

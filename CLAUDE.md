@@ -59,7 +59,7 @@ npx tsc --noEmit   # typecheck (the build does not)
 
 **Canon build (`src/core/build.ts`, UI `sidebar/BuildCanon.tsx`):** `planCanon` asks GLM (`PLAN_PROMPT`, `- kind | title | why` lines, `parsePlan`) for the documents the scenario needs, held in `runtime.plan` as pick cards; `buildCanon` creates the picked ones, drafts every empty one in `KIND_ORDER` with `writeDraft` (which resolves whether it finished) and saves it, then runs `reviewAll`. Refused while an unsaved draft is on the page; stops on Stop or when the writer takes over a Send, leaving that draft unsaved.
 
-**Draft buttons (`writeDraft` in `workshop.ts`):** press NovelAI's Send for the writer with `api.v1.editor.generate()` until the draft reaches `draftLength`, a Send adds almost nothing, or (for scenes only) the model starts a scene break or heading, which `onResponse` stops. A Send the writer makes themselves (`scriptInitiated: false`) ends the run.
+**Draft buttons (`writeDraft` in `workshop.ts`):** press NovelAI's Send for the writer with `api.v1.editor.generate()` until the draft reaches `draftLength`, a Send adds almost nothing, or the model starts the next piece, which `onResponse` cuts out of the text and stops: for a document the next block's divider (`DOC_END`, on any workshop Send; documents are capped at 12000 only as a guard, since a 3000 cap cut lists off), for a scene a break or heading (`PIECE_END`, during a Draft run). Both match at the start of a Send too: a Send continuing a finished paragraph opens with the divider. A run cut off by the cap or a stall ends on a whole sentence; a piece the model ended is left whole. A Send the writer makes themselves (`scriptInitiated: false`) ends the run.
 
 **UI (`src/ui/`):**
 
