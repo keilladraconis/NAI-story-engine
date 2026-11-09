@@ -154,7 +154,9 @@ function WhatNext(props: { blocked: boolean }) {
         type="text"
         value={note}
         placeholder={
-          picked ? "Add to it, or leave as is" : "Or say what you want to see"
+          picked
+            ? "Optional: add to this scene, then Draft it"
+            : "Or say what you want: Draft it, or Other ideas to steer"
         }
         onInput={(e) => setNote(e.currentTarget.value ?? "")}
         style={{
