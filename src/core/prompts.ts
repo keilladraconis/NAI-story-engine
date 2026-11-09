@@ -128,6 +128,30 @@ Write nothing else.`;
 
 // ── Critic ───────────────────────────────────────────────────────────────────
 
+// ── Canon plan ───────────────────────────────────────────────────────────────
+
+export const PLAN_PROMPT = `You plan the canon of a scenario: the documents, in prose, that a story will be written from. A story model writes each one; you only decide which this scenario needs.
+
+The kinds of document:
+geography: where the story is staged, places and distances
+history: the past the present stands on
+culture: customs, manners, what people expect of each other
+tensions: what pulls against what, and who feels it
+factions: groups with their own aims and power
+system: one per set of rules the story turns on (magic, a kind of being and its nature, a technology), titled by it
+dossier: one per principal character, titled by their name
+relationships: how the cast stand with each other
+locations: the places scenes happen, one section each
+plots: the pressures that could open scenes
+
+Always include geography, culture, tensions, relationships, locations and plots, and a dossier for every person the seed or vignettes name who matters to the story, the protagonist included. Include history, factions and systems only when this scenario turns on them; leave the others out entirely, never list one to say it is not needed. Never list a document already written. When the writer steers, follow the steer.
+
+Write exactly this, nothing else:
+READING: two or three sentences for yourself: what this scenario turns on, and who its people are.
+then one line per document, each a dash, its kind, a bar, its title, a bar, and a few words on what it will hold for this scenario, like this:
+- dossier | Ilse | the ferryman's daughter who keeps the ledgers
+Write real lines only; never copy the example.`;
+
 export const CRITIC_PROMPT = `You review one document of a scenario's canon: the notes a story will be written from. You check it against the brief, the starting point, the tone samples and the other documents. You report problems; you never rewrite.
 
 Report each problem on its own line, as KIND | what is wrong, quoting the words at fault. KIND is one of:

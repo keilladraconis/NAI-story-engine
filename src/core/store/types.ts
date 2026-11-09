@@ -162,6 +162,10 @@ export interface RuntimeState {
   autoDraft: boolean;
   /** What is on offer per offering tab; not kept across a reload. */
   offers: Record<OfferKind, OfferSet>;
+  /** The documents proposed for the canon; not kept across a reload. */
+  plan: PlanItem[];
+  /** A canon build run, while one is going. */
+  build: { running: boolean; done: number; total: number; current: string };
   /**
    * A direction put in the workshop box by a command (an offer drafted, a new
    * target). `seq` changes on every preset so the box refills even when the
@@ -174,6 +178,15 @@ export interface RuntimeState {
 export interface Offer {
   label: string;
   description: string;
+}
+
+/** A canon document the plan proposes. */
+export interface PlanItem {
+  kind: DocKind;
+  title: string;
+  /** What it will hold for this scenario. */
+  why: string;
+  picked: boolean;
 }
 
 /** The targets drafted from offers. */

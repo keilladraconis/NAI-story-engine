@@ -20,6 +20,7 @@ import {
   StageBody,
 } from "../../components/kit";
 import { DocCard } from "../DocCard";
+import { BuildCanon } from "../BuildCanon";
 
 const summary = (s: RootState): string => {
   const withText = s.canon.docs.filter((d) => d.text.trim());
@@ -110,10 +111,13 @@ export function CanonStage() {
   return (
     <StageBody>
       <Hint>
-        The world in full prose: the source of truth. Draft each document on the
-        page; the critic checks it against the brief, the starting point and the
-        rest.
+        The world in full prose: the source of truth. Plan the canon, pick the
+        documents, and Build drafts each on the page and saves it; the critic
+        then checks them all against the brief, the starting point and each
+        other. Read them, Fix what it found, and edit anything by hand.
       </Hint>
+      <SectionTitle>Build</SectionTitle>
+      <BuildCanon />
       <Row>
         <span style={{ flex: 1, fontSize: "0.85em", opacity: 0.8 }}>
           {line}

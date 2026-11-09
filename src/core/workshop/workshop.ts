@@ -195,6 +195,8 @@ export function stopWriting(): void {
 
 /**
  * Turn Workshop Sends on, point them at a target, and write the whole draft.
+ * Resolves true when the draft was written to its end, false when it was
+ * refused, the writer took over, or sending failed.
  * A `direction` replaces what is in the box; without one the box is kept.
  * With `replace`, a draft of the same target is cleared first (drafting from
  * an offer means "write this instead"); otherwise the run continues it.
@@ -203,10 +205,10 @@ export async function writeDraft(
   target: Target,
   direction?: string,
   replace = false,
-): Promise<void> {
-  if (run) return;
+): Promise<boolean> {
+  if (run) return false;
   await turnOn();
-  if (!(await chooseTarget(target))) return;
+  if (!(await chooseTarget(target))) return false;
   if (replace) await clearDraft();
   if (direction !== undefined) presetDirection(direction);
   run = { stop: false, ended: false };
@@ -240,12 +242,15 @@ export async function writeDraft(
     api.v1.log(`writeDraft stopped: ${why}`);
     // However the run ended (the model, the cap, a stalled Send), it ends on a
     // whole sentence, unless the writer took over: then the page is theirs.
-    if (!run.stop) await endOnSentence();
+    if (run.stop) return false;
+    await endOnSentence();
+    return true;
   } catch (error) {
     toast(
       "Story Engine could not send for you; press Send to continue by hand.",
     );
     api.v1.log(`writeDraft: ${String(error)}`);
+    return false;
   } finally {
     run = null;
     store.dispatch(autoDraftSet({ on: false }));

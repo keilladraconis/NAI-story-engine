@@ -1,6 +1,13 @@
 import { createSlice } from "nai-store";
 import type { GenerationState } from "nai-gen-x";
-import type { Job, Offer, OfferKind, OfferSet, RuntimeState } from "../types";
+import type {
+  Job,
+  Offer,
+  OfferKind,
+  OfferSet,
+  PlanItem,
+  RuntimeState,
+} from "../types";
 
 export const initialRuntimeState: RuntimeState = {
   genx: { status: "idle", queueLength: 0 },
@@ -10,6 +17,8 @@ export const initialRuntimeState: RuntimeState = {
     vignette: { offers: [], lead: "", picked: "" },
     startingPoint: { offers: [], lead: "", picked: "" },
   },
+  plan: [],
+  build: { running: false, done: 0, total: 0, current: "" },
   direction: { text: "", seq: 0 },
 };
 
@@ -48,6 +57,18 @@ export const runtimeSlice = createSlice({
     /** The picked offer was drafted and saved: nothing is picked now. */
     offerUnpicked: (state, p: { kind: OfferKind }) =>
       withSet(state, p.kind, { ...state.offers[p.kind], picked: "" }),
+    planSet: (state, p: { items: PlanItem[] }) => ({ ...state, plan: p.items }),
+    /** Pick or unpick one planned document, by its index. */
+    planToggled: (state, p: { index: number }) => ({
+      ...state,
+      plan: state.plan.map((item, i) =>
+        i === p.index ? { ...item, picked: !item.picked } : item,
+      ),
+    }),
+    buildProgressed: (state, build: RuntimeState["build"]) => ({
+      ...state,
+      build,
+    }),
     directionPreset: (state, p: { text: string }) => ({
       ...state,
       direction: { text: p.text, seq: state.direction.seq + 1 },
@@ -63,5 +84,8 @@ export const {
   offersSet,
   offerChosen,
   offerUnpicked,
+  planSet,
+  planToggled,
+  buildProgressed,
   directionPreset,
 } = runtimeSlice.actions;

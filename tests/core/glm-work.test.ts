@@ -13,6 +13,7 @@ import {
 import { parseIssues, rewriteTokens } from "../../src/core/critic";
 import { parseOffers } from "../../src/core/offers";
 import { firstLine } from "../../src/core/text";
+import { parsePlan } from "../../src/core/build";
 import { emptyBrief } from "../../src/core/store/slices/canon";
 
 let n = 0;
@@ -282,5 +283,28 @@ describe("firstLine", () => {
     expect(firstLine("[ Reticent ]\nThe couch gave a groan.")).toBe(
       "The couch gave a groan.",
     );
+  });
+});
+
+describe("parsePlan", () => {
+  it("reads kind | title | why, titles unnamed kinds by kind, drops junk and repeats", () => {
+    const text = [
+      "READING: A domestic story; two principals.",
+      "- geography | The apartment | where they live",
+      "- dossier | Cecile | the retired Serperior",
+      "- dossier | cecile | again",
+      "- dossier | <a name> | a placeholder",
+      "- dossier |  | no name",
+      "- weather | Rain | not a kind",
+      "- factions | Factions | not applicable to this story",
+      "- plots | Pressures | what could open scenes",
+    ].join("\n");
+    expect(
+      parsePlan(text).map((i) => [i.kind, i.title, i.why, i.picked]),
+    ).toEqual([
+      ["geography", "Geography", "where they live", true],
+      ["dossier", "Cecile", "the retired Serperior", true],
+      ["plots", "Plot pressures", "what could open scenes", true],
+    ]);
   });
 });
