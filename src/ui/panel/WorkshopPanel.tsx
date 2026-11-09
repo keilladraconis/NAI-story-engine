@@ -60,13 +60,14 @@ export function WorkshopPanel() {
   const save = useSlice((s) => saveLabel(s, s.workshop.target));
   const placeholder = useSlice((s) => defaultDirection(s, s.workshop.target));
   const writing = useSlice((s) => s.runtime.autoDraft);
+  const preset = useSlice((s) => s.runtime.direction.seq);
   const [text, setText] = useState("");
   // Bumped when a target change is refused: the select already shows the new
   // value, and an unchanged store value would not repaint it, so remount it.
   const [selectKey, setSelectKey] = useState(0);
 
-  // A new target starts with an empty direction (the core forgets it too).
-  useEffect(() => setText(""), [target]);
+  // A command filled the box (an offer drafted) or emptied it (a new target).
+  useEffect(() => setText(store.getState().runtime.direction.text), [preset]);
 
   return (
     <div

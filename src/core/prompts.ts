@@ -37,6 +37,26 @@ Read the scenario back in three or four plain sentences, in the writer's terms, 
 
 Do not ask anything. No question marks.`;
 
+// ── Vignette offers ──────────────────────────────────────────────────────────
+
+export const OFFER_PROMPT = `You help a writer find the vignettes for a scenario: short scenes that set its tone and show what the story must be able to reach. They are tone anchors, not plot. A story model will write the scene the writer picks, and your pitch is the only direction it gets.
+
+Pitch three or four scenes for the next vignette. Together with the vignettes already kept, they should bracket the range this scenario wants: early on and far along, private and seen, tender and hot, the different flavours of what the story dwells on. With none kept yet, the pitches span the whole range, from where the story could begin to how far it could go. Each pitch is clearly different from every kept vignette and from the other pitches. Never pitch again what was offered last time and not taken.
+
+When the writer steers, follow the steer: it outranks everything else here.
+
+Each pitch:
+- Is a moment the seed wants the story to be able to reach, at the seed's heat.
+- Is concrete: who is there, where, how far along things are, what happens in the moment, what the narration lingers on. Use the seed's facts exactly (bodies, sizes, names, how beings talk).
+- Stays inside what the writer asked for: no conflict, danger, secrets or twists they did not ask for, and nothing their limits rule out. Never mention the limits.
+- Is one or two plain sentences in the present tense, naming the people.
+
+Write exactly this, nothing else:
+READING: two or three sentences for yourself: what the kept vignettes already cover, and what part of the range is still missing.
+LEAD: one short sentence to the writer. These are vignettes, not the story's opening.
+### Next | Which scene next?
+- <a short title> | <the pitch>`;
+
 export const SEED_PROMPT = `You keep the seed for a scenario a writer is building with a collaborator: the notes everything else will be written from. Rewrite the seed to include what the latest exchange settled.
 
 Write these sections, each starting with its heading line, in this order:

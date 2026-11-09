@@ -11,6 +11,7 @@ import {
   missingBrief,
 } from "../../src/core/facilitator";
 import { parseIssues, rewriteTokens } from "../../src/core/critic";
+import { parseOffers } from "../../src/core/offers";
 import { emptyBrief } from "../../src/core/store/slices/canon";
 
 let n = 0;
@@ -231,5 +232,33 @@ describe("answers", () => {
       "genre",
       "title",
     ]);
+  });
+});
+
+describe("parseOffers", () => {
+  it("reads the pitches under the first question and drops the reading", () => {
+    const text = [
+      "READING: Both kept vignettes are early; the far end is missing.",
+      "LEAD: Here is where it could go next.",
+      "### Next | Which scene next?",
+      "- The goddess of the living room | Cecile, immense, fills the floor.",
+      "- Seen | A visitor sees her for the first time.",
+    ].join("\n");
+    expect(parseOffers(text)).toEqual({
+      lead: "Here is where it could go next.",
+      offers: [
+        {
+          label: "The goddess of the living room",
+          description: "Cecile, immense, fills the floor.",
+        },
+        {
+          label: "Seen",
+          description: "A visitor sees her for the first time.",
+        },
+      ],
+    });
+  });
+  it("offers nothing when no question can be read", () => {
+    expect(parseOffers("Just some prose.").offers).toEqual([]);
   });
 });

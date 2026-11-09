@@ -16,72 +16,12 @@ import {
 } from "../../core/store";
 import { talk, interviewDone, answerText } from "../../core/facilitator";
 import { useSlice, useStream } from "../bridge";
-import { SP, T, SCROLL, TOUCH } from "../style";
+import { SP, T, SCROLL } from "../style";
 import { Button, Row } from "../components/kit";
 import { ConfirmButton } from "../components/ConfirmButton";
+import { Choice } from "../components/Choice";
 /** Messages shown at once; Show more reveals this many more. */
 export const PAGE = 25;
-
-function Choice(props: {
-  id: string;
-  question: number;
-  label: string;
-  description: string;
-  live: boolean;
-}) {
-  const picked = useSlice(
-    (s) =>
-      s.chat.messages
-        .find((m) => m.id === props.id)
-        ?.picks?.[props.question]?.includes(props.label) ?? false,
-  );
-  return (
-    <button
-      aria-pressed={picked}
-      disabled={!props.live}
-      onClick={() =>
-        store.dispatch(
-          optionPicked({
-            id: props.id,
-            question: props.question,
-            label: props.label,
-          }),
-        )
-      }
-      style={{
-        flex: "1 1 140px",
-        minHeight: TOUCH,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "flex-start",
-        gap: SP.xs,
-        padding: "6px 10px",
-        borderRadius: "8px",
-        border: `1px solid ${picked ? T.textHeadings : T.bg3}`,
-        background: picked ? T.bg3 : T.bg1,
-        color: T.text,
-        font: "inherit",
-        textAlign: "left",
-        cursor: props.live ? "pointer" : "default",
-        opacity: props.live || picked ? 1 : 0.6,
-      }}
-    >
-      <span style={{ fontWeight: "bold" }}>
-        {picked ? `✓ ${props.label}` : props.label}
-      </span>
-      <span
-        style={{
-          display: props.description ? "block" : "none",
-          fontSize: "0.8em",
-          opacity: 0.75,
-          lineHeight: 1.35,
-        }}
-      >
-        {props.description}
-      </span>
-    </button>
-  );
-}
 
 /** A round's questions, each with its options as wrapping choices. */
 function Round(props: { id: string; live: boolean }) {
@@ -125,11 +65,15 @@ function Round(props: { id: string; live: boolean }) {
             {q.options.map((o, j) => (
               <Choice
                 key={j}
-                id={props.id}
-                question={i}
                 label={o.label}
                 description={o.description}
+                picked={message?.picks?.[i]?.includes(o.label) ?? false}
                 live={props.live}
+                onPick={() =>
+                  store.dispatch(
+                    optionPicked({ id: props.id, question: i, label: o.label }),
+                  )
+                }
               />
             ))}
           </div>

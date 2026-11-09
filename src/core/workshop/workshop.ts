@@ -8,10 +8,12 @@ import {
   docTextSet,
   openingKeptSet,
   autoDraftSet,
+  directionPreset,
   type RootState,
   type Target,
 } from "../store";
 import { firstLine } from "../text";
+import { offerVignettes } from "../offers";
 import { buildFrame } from "./frames";
 import { replaceContext, directOnly } from "./context";
 import { inDraft, splitStartingPoint } from "./draft-region";
@@ -32,11 +34,17 @@ const toast = (message: string) =>
 
 // ── Direction ────────────────────────────────────────────────────────────────
 // What the writer typed in the direction box. Held here, not in the store: it
-// changes per keystroke, and only a Send reads it.
+// changes per keystroke, and only a Send reads it. A command that fills the
+// box (a new target, an offer drafted) presets it through the store, so the
+// box shows what the Send will be told.
 
 let direction = "";
 export function setDirection(text: string): void {
   direction = text;
+}
+function presetDirection(text: string): void {
+  direction = text;
+  store.dispatch(directionPreset({ text }));
 }
 export function getDirection(): string {
   return direction;
@@ -69,7 +77,7 @@ export async function chooseTarget(target: Target): Promise<boolean> {
     return false;
   }
   store.dispatch(targetSet(target));
-  direction = "";
+  presetDirection("");
   await redraw();
   return true;
 }
@@ -91,8 +99,13 @@ export async function saveDraft(): Promise<void> {
     const target = state.workshop.target;
     switch (target.kind) {
       case "vignette":
+        // Drafted from an offer, it is named after the offer.
         store.dispatch(
-          vignetteAdded({ id: api.v1.uuid(), title: firstLine(text), text }),
+          vignetteAdded({
+            id: api.v1.uuid(),
+            title: state.runtime.offerPicked || firstLine(text),
+            text,
+          }),
         );
         break;
       case "startingPoint":
@@ -112,6 +125,12 @@ export async function saveDraft(): Promise<void> {
         return;
     }
     await clearDraft();
+    if (target.kind === "vignette") {
+      // The next vignette starts from a new offer, not this one's direction.
+      presetDirection("");
+      // A kept vignette changes what the range still lacks: offer the next.
+      void offerVignettes();
+    }
   } finally {
     saving = false;
   }
@@ -171,11 +190,18 @@ export function stopWriting(): void {
   if (run) run.stop = true;
 }
 
-/** Turn Workshop Sends on, point them at a target, and write the whole draft. */
-export async function writeDraft(target: Target): Promise<void> {
+/**
+ * Turn Workshop Sends on, point them at a target, and write the whole draft.
+ * A `direction` replaces what is in the box; without one the box is kept.
+ */
+export async function writeDraft(
+  target: Target,
+  direction?: string,
+): Promise<void> {
   if (run) return;
   await turnOn();
   if (!(await chooseTarget(target))) return;
+  if (direction !== undefined) presetDirection(direction);
   run = { stop: false, ended: false };
   store.dispatch(autoDraftSet({ on: true }));
   try {

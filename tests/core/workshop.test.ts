@@ -13,6 +13,7 @@ import {
 import { attgLine, buildFrame, fit } from "../../src/core/workshop/frames";
 import {
   defaultDirection,
+  vignetteDirection,
   saveLabel,
   sameTarget,
   targetLabel,
@@ -258,5 +259,26 @@ describe("toSentenceEnd", () => {
     );
     expect(toSentenceEnd('He said, "Go." And then')).toBe('He said, "Go."');
     expect(toSentenceEnd("No ending at all")).toBe("No ending at all");
+  });
+});
+
+describe("vignetteDirection", () => {
+  const state = withCanon({
+    brief: {
+      ...emptyBrief,
+      voice: "Third limited, past: we are close to Cecile's thoughts.",
+    },
+  });
+  it("turns a pitch and a note into a scene direction in the brief's voice", () => {
+    expect(
+      vignetteDirection(state, "Cecile fills the couch.", "More bloated."),
+    ).toBe(
+      "Write a short scene, told in third limited, past: Cecile fills the couch. More bloated.",
+    );
+  });
+  it("falls back to the default direction with nothing picked or typed", () => {
+    expect(vignetteDirection(state, "", " ")).toBe(
+      defaultDirection(state, { kind: "vignette" }),
+    );
   });
 });

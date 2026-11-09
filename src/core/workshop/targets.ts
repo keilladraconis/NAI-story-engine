@@ -133,12 +133,30 @@ export function saveLabel(state: RootState, target: Target): string {
   }
 }
 
-/** ", told in third limited, past" from the Brief's voice, or "". */
+/**
+ * ", told in third limited, past" from the Brief's voice, or "". Only the
+ * voice's first clause: a voice field often goes on ("Third limited, past: we
+ * are close to her thoughts…"), and the rest buried the scene it introduced.
+ */
 function toldIn(state: RootState): string {
-  const voice = given(state.canon.brief.voice).replace(/\.$/, "");
+  const voice = given(state.canon.brief.voice)
+    .split(/[:;.\n]|\s[—–-]\s/)[0]
+    .trim();
   return voice
     ? `, told in ${voice.charAt(0).toLowerCase()}${voice.slice(1)}`
     : "";
+}
+
+/** A vignette direction from an offer's pitch and the writer's note. */
+export function vignetteDirection(
+  state: RootState,
+  pitch: string,
+  note: string,
+): string {
+  const scene = [pitch.trim(), note.trim()].filter(Boolean).join(" ");
+  return scene
+    ? `Write a short scene${toldIn(state)}: ${scene}`
+    : defaultDirection(state, { kind: "vignette" });
 }
 
 export function defaultDirection(state: RootState, target: Target): string {

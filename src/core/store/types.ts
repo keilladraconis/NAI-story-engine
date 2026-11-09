@@ -160,6 +160,24 @@ export interface RuntimeState {
   jobs: Job[];
   /** A Draft button is sending on the writer's behalf until the draft is done. */
   autoDraft: boolean;
+  /** Scenes offered for the next vignette; not kept across a reload. */
+  offers: Offer[];
+  /** What the offers were introduced with. */
+  offerLead: string;
+  /** The offer's label the writer picked, or "". */
+  offerPicked: string;
+  /**
+   * A direction put in the workshop box by a command (an offer drafted, a new
+   * target). `seq` changes on every preset so the box refills even when the
+   * text is the same as last time.
+   */
+  direction: { text: string; seq: number };
+}
+
+/** A pitch for the next vignette: its label and the scene as a direction. */
+export interface Offer {
+  label: string;
+  description: string;
 }
 
 export interface UIState {

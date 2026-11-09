@@ -22,6 +22,7 @@ import {
 import { runGlm, Cancelled } from "./engine/glm";
 import { ROUND_PROMPT, FACILITATOR_CLOSE, SEED_PROMPT } from "./prompts";
 import { given } from "./text";
+import { offerIfNone } from "./offers";
 
 /** Turns of transcript a facilitator call reads. */
 const HISTORY = 16;
@@ -288,8 +289,11 @@ async function reply(): Promise<void> {
   const replyId = api.v1.uuid();
   store.dispatch(messageAdded({ id: replyId, role: "assistant", content: "" }));
   try {
-    if (interviewDone(store.getState().canon.brief)) await close(replyId);
-    else await round(replyId);
+    if (interviewDone(store.getState().canon.brief)) {
+      await close(replyId);
+      // The seed is done: have the first vignettes waiting on their tab.
+      offerIfNone();
+    } else await round(replyId);
   } catch (error) {
     store.dispatch(messageRemoved({ id: replyId }));
     if (!(error instanceof Cancelled)) {

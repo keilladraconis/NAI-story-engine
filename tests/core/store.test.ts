@@ -8,6 +8,9 @@ import {
   issueDismissed,
   workshopTurnedOn,
   workshopTurnedOff,
+  offersSet,
+  offerChosen,
+  directionPreset,
   type RootState,
 } from "../../src/core/store";
 import { stageDone, missingKinds, openIssueCount } from "../../src/core/stages";
@@ -121,5 +124,27 @@ describe("stages", () => {
       docTextSet({ id: "a", text: "A different island." }),
     );
     expect(openIssueCount(state)).toBe(0);
+  });
+});
+
+describe("offers", () => {
+  const base = rootReducer(undefined, { type: "@@INIT" });
+  it("new offers clear the pick; picking again unpicks", () => {
+    let state = rootReducer(
+      base,
+      offersSet({ lead: "", offers: [{ label: "A", description: "a" }] }),
+    );
+    state = rootReducer(state, offerChosen({ label: "A" }));
+    expect(state.runtime.offerPicked).toBe("A");
+    state = rootReducer(state, offerChosen({ label: "A" }));
+    expect(state.runtime.offerPicked).toBe("");
+    state = rootReducer(state, offerChosen({ label: "A" }));
+    state = rootReducer(state, offersSet({ lead: "", offers: [] }));
+    expect(state.runtime.offerPicked).toBe("");
+  });
+  it("a preset bumps its sequence even for the same text", () => {
+    const once = rootReducer(base, directionPreset({ text: "" }));
+    const twice = rootReducer(once, directionPreset({ text: "" }));
+    expect(twice.runtime.direction.seq).toBe(once.runtime.direction.seq + 1);
   });
 });
