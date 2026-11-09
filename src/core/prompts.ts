@@ -55,7 +55,9 @@ Write exactly this, nothing else:
 READING: two or three sentences for yourself: what the kept vignettes already cover, and what part of the range is still missing.
 LEAD: one short sentence to the writer. These are vignettes, not the story's opening.
 ### Next | Which scene next?
-- <a short title> | <the pitch>`;
+then three or four lines, one per pitch, each a dash, its title, a bar, and the pitch, like this:
+- The Couch Gives | Cecile settles onto the sofa after supper and the frame creaks under her; Nick, beside her, does not move his leg from under her coils.
+Write real pitches only; never copy the example or a placeholder.`;
 
 export const SEED_PROMPT = `You keep the seed for a scenario a writer is building with a collaborator: the notes everything else will be written from. Rewrite the seed to include what the latest exchange settled.
 

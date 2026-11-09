@@ -21,9 +21,16 @@ export function hashText(text: string): string {
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
-/** First line of a text, trimmed and cut to `max` characters. */
+/**
+ * First line of a text, trimmed and cut to `max` characters. A bracketed tag
+ * line ("[ Reticent ]", an ATTG) is skipped: it names no scene.
+ */
 export function firstLine(text: string, max = 60): string {
-  const line = text.trim().split("\n")[0]?.trim() ?? "";
+  const lines = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const line = lines.find((l) => !/^\[.*\]$/.test(l)) ?? lines[0] ?? "";
   return line.length > max ? `${line.slice(0, max - 1)}…` : line;
 }
 

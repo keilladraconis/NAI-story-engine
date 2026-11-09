@@ -12,6 +12,7 @@ import {
 } from "../../src/core/facilitator";
 import { parseIssues, rewriteTokens } from "../../src/core/critic";
 import { parseOffers } from "../../src/core/offers";
+import { firstLine } from "../../src/core/text";
 import { emptyBrief } from "../../src/core/store/slices/canon";
 
 let n = 0;
@@ -258,7 +259,28 @@ describe("parseOffers", () => {
       ],
     });
   });
+  it("drops the format's placeholder lines echoed back", () => {
+    const text = [
+      "### Next | Which scene next?",
+      "- <a short title> | <the pitch>",
+      "- <a short title> | <the pitch>",
+      "- The Feast | Cecile lies heaped across three cushions.",
+      "- Mirror's Lie | Cecile stares at her reflection.",
+    ].join("\n");
+    expect(parseOffers(text).offers.map((o) => o.label)).toEqual([
+      "The Feast",
+      "Mirror's Lie",
+    ]);
+  });
   it("offers nothing when no question can be read", () => {
     expect(parseOffers("Just some prose.").offers).toEqual([]);
+  });
+});
+
+describe("firstLine", () => {
+  it("skips a bracketed tag line", () => {
+    expect(firstLine("[ Reticent ]\nThe couch gave a groan.")).toBe(
+      "The couch gave a groan.",
+    );
   });
 });

@@ -182,7 +182,7 @@ export function parseRound(text: string): {
   let current: Question | null = null;
   for (const raw of text.split("\n")) {
     const line = raw.trim();
-    if (!line || /^READING:/i.test(line)) continue;
+    if (!line || /^READING:/i.test(line) || isTemplate(line)) continue;
     const leadLine = line.match(/^LEAD:\s*(.*)$/i);
     const option = line.match(/^[-*•]\s*(.+)$/);
     const head = line.match(/^#{2,4}\s*(.+)$/);
@@ -196,6 +196,18 @@ export function parseRound(text: string): {
     }
   }
   return { lead, questions: questions.filter((q) => q.options.length >= 2) };
+}
+
+/**
+ * A line of the prompt's format copied back unfilled: "- <option> | <what it
+ * means>". GLM sometimes echoes it before (or instead of) real lines.
+ */
+function isTemplate(line: string): boolean {
+  const first = line
+    .replace(/^[-*•#\s]+/, "")
+    .split("|")[0]
+    .trim();
+  return /^<[^>]*>$/.test(first);
 }
 
 /** One question line: "header | question | any" or "HEADER: question?". */
