@@ -125,6 +125,17 @@ describe("splitStartingPoint", () => {
     });
   });
 
+  it("reads bracketed headings", () => {
+    expect(
+      splitStartingPoint(
+        "[ NOW ]\nThe boat is late.\n[ NOT YET ]\nIlse knows.",
+      ),
+    ).toEqual({
+      now: "The boat is late.",
+      notYet: "Ilse knows.",
+    });
+  });
+
   it("treats text without headings as Now", () => {
     expect(splitStartingPoint("The boat is late.")).toEqual({
       now: "The boat is late.",

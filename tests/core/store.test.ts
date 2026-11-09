@@ -10,6 +10,7 @@ import {
   workshopTurnedOff,
   offersSet,
   offerChosen,
+  offerUnpicked,
   directionPreset,
   type RootState,
 } from "../../src/core/store";
@@ -132,15 +133,40 @@ describe("offers", () => {
   it("new offers clear the pick; picking again unpicks", () => {
     let state = rootReducer(
       base,
-      offersSet({ lead: "", offers: [{ label: "A", description: "a" }] }),
+      offersSet({
+        kind: "vignette",
+        lead: "",
+        offers: [{ label: "A", description: "a" }],
+      }),
     );
-    state = rootReducer(state, offerChosen({ label: "A" }));
-    expect(state.runtime.offerPicked).toBe("A");
-    state = rootReducer(state, offerChosen({ label: "A" }));
-    expect(state.runtime.offerPicked).toBe("");
-    state = rootReducer(state, offerChosen({ label: "A" }));
-    state = rootReducer(state, offersSet({ lead: "", offers: [] }));
-    expect(state.runtime.offerPicked).toBe("");
+    state = rootReducer(state, offerChosen({ kind: "vignette", label: "A" }));
+    expect(state.runtime.offers.vignette.picked).toBe("A");
+    state = rootReducer(state, offerChosen({ kind: "vignette", label: "A" }));
+    expect(state.runtime.offers.vignette.picked).toBe("");
+    state = rootReducer(state, offerChosen({ kind: "vignette", label: "A" }));
+    state = rootReducer(
+      state,
+      offersSet({ kind: "vignette", lead: "", offers: [] }),
+    );
+    expect(state.runtime.offers.vignette.picked).toBe("");
+  });
+  it("kinds keep their own offers; unpicking keeps the offers", () => {
+    let state = rootReducer(
+      base,
+      offersSet({
+        kind: "startingPoint",
+        lead: "",
+        offers: [{ label: "S", description: "s" }],
+      }),
+    );
+    state = rootReducer(
+      state,
+      offerChosen({ kind: "startingPoint", label: "S" }),
+    );
+    expect(state.runtime.offers.vignette.offers).toEqual([]);
+    state = rootReducer(state, offerUnpicked({ kind: "startingPoint" }));
+    expect(state.runtime.offers.startingPoint.picked).toBe("");
+    expect(state.runtime.offers.startingPoint.offers).toHaveLength(1);
   });
   it("a preset bumps its sequence even for the same text", () => {
     const once = rootReducer(base, directionPreset({ text: "" }));

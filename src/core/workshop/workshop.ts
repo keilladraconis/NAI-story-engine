@@ -9,11 +9,12 @@ import {
   openingKeptSet,
   autoDraftSet,
   directionPreset,
+  offerUnpicked,
   type RootState,
   type Target,
 } from "../store";
 import { firstLine } from "../text";
-import { offerVignettes } from "../offers";
+import { offer } from "../offers";
 import { buildFrame } from "./frames";
 import { replaceContext, directOnly } from "./context";
 import { inDraft, splitStartingPoint } from "./draft-region";
@@ -103,7 +104,7 @@ export async function saveDraft(): Promise<void> {
         store.dispatch(
           vignetteAdded({
             id: api.v1.uuid(),
-            title: state.runtime.offerPicked || firstLine(text),
+            title: state.runtime.offers.vignette.picked || firstLine(text),
             text,
           }),
         );
@@ -125,12 +126,14 @@ export async function saveDraft(): Promise<void> {
         return;
     }
     await clearDraft();
-    if (target.kind === "vignette") {
-      // The next vignette starts from a new offer, not this one's direction.
+    if (target.kind === "vignette" || target.kind === "startingPoint") {
+      // The next draft starts from a new offer, not this one's direction:
+      // the call to action goes back to offering.
       presetDirection("");
-      // A kept vignette changes what the range still lacks: offer the next.
-      void offerVignettes();
+      store.dispatch(offerUnpicked({ kind: target.kind }));
     }
+    // A kept vignette changes what the range still lacks: offer the next.
+    if (target.kind === "vignette") void offer("vignette");
   } finally {
     saving = false;
   }
@@ -214,7 +217,12 @@ export async function writeDraft(
       else if (before >= goal) why = "length cap";
       if (run.stop || run.ended || before >= goal) break;
       const ended = nextEnd();
-      await api.v1.editor.generate();
+      // Not awaited: a Send NovelAI never starts (the page lost its draft
+      // region) left generate() pending and the run stuck; the timeout ends it.
+      api.v1.editor.generate().catch((error: unknown) => {
+        api.v1.log(`writeDraft: ${String(error)}`);
+        if (run) run.stop = true;
+      });
       if (!(await ended)) {
         why = "send timed out";
         break;

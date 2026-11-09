@@ -47,7 +47,7 @@ export function splitStartingPoint(text: string): {
   let into = now;
   for (const line of lines) {
     const bare = line
-      .replace(/[#*_:]/g, "")
+      .replace(/[#*_:[\]]/g, "")
       .trim()
       .toLowerCase();
     if (bare === "now") {

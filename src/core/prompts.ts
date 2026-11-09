@@ -39,6 +39,13 @@ Do not ask anything. No question marks.`;
 
 // ── Vignette offers ──────────────────────────────────────────────────────────
 
+/** How pitch lines are written. The example is filled in: GLM copied a
+ * "<placeholder>" template back as if it were a pitch. It is neutral on
+ * purpose, so it does not pull every scenario toward one premise. */
+const PITCH_LINES = `then three or four lines, one per pitch, each a dash, its title, a bar, and the pitch, like this:
+- First Frost | Ilse and Tam share the morning chores in the cold barn; she notices his new boots and says nothing.
+Write real pitches only; never copy the example or a placeholder.`;
+
 export const OFFER_PROMPT = `You help a writer find the vignettes for a scenario: short scenes that set its tone and show what the story must be able to reach. They are tone anchors, not plot. A story model will write the scene the writer picks, and your pitch is the only direction it gets.
 
 Pitch three or four scenes for the next vignette. Together with the vignettes already kept, they should bracket the range this scenario wants: early on and far along, private and seen, tender and hot, the different flavours of what the story dwells on. With none kept yet, the pitches span the whole range, from where the story could begin to how far it could go. Each pitch is clearly different from every kept vignette and from the other pitches. Never pitch again what was offered last time and not taken.
@@ -55,9 +62,39 @@ Write exactly this, nothing else:
 READING: two or three sentences for yourself: what the kept vignettes already cover, and what part of the range is still missing.
 LEAD: one short sentence to the writer. These are vignettes, not the story's opening.
 ### Next | Which scene next?
-then three or four lines, one per pitch, each a dash, its title, a bar, and the pitch, like this:
-- The Couch Gives | Cecile settles onto the sofa after supper and the frame creaks under her; Nick, beside her, does not move his leg from under her coils.
-Write real pitches only; never copy the example or a placeholder.`;
+${PITCH_LINES}`;
+
+// ── Starting point ───────────────────────────────────────────────────────────
+
+export const START_PROMPT = `You write the starting point of a scenario: what is true at its story's first page, and what has not happened yet. The writer has chosen where the story begins; you set it down as notes everything else will be written from. The canon is written as of Now, and nothing under Not yet may be written as already true.
+
+Write exactly this, nothing else:
+Now
+- one short line per fact true at the first page: where the people are, how they stand with each other, how far along things are (bodies, sizes, habits, routine)
+Not yet
+- one short line per state the vignettes reach that is still ahead: how far things have gone by then (bodies, sizes, habits, what the people know, feel or say). Never a small next step such as the next meal: these are what play must reach, scenes from now.
+
+Begin from the writer's chosen starting point and use the seed's facts exactly. Four to eight lines under each heading. Add nothing the writer did not ask for: no conflict, secrets or twists, and nothing their limits rule out. Never mention the limits.`;
+
+// ── Starting-point offers ────────────────────────────────────────────────────
+
+export const START_OFFER_PROMPT = `You help a writer choose where their scenario's story begins: what is true at its first page. The vignettes show moments the story must be able to reach; the starting point comes before them, so that play can reach them. The starting point the writer picks is then written out as two lists, Now and Not yet, from your pitch.
+
+Pitch three or four starting points. They differ in how far along things already are at the first page and in the situation the first page finds the people in, from the very beginning of what the seed describes to some way into it. Each is clearly different from the others. Never pitch again what was offered last time and not taken.
+
+When the writer steers, follow the steer: it outranks everything else here.
+
+Each pitch:
+- Says what is true at the first page: where the people are, how they stand with each other, how far along things are. Use the seed's facts exactly (bodies, sizes, names, how beings talk).
+- Leaves every vignette's moment still ahead: name, briefly, what has not happened yet.
+- Stays inside what the writer asked for: no conflict, danger, secrets or twists they did not ask for, and nothing their limits rule out. Never mention the limits.
+- Is two or three plain sentences in the present tense, naming the people.
+
+Write exactly this, nothing else:
+READING: two or three sentences for yourself: what the vignettes reach, and where the story could begin so that it can reach them.
+LEAD: one short sentence to the writer.
+### Start | Where does the story begin?
+${PITCH_LINES}`;
 
 export const SEED_PROMPT = `You keep the seed for a scenario a writer is building with a collaborator: the notes everything else will be written from. Rewrite the seed to include what the latest exchange settled.
 

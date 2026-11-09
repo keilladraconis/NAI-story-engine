@@ -3,9 +3,18 @@
 // Now, and no document may write a Not-yet state as present.
 
 import { store, startingPointSet } from "../../../core/store";
-import { writeDraft, openOnPage } from "../../../core/workshop/workshop";
+import { openOnPage } from "../../../core/workshop/workshop";
+import { missingBrief } from "../../../core/facilitator";
 import { useSlice } from "../../bridge";
-import { Button, Field, Hint, Row, StageBody } from "../../components/kit";
+import {
+  Button,
+  Field,
+  Hint,
+  Row,
+  SectionTitle,
+  StageBody,
+} from "../../components/kit";
+import { Offers } from "../../components/Offers";
 
 export function NowStage() {
   const now = useSlice((s) => s.canon.startingPoint.now);
@@ -13,29 +22,31 @@ export function NowStage() {
   const set = (patch: { now?: string; notYet?: string }) =>
     store.dispatch(startingPointSet({ now, notYet, ...patch }));
   const hasText = Boolean(now.trim() || notYet.trim());
+  const missing = useSlice((s) => missingBrief(s.canon.brief).length > 0);
 
   return (
     <StageBody>
       <Hint>
         Where the story begins. Without it, the canon starts wherever its prose
-        is most vivid, and a vignette's ending becomes the opening. Name plainly
-        what has not happened yet.
+        is most vivid, and a vignette's ending becomes the opening. Pick a
+        starting point to draft on the page, edit it there, then save it.
       </Hint>
-      <Row>
-        <Button
-          tone="primary"
-          onClick={() =>
-            void (hasText
-              ? openOnPage(
-                  { kind: "startingPoint" },
-                  `Now\n${now.trim()}\n\nNot yet\n${notYet.trim()}`,
-                )
-              : writeDraft({ kind: "startingPoint" }))
-          }
-        >
-          {hasText ? "Open on page" : "Draft on page"}
-        </Button>
-      </Row>
+      <SectionTitle>Starting points</SectionTitle>
+      <Offers kind="startingPoint" blocked={missing} noun="starting points" />
+      <div style={{ display: hasText ? "block" : "none", marginTop: "8px" }}>
+        <Row>
+          <Button
+            onClick={() =>
+              void openOnPage(
+                { kind: "startingPoint" },
+                `Now\n${now.trim()}\n\nNot yet\n${notYet.trim()}`,
+              )
+            }
+          >
+            Open on page
+          </Button>
+        </Row>
+      </div>
       <div style={{ height: "8px" }} />
       <Field
         label="Now: true at the first page"

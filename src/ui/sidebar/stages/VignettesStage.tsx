@@ -2,21 +2,12 @@
 // never what will happen. "What next" offers the next scene, so the writer
 // picks, notes or steers instead of writing a prompt.
 
-import {
-  store,
-  offerChosen,
-  vignetteRemoved,
-  vignetteUpdated,
-} from "../../../core/store";
-import { writeDraft } from "../../../core/workshop/workshop";
-import { vignetteDirection } from "../../../core/workshop/targets";
+import { store, vignetteRemoved, vignetteUpdated } from "../../../core/store";
 import { missingBrief } from "../../../core/facilitator";
-import { OFFER_LABEL, offerVignettes } from "../../../core/offers";
 import { useSlice } from "../../bridge";
 import { SP, T } from "../../style";
-import { Choice } from "../../components/Choice";
+import { Offers } from "../../components/Offers";
 import {
-  Button,
   Field,
   Hint,
   Row,
@@ -88,119 +79,6 @@ function VignetteCard(props: { id: string }) {
   );
 }
 
-/** The offers for the next vignette, a note, and the buttons that use them. */
-function WhatNext(props: { blocked: boolean }) {
-  const labels = useSlice((s) =>
-    s.runtime.offers.map((o) => o.label).join("\n"),
-  );
-  const lead = useSlice((s) => s.runtime.offerLead);
-  const picked = useSlice((s) => s.runtime.offerPicked);
-  const offering = useSlice((s) =>
-    s.runtime.jobs.some((j) => j.label === OFFER_LABEL),
-  );
-  const writing = useSlice((s) => s.runtime.autoDraft);
-  const [note, setNote] = useState("");
-  const offers = labels ? labels.split("\n") : [];
-
-  const draft = () => {
-    const state = store.getState();
-    const pitch =
-      state.runtime.offers.find((o) => o.label === state.runtime.offerPicked)
-        ?.description ?? "";
-    void writeDraft(
-      { kind: "vignette" },
-      vignetteDirection(state, pitch, note),
-    );
-    setNote("");
-  };
-  const steer = () => {
-    void offerVignettes(note);
-    setNote("");
-  };
-
-  return (
-    <section
-      aria-label="What next"
-      style={{ display: "flex", flexDirection: "column", gap: SP.md }}
-    >
-      <SectionTitle>What next</SectionTitle>
-      <p
-        style={{
-          display: offering || lead ? "block" : "none",
-          margin: 0,
-          lineHeight: 1.5,
-        }}
-      >
-        {offering ? "Thinking of scenes…" : lead}
-      </p>
-      <div
-        style={{
-          display: offers.length ? "flex" : "none",
-          flexWrap: "wrap",
-          gap: SP.sm,
-        }}
-      >
-        {offers.map((label, i) => (
-          <OfferChoice
-            key={i}
-            index={i}
-            picked={label === picked}
-            live={!offering && !writing}
-          />
-        ))}
-      </div>
-      <input
-        aria-label="Your note"
-        type="text"
-        value={note}
-        placeholder={
-          picked
-            ? "Optional: add to this scene, then Draft it"
-            : "Or say what you want: Draft it, or Other ideas to steer"
-        }
-        onInput={(e) => setNote(e.currentTarget.value ?? "")}
-        style={{
-          minHeight: "44px",
-          boxSizing: "border-box",
-          padding: "0 10px",
-          borderRadius: "6px",
-          border: `1px solid ${T.bg3}`,
-          background: T.bg,
-          color: T.text,
-          font: "inherit",
-        }}
-      />
-      <Row>
-        <Button
-          tone="primary"
-          disabled={props.blocked || writing}
-          onClick={draft}
-        >
-          {picked || note.trim() ? "Draft it" : "Draft a vignette"}
-        </Button>
-        <Button disabled={props.blocked || offering} onClick={steer}>
-          {offers.length ? "Other ideas" : "Offer scenes"}
-        </Button>
-      </Row>
-    </section>
-  );
-}
-
-function OfferChoice(props: { index: number; picked: boolean; live: boolean }) {
-  const offer = useSlice((s) => s.runtime.offers[props.index]);
-  return (
-    <Choice
-      label={offer?.label ?? ""}
-      description={offer?.description ?? ""}
-      picked={props.picked}
-      live={props.live}
-      onPick={() =>
-        offer && store.dispatch(offerChosen({ label: offer.label }))
-      }
-    />
-  );
-}
-
 export function VignettesStage() {
   const ids = useSlice((s) => s.canon.vignettes.map((v) => v.id).join(","));
   const missing = useSlice((s) => missingBrief(s.canon.brief).join(", "));
@@ -225,7 +103,8 @@ export function VignettesStage() {
         Finish the brief first (the Talk tab asks for it). Still missing:{" "}
         {missing}.
       </p>
-      <WhatNext blocked={Boolean(missing)} />
+      <SectionTitle>What next</SectionTitle>
+      <Offers kind="vignette" blocked={Boolean(missing)} noun="scenes" />
       <SectionTitle>Kept · {ids ? ids.split(",").length : 0}</SectionTitle>
       {(ids ? ids.split(",") : []).map((id) => (
         <VignetteCard key={id} id={id} />
