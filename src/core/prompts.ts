@@ -180,10 +180,11 @@ Write the whole revised document and nothing else: no heading, no commentary.`;
 
 // ── Distill ──────────────────────────────────────────────────────────────────
 
-export const DISTILL_PROMPT = `You compile part of a scenario's canon into text that a story model reads while it writes the story. The canon is the source of truth; you only compress it.
+export const DISTILL_PROMPT = `You compile part of a scenario's canon into text that a story model reads while it writes the story. The canon is the source of truth: you condense its prose, never its facts.
 
 Rules:
-- Use only facts in the sources. Invent nothing: no new names, events, numbers or details. A detail you leave out is fine; a detail you add is a defect.
+- Use only facts in the sources. Invent nothing: no new names, events, numbers or details.
+- Keep the specifics. Carry over the concrete details the story model needs to write this subject well: names, ages, places, habits, objects, numbers, how things work. Cut the sources' narration and repetition, not their facts; a vague summary in place of a specific detail is a defect.
 - Describe the world as it stands at the starting point's Now. Never write anything listed under "Not yet" as having happened, and never say it will happen.
 - The story model writes whatever it is shown as known to everyone. Never call something a secret or say someone does not know a thing.
 - Plain, concrete sentences in the scenario's register. Behaviour over labels: show a trait by what the person does.
@@ -194,19 +195,20 @@ export const DISTILL_INSTRUCTIONS = {
 Line 1: the protagonist, as "<Name>: <who they are, in one sentence>".
 Line 2: the central tension of the scenario, in one sentence.`,
   an: `Write the story's style as comma-separated descriptors of the prose: perspective and tense, register, pacing, sentence feel. At most 25 words. Descriptors only, no sentence.`,
-  world: `Write a digest of the world from the sources: where it is set, and whichever of history, culture, tensions, factions and systems the sources cover. Short paragraphs, each starting with a plain label and a colon ("Setting:", "History:" …). Write a paragraph only for what the sources cover; never fill in a topic they leave out. At most 350 words.`,
-  dramatis: `Write one line per character in the dossiers, as "- Name (age, role): two physical details, one behavioural tell". Every dossier, no one else.`,
-  profile: `Write this character's lorebook profile, one field per line, filling each from the dossier. The first line is the character's full name and nothing else; then these fields, in this order:
+  world: `Write a digest of the world from the sources: where it is set, and whichever of history, culture, tensions, factions and systems the sources cover. Short paragraphs, each starting with a plain label and a colon ("Setting:", "History:" …). Write a paragraph only for what the sources cover; never fill in a topic they leave out. Keep the specifics: names, places, customs, rules. At most 600 words.`,
+  dramatis: `Write one line per character in the dossiers, as "- Name (age, role): two physical details, one behavioural tell". Every dossier, no one else, each line from that character's own dossier.`,
+  profile: (name: string) =>
+    `Write ${name}'s lorebook profile, one field per line, filling each from ${name}'s dossier. Every field is about ${name}: other people appear only as they bear on ${name}, never in ${name}'s place. The first line is ${name}'s full name and nothing else; then these fields, in this order:
 Type: character
 Age:
 Gender:
 Occupation:
-Appearance:
+Appearance: (build, face, hair, how they dress, anything distinctive)
 Personality:
-Description: (100 to 150 words; at least a third of it behavioural tells: what they do, not what they are)
-Quotes: (one or two lines of their speech, in quotation marks)
-Summary: (100 to 150 words: their history, their family, and what ties them to the story's tension)`,
-  locations: `Write one entry per location, each a paragraph starting "<Name>:", covering what it is like, who is found there and why, and what could happen there. At most 80 words each.`,
+Description: (150 to 250 words; at least a third of it behavioural tells: what they do, not what they are)
+Quotes: (two or three lines of their speech, in quotation marks)
+Summary: (150 to 250 words: their history, their family, how they stand with each of the others, and what ties them to the story's tension)`,
+  locations: `Write one entry per location, each a paragraph starting "<Name>:", covering what it looks and feels like, what is kept there, who is found there and why, and what could happen there. 60 to 150 words each.`,
   relationships: `Write one line per tie between the cast, as "<A> and <B>: what the tie rests on; what strains it".`,
   plots: `Write the possible plot situations: open pressures that could start scenes, never their outcomes. Group them under short headings by the pressure they come from. Each is one line: a setup sketched by role, then the complication that forces a choice. Include a road toward each "Not yet" state without arriving.`,
 } as const;

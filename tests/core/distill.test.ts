@@ -62,6 +62,20 @@ describe("distillTargets", () => {
     expect(profile.sources).toContain("Tam's dossier.");
     expect(profile.sources).toContain("Ilse and Tam.");
   });
+
+  it("names the character a profile is about, in its sources and its instruction", () => {
+    const profile = distillTargets(STATE).find(
+      (t) => t.id === "entry:profile:t",
+    )!;
+    expect(profile.sources).toMatch(
+      /^# Tam Ward's dossier: the profile is about Tam Ward/,
+    );
+    expect(profile.sources).toContain(
+      "for how Tam Ward stands with the others",
+    );
+    expect(profile.instruction).toMatch(/^Write Tam Ward's lorebook profile/);
+    expect(profile.instruction).toContain("never in Tam Ward's place");
+  });
 });
 
 describe("statusOf", () => {

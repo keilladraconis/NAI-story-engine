@@ -128,7 +128,7 @@ export function distillTargets(state: RootState): DistillTarget[] {
     sources: world.length
       ? [docSections(world), startingSection(state)].join("\n\n")
       : "",
-    maxTokens: 700,
+    maxTokens: 1100,
     activation: { kind: "always" },
     docIds: world.map((d) => d.id),
   });
@@ -147,15 +147,26 @@ export function distillTargets(state: RootState): DistillTarget[] {
       id: `entry:profile:${dossier.id}`,
       label: dossier.title,
       write: "entry",
-      instruction: DISTILL_INSTRUCTIONS.profile,
+      instruction: DISTILL_INSTRUCTIONS.profile(dossier.title),
+      // The relationships and the starting point centre on the protagonist; a
+      // profile fed them unlabelled was written about the protagonist instead.
       sources: [
-        section(`${dossier.title} (dossier)`, dossier.text),
-        docSections(relationships),
-        startingSection(state),
+        section(
+          `${dossier.title}'s dossier: the profile is about ${dossier.title}`,
+          dossier.text,
+        ),
+        section(
+          `Relationships: for how ${dossier.title} stands with the others`,
+          relationships.map((d) => d.text.trim()).join("\n\n"),
+        ),
+        section(
+          `Starting point: for where ${dossier.title} stands now`,
+          startingSection(state).replace(/^# Starting point\n/, ""),
+        ),
       ]
         .filter(Boolean)
         .join("\n\n"),
-      maxTokens: 900,
+      maxTokens: 1400,
       activation: { kind: "keys" },
       docIds: [dossier.id, ...relationships.map((d) => d.id)],
     });
@@ -167,7 +178,7 @@ export function distillTargets(state: RootState): DistillTarget[] {
     write: "entry",
     instruction: DISTILL_INSTRUCTIONS.locations,
     sources: docSections(locations),
-    maxTokens: 900,
+    maxTokens: 1500,
     activation: { kind: "keys" },
     docIds: locations.map((d) => d.id),
   });
