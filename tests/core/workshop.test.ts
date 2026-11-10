@@ -250,6 +250,12 @@ describe("targets", () => {
     );
   });
 
+  it("asks a dossier for the body's figures", () => {
+    const direction = defaultDirection(state, { kind: "doc", docId: "a" });
+    expect(direction).toContain("height, or length for a long body");
+    expect(direction).toContain("chest-waist-hip where there is no bust");
+  });
+
   it("compares targets by kind and document", () => {
     expect(
       sameTarget({ kind: "doc", docId: "a" }, { kind: "doc", docId: "a" }),

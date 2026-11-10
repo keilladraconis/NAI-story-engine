@@ -179,7 +179,8 @@ describe("profileKeys", () => {
         "Nick",
         ["nick", "trainer", "my beautiful girl", "you absolute queen"],
         ["cecile", "nick"],
-        'Quotes: "There\'s my beautiful girl." “You absolute queen.”\nOccupation: trainer',
+        // The inch mark used to pair with the first quotation mark.
+        'Height: 178 cm (5\'10")\nDescription: he says "hi".\nQuotes: "There\'s my beautiful girl."\n“You absolute queen.”\nSummary: a trainer',
       ),
     ).toEqual(["nick", "trainer"]);
   });

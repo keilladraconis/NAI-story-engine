@@ -72,7 +72,7 @@ export const KINDS: Record<DocKind, KindMeta> = {
     heading: "Dossiers",
     noun: "dossier",
     direction:
-      "Write {title}'s dossier: appearance, voice, habits and tells, what they want and fear, their history, and their family.",
+      "Write {title}'s dossier: species, age and role; their body in figures (height, or length for a long body; weight; bust-waist-hip with a cup size, or chest-waist-hip where there is no bust) and in full, with hair and eyes; their voice, habits and tells, what they want and fear, their history, and their family.",
   },
 };
 

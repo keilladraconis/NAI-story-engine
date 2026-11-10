@@ -343,6 +343,20 @@ async function keysFor(
 }
 
 /**
+ * The Quotes field of a profile, lowercased: its line and any lines that
+ * continue it. Only there: a height's inch mark (5'10") elsewhere paired with
+ * the first quotation mark and shifted every quote after it.
+ */
+export function quotesField(text: string): string {
+  const lines = text.toLowerCase().split("\n");
+  const start = lines.findIndex((l) => l.startsWith("quotes:"));
+  if (start === -1) return "";
+  const rest = lines.slice(start + 1);
+  const end = rest.findIndex((l) => /^[a-z][a-z ]*:/.test(l));
+  return [lines[start], ...(end === -1 ? rest : rest.slice(0, end))].join("\n");
+}
+
+/**
  * A profile's keys: always the name the story will use (GLM has left out the
  * first name), and never another character's name: Nick's profile keyed on
  * "cecile" fired whenever the protagonist was on stage. Nor words from the
@@ -360,7 +374,7 @@ export function profileKeys(
   const spaced = (k: string) => ` ${k.replace(/[^a-z0-9]+/g, " ")} `;
   const speech = spaced(
     (
-      text.toLowerCase().match(/["\u201c][^"\u201c\u201d]*["\u201d]/g) ?? []
+      quotesField(text).match(/["\u201c][^"\u201c\u201d]*["\u201d]/g) ?? []
     ).join(" "),
   );
   return [

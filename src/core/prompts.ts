@@ -196,18 +196,27 @@ Line 1: the protagonist, as "<Name>: <who they are, in one sentence>".
 Line 2: the central tension of the scenario, in one sentence.`,
   an: `Write the story's style as comma-separated descriptors of the prose: perspective and tense, register, pacing, sentence feel. At most 25 words. Descriptors only, no sentence.`,
   world: `Write a digest of the world from the sources: where it is set, and whichever of history, culture, tensions, factions and systems the sources cover. Short paragraphs, each starting with a plain label and a colon ("Setting:", "History:" …). Write a paragraph only for what the sources cover; never fill in a topic they leave out. Keep the specifics: names, places, customs, rules. At most 600 words.`,
-  dramatis: `Write one line per character in the dossiers, as "- Name (age, role): two physical details, one behavioural tell". Every dossier, no one else, each line from that character's own dossier.`,
+  dramatis: `Write one line per character in the dossiers, as "- Name (species, gender, age, role): two physical details, one behavioural tell". Every dossier, no one else, each line from that character's own dossier.`,
   profile: (name: string) =>
     `Write ${name}'s lorebook profile, one field per line, filling each from ${name}'s dossier. Every field is about ${name}: other people appear only as they bear on ${name}, never in ${name}'s place. The first line is ${name}'s full name and nothing else; then these fields, in this order:
 Type: character
-Age:
+Species:
+Age: (a number)
 Gender:
 Occupation:
-Appearance: (build, face, hair, how they dress, anything distinctive)
-Personality:
+Height: (<cm> cm (<feet>'<inches>")); for a long, low body such as a serpent's, write Length: instead, in the same units
+Weight: (<kg> kg (<lbs> lbs))
+BWH: (<bust><cup>-<waist>-<hip> cm (<bust><cup>-<waist>-<hip> in)) only for a body with a bust, cup letter in both; any other body gets CWH: (<chest>-<waist>-<hip> cm (<chest>-<waist>-<hip> in)) instead, whatever its gender. Exactly one of the two.
+Talents: (three or four skills)
+Body: (build and shape, skin, scales or fur, anything distinctive)
+Hair: (colour, length, style; leave the field out for a body without hair)
+Eyes: (colour, quality)
+Personality: (three or four traits)
 Description: (150 to 250 words; at least a third of it behavioural tells: what they do, not what they are)
 Quotes: (two or three lines of their speech, in quotation marks)
-Summary: (150 to 250 words: their history, their family, how they stand with each of the others, and what ties them to the story's tension)`,
+Summary: (150 to 250 words: their history, their family, how they stand with each of the others, and what ties them to the story's tension)
+
+The figures ground the character's body in the story, so none is left blank. Use the dossier's figures exactly, converting units where needed. Where the dossier gives none, and only there, choose a figure that fits what it says of the body: this is the one thing you may supply.`,
   locations: `Write one entry per location, each a paragraph starting "<Name>:", covering what it looks and feels like, what is kept there, who is found there and why, and what could happen there. 60 to 150 words each.`,
   relationships: `Write one line per tie between the cast, as "<A> and <B>: what the tie rests on; what strains it".`,
   plots: `Write the possible plot situations: open pressures that could start scenes, never their outcomes. Group them under short headings by the pressure they come from. Each is one line: a setup sketched by role, then the complication that forces a choice. Include a road toward each "Not yet" state without arriving.`,
