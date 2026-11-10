@@ -213,6 +213,6 @@ Summary: (150 to 250 words: their history, their family, how they stand with eac
   plots: `Write the possible plot situations: open pressures that could start scenes, never their outcomes. Group them under short headings by the pressure they come from. Each is one line: a setup sketched by role, then the complication that forces a choice. Include a road toward each "Not yet" state without arriving.`,
 } as const;
 
-export const KEYS_PROMPT = `Write the activation keys for a lorebook entry: the words a story would use when this subject is on stage. Names, nicknames, titles and distinctive terms only, never common words that would fire everywhere.
+export const KEYS_PROMPT = `Write the activation keys for a lorebook entry: the words a story would use when this subject is on stage. Names, nicknames and titles the story would call this subject by, and terms unique to it. Never another character's name, never a physical description ("hazel eyes"), never a line of dialogue, and never common words that would fire everywhere.
 
 Write 3 to 8 keys on one line, comma-separated, lowercase. Write nothing else.`;

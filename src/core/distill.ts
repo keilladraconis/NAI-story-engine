@@ -337,12 +337,42 @@ async function keysFor(
       ],
     }),
   });
-  // A profile is always keyed on the name the story will use for the character;
-  // GLM has left out the first name.
-  const names = target.id.startsWith("entry:profile:")
-    ? nameKeys(target.label)
-    : [];
-  return [...new Set([...names, ...parseKeys(reply)])];
+  return target.id.startsWith("entry:profile:")
+    ? profileKeys(target.label, parseKeys(reply), castKeys(state), text)
+    : parseKeys(reply);
+}
+
+/**
+ * A profile's keys: always the name the story will use (GLM has left out the
+ * first name), and never another character's name: Nick's profile keyed on
+ * "cecile" fired whenever the protagonist was on stage. Nor words from the
+ * profile's quoted speech: GLM took the pet names Nick calls her for his own.
+ */
+export function profileKeys(
+  name: string,
+  keys: string[],
+  cast: string[],
+  text = "",
+): string[] {
+  const own = nameKeys(name);
+  const others = cast.filter((k) => !own.includes(k));
+  // Word-bounded: "cecile's trainer" names Cecile; "nicky" is not "nick".
+  const spaced = (k: string) => ` ${k.replace(/[^a-z0-9]+/g, " ")} `;
+  const speech = spaced(
+    (
+      text.toLowerCase().match(/["\u201c][^"\u201c\u201d]*["\u201d]/g) ?? []
+    ).join(" "),
+  );
+  return [
+    ...new Set([
+      ...own,
+      ...keys.filter(
+        (k) =>
+          !others.some((o) => spaced(k).includes(spaced(o))) &&
+          !speech.includes(spaced(k)),
+      ),
+    ]),
+  ];
 }
 
 async function write(

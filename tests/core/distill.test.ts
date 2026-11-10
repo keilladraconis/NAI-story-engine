@@ -7,6 +7,7 @@ import {
   finish,
   castKeys,
   parseKeys,
+  profileKeys,
 } from "../../src/core/distill";
 import { rootReducer, type RootState } from "../../src/core/store";
 import { emptyBrief } from "../../src/core/store/slices/canon";
@@ -158,5 +159,28 @@ describe("nameKeys", () => {
     expect(nameKeys("Tam Ward")).toEqual(["tam ward", "tam"]);
     expect(nameKeys("Ilse")).toEqual(["ilse"]);
     expect(nameKeys("Al Bo")).toEqual(["al bo"]);
+  });
+});
+
+describe("profileKeys", () => {
+  it("keys on the character's own name, never on another character's", () => {
+    expect(
+      profileKeys(
+        "Nick",
+        ["nick", "cecile", "my dear boy", "cecile's trainer", "nicky"],
+        ["cecile", "nick"],
+      ),
+    ).toEqual(["nick", "my dear boy", "nicky"]);
+  });
+
+  it("drops keys taken from the profile's quoted speech", () => {
+    expect(
+      profileKeys(
+        "Nick",
+        ["nick", "trainer", "my beautiful girl", "you absolute queen"],
+        ["cecile", "nick"],
+        'Quotes: "There\'s my beautiful girl." “You absolute queen.”\nOccupation: trainer',
+      ),
+    ).toEqual(["nick", "trainer"]);
   });
 });
