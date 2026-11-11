@@ -39,12 +39,6 @@ export const runtimeSlice = createSlice({
       ...state,
       autoDraft: p.on,
     }),
-    jobStarted: (state, p: { id: string; at: number }) => ({
-      ...state,
-      jobs: state.jobs.map((j) =>
-        j.id === p.id ? { ...j, startedAt: p.at } : j,
-      ),
-    }),
     jobFinished: (state, p: { id: string }) => ({
       ...state,
       jobs: state.jobs.filter((j) => j.id !== p.id),
@@ -80,7 +74,6 @@ export const runtimeSlice = createSlice({
 export const {
   genxUpdated,
   jobQueued,
-  jobStarted,
   jobFinished,
   autoDraftSet,
   offersSet,

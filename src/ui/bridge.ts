@@ -9,7 +9,11 @@
 // loop. For derived objects, pass an `equals` and memoize at the call site.
 
 import { store, type RootState } from "../core/store";
-import { readStream, subscribeStream } from "../core/engine/stream-buffer";
+import {
+  readStream,
+  readTokens,
+  subscribeStream,
+} from "../core/engine/stream-buffer";
 
 export function sliceStore<T>(
   selector: (s: RootState) => T,
@@ -63,5 +67,15 @@ export function useStream(key: string): string | undefined {
     [key],
   );
   const getSnapshot = useCallback(() => readStream(key), [key]);
+  return useSyncExternalStore(subscribe, getSnapshot);
+}
+
+// Tokens received so far for a stream key (a GLM job id), thinking included.
+export function useTokens(key: string): number {
+  const subscribe = useCallback(
+    (onChange: () => void) => subscribeStream(key, onChange),
+    [key],
+  );
+  const getSnapshot = useCallback(() => readTokens(key), [key]);
   return useSyncExternalStore(subscribe, getSnapshot);
 }

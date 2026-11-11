@@ -48,7 +48,7 @@ export const KINDS: Record<DocKind, KindMeta> = {
     heading: "Locations",
     noun: "locations",
     direction:
-      "Write the locations, one section each: what it is like, who is found there and why, what could happen there.",
+      "Write the locations as they are at the start, one section each: what it is like, who is found there and why, and what kind of scene it could hold. Never what will happen there or what it will become.",
   },
   relationships: {
     heading: "Relationships",

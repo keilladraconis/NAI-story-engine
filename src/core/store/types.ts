@@ -152,12 +152,8 @@ export interface Job {
   id: string;
   /** What the job is doing, for status lines: "Reviewing Tam". */
   label: string;
-  /** How long the job is expected to take once started, in ms. */
-  expectMs: number;
-  /** Characters the reply is expected to run to. */
-  expectChars: number;
-  /** When the job reached the model (0 while it waits in the queue). */
-  startedAt: number;
+  /** The tokens requested: progress is the tokens received against this. */
+  maxTokens: number;
 }
 
 export interface RuntimeState {

@@ -93,7 +93,8 @@ export function parseIssues(
       .toLowerCase()
       .replace(/^[-*\s]+/, "") as IssueKind;
     const body = line.slice(at + 1).trim();
-    if (!KINDS.includes(kind) || !body) continue;
+    // A body with no words (a lone quote mark from a broken line) is no issue.
+    if (!KINDS.includes(kind) || !/[a-z]{3}/i.test(body)) continue;
     if (docText !== undefined && !quotesDoc(body, docText)) continue;
     issues.push({ id: makeId(), kind, text: body });
   }
@@ -215,9 +216,23 @@ export function fix(docId: string, issue: Issue): Promise<void> {
     await rewrite(
       docId,
       `Fixing ${doc.title}`,
-      `Resolve this problem, and only this one: ${issue.kind} | ${issue.text}`,
+      `Resolve this problem, everywhere it occurs in the document, and nothing else: ${issue.kind} | ${issue.text}`,
     );
     // The fixed text has no review yet; the critic runs again on demand.
+  });
+}
+
+/** Resolve every open issue of a document in one rewrite. */
+export function fixAll(docId: string): Promise<void> {
+  return once(docId, async () => {
+    const doc = docOf(docId);
+    const issues = doc?.review?.issues ?? [];
+    if (!doc || !issues.length) return;
+    await rewrite(
+      docId,
+      `Fixing ${doc.title}`,
+      `Resolve these problems, everywhere each occurs in the document, and nothing else:\n${issues.map((i) => `- ${i.kind} | ${i.text}`).join("\n")}`,
+    );
   });
 }
 

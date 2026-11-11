@@ -52,20 +52,8 @@ describe("derive: widget", () => {
 
 describe("derive: status text", () => {
   const jobs = [
-    {
-      id: "a",
-      label: "Reviewing Tam",
-      expectMs: 10_000,
-      expectChars: 400,
-      startedAt: NOW - 2_300,
-    },
-    {
-      id: "b",
-      label: "Reviewing Ilse",
-      expectMs: 10_000,
-      expectChars: 400,
-      startedAt: 0,
-    },
+    { id: "a", label: "Reviewing Tam", maxTokens: 600 },
+    { id: "b", label: "Reviewing Ilse", maxTokens: 600 },
   ];
 
   it("names the oldest job and counts the rest", () => {
@@ -77,8 +65,9 @@ describe("derive: status text", () => {
     const m = derive(
       state({ jobs, genx: { status: "generating", queueLength: 2 } }),
       NOW,
+      138,
     );
-    expect(m.statusText).toBe("Reviewing Tam 20%… · 1 more");
+    expect(m.statusText).toBe("Reviewing Tam 23%… · 1 more");
     expect(m.busy).toBe(true);
   });
 
@@ -88,17 +77,11 @@ describe("derive: status text", () => {
 });
 
 describe("percent", () => {
-  it("runs with time to 90% at the expected time, then eases", () => {
-    expect(percent(0, 10_000)).toBe(0);
-    expect(percent(5_000, 10_000)).toBe(45);
-    expect(percent(10_000, 10_000)).toBe(90);
-    expect(percent(20_000, 10_000)).toBe(95);
-    expect(percent(1e9, 10_000)).toBe(99);
+  it("is the tokens received of the tokens requested, short of 100", () => {
+    expect(percent(0, 600)).toBe(0);
+    expect(percent(138, 600)).toBe(23);
+    expect(percent(600, 600)).toBe(99);
     expect(percent(10, 0)).toBe(0);
-  });
-
-  it("is pushed on by the reply streaming in", () => {
-    expect(percent(1_000, 10_000, 300, 400)).toBe(75);
   });
 });
 
@@ -111,9 +94,7 @@ describe("storeSignature", () => {
     expect(
       storeSignature(
         state({
-          jobs: [
-            { id: "a", label: "x", expectMs: 1, expectChars: 1, startedAt: 0 },
-          ],
+          jobs: [{ id: "a", label: "x", maxTokens: 1 }],
         }),
       ),
     ).not.toBe(base);

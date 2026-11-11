@@ -5,7 +5,7 @@
 
 import { store } from "../../core/store";
 import { cancelGlm, confirmPresence } from "../../core/engine/glm";
-import { useSlice, useStream } from "../bridge";
+import { useSlice, useTokens } from "../bridge";
 import { SP, T } from "../style";
 import { derive, storeSignature, type WidgetMode } from "./header-model";
 import { Play, X, Clock } from "nai:icons/feather";
@@ -13,9 +13,8 @@ import { Play, X, Clock } from "nai:icons/feather";
 const ICON_SIZE = 13;
 
 /**
- * Re-renders the caller every half second while a budget wait counts down or
- * work is under way. The countdown and the progress figure are wall-clock,
- * not store state, so they need their own heartbeat.
+ * Re-renders the caller every half second while a budget wait counts down.
+ * The countdown is wall-clock, not store state, so it needs its own heartbeat.
  * Self-rescheduling: api.v1.timers has no setInterval.
  */
 function useTick(active: boolean): void {
@@ -135,10 +134,10 @@ function useShimmer(active: boolean): Record<string, string> {
 export function Header() {
   useSlice(storeSignature);
   const oldest = useSlice((s) => s.runtime.jobs[0]?.id ?? "");
-  const streamed = useStream(oldest)?.length ?? 0;
-  const model = derive(store.getState(), Date.now(), streamed);
+  const received = useTokens(oldest);
+  const model = derive(store.getState(), Date.now(), received);
   const shimmer = useShimmer(model.busy);
-  useTick(model.widget.mode === "wait" || model.busy);
+  useTick(model.widget.mode === "wait");
 
   const onWidget = () => {
     if (model.widget.mode === "continue") confirmPresence();

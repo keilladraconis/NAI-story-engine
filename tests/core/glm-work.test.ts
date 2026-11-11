@@ -66,6 +66,12 @@ describe("parseIssues", () => {
     ]);
   });
 
+  it("drops an issue with no words", () => {
+    expect(parseIssues('contradiction | "\npast-the-now | ""', makeId)).toEqual(
+      [],
+    );
+  });
+
   it("reads NONE as no issues", () => {
     expect(parseIssues("NONE", makeId)).toEqual([]);
   });

@@ -43,7 +43,7 @@ export function StageTabs() {
                 aria-hidden="true"
                 style={{
                   display: i ? "inline" : "none",
-                  padding: "0 1px",
+                  padding: "0",
                   color: T.textDisabled,
                   fontSize: "0.85em",
                 }}
@@ -56,7 +56,7 @@ export function StageTabs() {
                 onClick={() => store.dispatch(stageOpened({ stage: stage.id }))}
                 style={{
                   minHeight: DENSE,
-                  padding: "0 7px",
+                  padding: "0 5px",
                   borderRadius: "999px",
                   border: `1px solid ${active ? T.textHeadings : i === next ? T.bg3 : "transparent"}`,
                   background: active ? T.bg2 : "none",

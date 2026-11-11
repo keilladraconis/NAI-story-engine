@@ -8,6 +8,8 @@
 // once, on generation completion. See Message.tsx / useStream for the read side.
 
 const buffers = new Map<string, string>();
+/** Tokens received so far per key, for a progress figure. */
+const tokens = new Map<string, number>();
 const subs = new Map<string, Set<() => void>>();
 
 function notify(key: string): void {
@@ -25,6 +27,17 @@ export function appendStream(key: string, chunk: string): void {
   writeStream(key, (buffers.get(key) ?? "") + chunk);
 }
 
+/** Count tokens received for a key and notify subscribers. */
+export function addTokens(key: string, n: number): void {
+  tokens.set(key, (tokens.get(key) ?? 0) + n);
+  notify(key);
+}
+
+/** Tokens received so far for a key; 0 when nothing is streaming for it. */
+export function readTokens(key: string): number {
+  return tokens.get(key) ?? 0;
+}
+
 /** Current in-flight text, or undefined when nothing is streaming for this key. */
 export function readStream(key: string): string | undefined {
   return buffers.get(key);
@@ -32,7 +45,8 @@ export function readStream(key: string): string | undefined {
 
 /** Drop the in-flight text for a key (call once the committed value lands). */
 export function clearStream(key: string): void {
-  if (buffers.delete(key)) notify(key);
+  const had = tokens.delete(key);
+  if (buffers.delete(key) || had) notify(key);
 }
 
 /** Subscribe to in-flight changes for a key. Returns an unsubscribe function. */

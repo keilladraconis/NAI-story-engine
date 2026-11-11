@@ -13,7 +13,7 @@ import {
   type CanonDoc,
 } from "../../core/store";
 import { reviewCurrent } from "../../core/stages";
-import { review, fix, rewriteWith } from "../../core/critic";
+import { review, fix, fixAll, rewriteWith } from "../../core/critic";
 import { deleteDoc } from "../../core/canon";
 import { openOnPage, writeDraft } from "../../core/workshop/workshop";
 import { KINDS } from "../../core/workshop/targets";
@@ -51,6 +51,21 @@ function Issues(props: { doc: CanonDoc; open: boolean }) {
         gap: SP.md,
       }}
     >
+      <li
+        style={{
+          display: issues.length > 1 ? "flex" : "none",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: SP.md,
+        }}
+      >
+        <span style={{ flex: "1 1 140px", fontSize: "0.85em", opacity: 0.8 }}>
+          Fix all resolves them in one rewrite; or work through them one by one.
+        </span>
+        <Button dense tone="primary" onClick={() => void fixAll(doc.id)}>
+          {`Fix all ${issues.length}`}
+        </Button>
+      </li>
       {issues.map((issue) => (
         <li
           key={issue.id}
@@ -91,7 +106,7 @@ function Issues(props: { doc: CanonDoc; open: boolean }) {
           <Row>
             <Button
               dense
-              tone="primary"
+              tone={issues.length > 1 ? "plain" : "primary"}
               onClick={() => void fix(doc.id, issue)}
             >
               Fix

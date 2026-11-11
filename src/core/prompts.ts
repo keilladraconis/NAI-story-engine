@@ -155,8 +155,8 @@ Write real lines only; never copy the example.`;
 export const CRITIC_PROMPT = `You review one document of a scenario's canon: the notes a story will be written from. You check it against the brief, the starting point, the tone samples and the other documents. You report problems; you never rewrite.
 
 Report only problems in the document under review. Each goes on its own line, as KIND | what is wrong: open with the words at fault from the document under review, quoted exactly, then say what they disagree with. A problem whose words are in another document belongs to that document's review, not this one. KIND is one of:
-contradiction | it disagrees with another document, the brief or the starting point
-past-the-now | it writes as already true something the starting point lists under "Not yet"
+contradiction | it disagrees with another document or the brief
+past-the-now | it disagrees with the starting point: it writes as already true, or as what will happen, something the starting point has not reached
 invented | it adds a fact that the brief or a kept document rules out
 name-collision | two different people or places share a name, or one has two names
 missing-family | a principal character's family is not answered (who they are tied to, how close, and what that changes)
@@ -164,6 +164,8 @@ limit | it crosses one of the brief's limits
 
 Rules:
 - Only real problems. Style, length and taste are not problems.
+- Disagreement with the starting point is past-the-now, never contradiction.
+- One cause is one problem: when the same fault runs through the document (it narrates where the story goes, say), report it once, quoting its first instance, and say it recurs.
 - A contradiction is two statements that cannot both be true. Check the other document's actual words before reporting one: the same name or fact in both is agreement.
 - A detail no other document mentions is not a problem unless something rules it out.
 - missing-family applies to dossiers only.

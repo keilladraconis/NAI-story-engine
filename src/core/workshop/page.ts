@@ -149,25 +149,28 @@ export function redraw(): Promise<void> {
 
 /**
  * Turn Workshop Sends on: the last paragraph with text becomes the boundary,
- * and an empty paragraph after it starts the draft.
+ * and an empty paragraph after it starts the draft. On an empty page a blank
+ * line is the boundary: an inline divider at the draft's start sat over
+ * NovelAI's "Enter your prompt here" placeholder, and the blank line gives the
+ * divider a paragraph of its own to follow.
  */
 export function turnOn(): Promise<void> {
   return serial(async () => {
     if (store.getState().workshop.on) return;
-    const all = await sections();
+    let all = await sections();
+    if (!all.length) {
+      await api.v1.document.appendParagraph({ text: "" });
+      all = await sections();
+    }
     const withText = all.filter((s) => s.section.text.trim());
-    const boundary = withText.length
-      ? withText[withText.length - 1].sectionId
-      : 0;
+    const boundary = (withText.length ? withText[withText.length - 1] : all[0])
+      .sectionId;
     const after = draftIds(
       all.map((s) => s.sectionId),
       boundary,
     );
-    // An empty page already has an empty paragraph to write into.
-    if (!after.length) {
-      if (boundary === 0) await api.v1.document.appendParagraph({ text: "" });
-      else await api.v1.document.insertParagraphAfter(boundary, { text: "" });
-    }
+    if (!after.length)
+      await api.v1.document.insertParagraphAfter(boundary, { text: "" });
     store.dispatch(workshopTurnedOn({ boundary }));
     await draw();
   });
