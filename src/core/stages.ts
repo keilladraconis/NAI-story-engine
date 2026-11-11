@@ -57,7 +57,11 @@ export function stageDone(state: RootState, stage: StageId): boolean {
     case "now":
       return Boolean(canon.startingPoint.now.trim());
     case "canon":
-      return missingKinds(state).length === 0 && openIssueCount(state) === 0;
+      return (
+        missingKinds(state).length === 0 &&
+        canon.docs.every((d) => !d.text.trim() || reviewCurrent(d)) &&
+        openIssueCount(state) === 0
+      );
     case "cast":
       return canon.castReviewed;
     case "distill":

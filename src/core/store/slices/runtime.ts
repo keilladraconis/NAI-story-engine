@@ -19,7 +19,6 @@ export const initialRuntimeState: RuntimeState = {
   },
   plan: [],
   build: { running: false, done: 0, total: 0, current: "" },
-  direction: { text: "", seq: 0 },
 };
 
 function withSet(
@@ -39,6 +38,12 @@ export const runtimeSlice = createSlice({
     autoDraftSet: (state, p: { on: boolean }) => ({
       ...state,
       autoDraft: p.on,
+    }),
+    jobStarted: (state, p: { id: string; at: number }) => ({
+      ...state,
+      jobs: state.jobs.map((j) =>
+        j.id === p.id ? { ...j, startedAt: p.at } : j,
+      ),
     }),
     jobFinished: (state, p: { id: string }) => ({
       ...state,
@@ -69,16 +74,13 @@ export const runtimeSlice = createSlice({
       ...state,
       build,
     }),
-    directionPreset: (state, p: { text: string }) => ({
-      ...state,
-      direction: { text: p.text, seq: state.direction.seq + 1 },
-    }),
   },
 });
 
 export const {
   genxUpdated,
   jobQueued,
+  jobStarted,
   jobFinished,
   autoDraftSet,
   offersSet,
@@ -87,5 +89,4 @@ export const {
   planSet,
   planToggled,
   buildProgressed,
-  directionPreset,
 } = runtimeSlice.actions;

@@ -9,11 +9,12 @@ import { useSlice } from "../../bridge";
 import {
   Button,
   Field,
-  Hint,
+  Intro,
   Row,
   SectionTitle,
   StageBody,
 } from "../../components/kit";
+import { NextStage } from "../NextStage";
 import { Offers } from "../../components/Offers";
 
 export function NowStage() {
@@ -26,11 +27,18 @@ export function NowStage() {
 
   return (
     <StageBody>
-      <Hint>
-        Where the story begins. Without it, the canon starts wherever its prose
-        is most vivid, and a vignette's ending becomes the opening. Pick a
-        starting point to draft on the page, edit it there, then save it.
-      </Hint>
+      <Intro
+        step={4}
+        title="Now"
+        steps={[
+          "Pick a starting point below, or describe one, and press Draft it.",
+          "It is put on the page. Edit it there, then press Save starting point in the toolbar above the editor. Or type the two fields below by hand.",
+        ]}
+      >
+        Where the story begins: what is true at the first page, and what the
+        vignettes show that has not happened yet. The canon is written as of
+        this moment, so a vignette's ending never becomes the opening.
+      </Intro>
       <SectionTitle>Starting points</SectionTitle>
       <Offers kind="startingPoint" blocked={missing} noun="starting points" />
       <div style={{ display: hasText ? "block" : "none", marginTop: "8px" }}>
@@ -62,6 +70,7 @@ export function NowStage() {
         value={notYet}
         onCommit={(v) => set({ notYet: v })}
       />
+      <NextStage from="now" todo="Write what is true at the first page." />
     </StageBody>
   );
 }

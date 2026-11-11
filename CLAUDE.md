@@ -47,7 +47,7 @@ npx tsc --noEmit   # typecheck (the build does not)
   - Widget content stays plain: a `row` wrapper or `display` made `createWidget` refuse its options.
   - Page work is serialised (`serial`); code already inside the chain calls `draw()` directly, never `redraw()`, or it waits on itself.
 - `workshop.ts` — commands (switch, choose target, save, open on page) and the hooks. A Send aimed above the boundary is stopped. Changing the target or switching off is **refused while the draft holds text**, so a half-written draft never becomes something else or quietly becomes story.
-- `targets.ts` — what each target is called, its save button's wording, and its default direction (a Send with an empty direction box uses it). Directions carry the Brief's voice, its first clause only: Xialong ignores "the brief's voice" but follows "told in third limited, past", and a whole voice field ("…: we are close to her thoughts") buried the scene after it.
+- `targets.ts` — what each target is called, its save button's wording, and its default direction (a Send with no direction set by an offer uses it). Directions carry the Brief's voice, its first clause only: Xialong ignores "the brief's voice" but follows "told in third limited, past", and a whole voice field ("…: we are close to her thoughts") buried the scene after it.
 
 **Canon work (`src/core/critic.ts`):** the critic reports `KIND | text` lines, each opening with the reviewed document's own words; an issue whose first quote is another document's is dropped (`quotesDoc`), since the critic reads the whole canon and filed other documents' problems on the one under review; Fix and rewrite-with-an-instruction rewrite one document. A result lands **only if the document still holds the text the call started from**; otherwise the writer's newer edit wins. A review counts only while its `textHash` matches the document (`reviewCurrent`).
 
@@ -88,7 +88,7 @@ npx tsc --noEmit   # typecheck (the build does not)
 **UI Rendering Rules:**
 
 - **Never swap a component's type at a fixed position**, including to and from `null`. `{cond ? <A/> : <B/>}` leaves both in the DOM when the re-render comes from a detached callback (a timer, a store subscription, a GLM result). Mount every variant and toggle `display`, and render lists from arrays (`(ids ? ids.split(",") : []).map(…)`). `ConfirmButton.tsx` and `Header.tsx`'s `WidgetIcon` are the worked examples.
-- **A controlled `<select>` does not snap back** when a change is refused and the store value stays the same; remount it with a key (`WorkshopPanel`).
+- **A controlled `<select>` does not snap back** when a change is refused and the store value stays the same; remount it with a key.
 
 ## Key Constraints
 

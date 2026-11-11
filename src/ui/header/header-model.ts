@@ -15,8 +15,10 @@ export type WidgetMode = "idle" | "cancel" | "continue" | "wait";
 
 export type HeaderModel = {
   widget: { mode: WidgetMode; text: string };
-  /** What the oldest job is doing; empty when nothing is. */
+  /** What the oldest job is doing, with how far it has got; empty when idle. */
   statusText: string;
+  /** Work is under way: the status line shimmers. */
+  busy: boolean;
 };
 
 function deriveWidget(state: RootState, now: number): HeaderModel["widget"] {
@@ -34,12 +36,43 @@ function deriveWidget(state: RootState, now: number): HeaderModel["widget"] {
   return { mode: "idle", text: "" };
 }
 
-export function derive(state: RootState, now: number): HeaderModel {
-  const jobs = state.runtime.jobs;
-  const more = jobs.length > 1 ? ` (+${jobs.length - 1})` : "";
+/**
+ * How far a job has got: time since it reached the model against how long the
+ * last such job took, eased so it slows past 90% rather than stalling, and
+ * pushed on by characters streamed against the reply's expected length. Never
+ * 100 before it lands.
+ */
+export function percent(
+  elapsed: number,
+  expectMs: number,
+  streamed = 0,
+  expectChars = 0,
+): number {
+  const t = expectMs > 0 ? Math.max(0, elapsed) / expectMs : 0;
+  const byTime = t < 1 ? 90 * t : 90 + 9 * (1 - Math.exp(-(t - 1)));
+  const byChars = expectChars > 0 ? (streamed / expectChars) * 100 : 0;
+  return Math.min(99, Math.floor(Math.max(byTime, byChars)));
+}
+
+/** `streamed`: characters of the oldest job's reply received so far. */
+export function derive(
+  state: RootState,
+  now: number,
+  streamed = 0,
+): HeaderModel {
+  const { jobs, genx } = state.runtime;
+  const widget = deriveWidget(state, now);
+  if (!jobs.length) return { widget, statusText: "", busy: false };
+  const more = jobs.length > 1 ? ` · ${jobs.length - 1} more` : "";
+  const job = jobs[0];
+  const progress =
+    genx.status === "generating" && job.startedAt
+      ? ` ${percent(now - job.startedAt, job.expectMs, streamed, job.expectChars)}%`
+      : "";
   return {
-    widget: deriveWidget(state, now),
-    statusText: jobs.length ? `${jobs[0].label}${more}` : "",
+    widget,
+    statusText: `${jobs[0].label}${progress}…${more}`,
+    busy: widget.mode === "cancel",
   };
 }
 
@@ -48,6 +81,6 @@ export function storeSignature(state: RootState): string {
   return [
     genx.status,
     genx.budgetWaitEndTime ?? "",
-    jobs.map((j) => `${j.id}:${j.label}`).join(","),
+    jobs.map((j) => `${j.id}:${j.label}:${j.startedAt}`).join(","),
   ].join("|");
 }

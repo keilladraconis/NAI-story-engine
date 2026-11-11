@@ -11,7 +11,6 @@ import {
   offersSet,
   offerChosen,
   offerUnpicked,
-  directionPreset,
   type RootState,
 } from "../../src/core/store";
 import { stageDone, missingKinds, openIssueCount } from "../../src/core/stages";
@@ -167,10 +166,5 @@ describe("offers", () => {
     state = rootReducer(state, offerUnpicked({ kind: "startingPoint" }));
     expect(state.runtime.offers.startingPoint.picked).toBe("");
     expect(state.runtime.offers.startingPoint.offers).toHaveLength(1);
-  });
-  it("a preset bumps its sequence even for the same text", () => {
-    const once = rootReducer(base, directionPreset({ text: "" }));
-    const twice = rootReducer(once, directionPreset({ text: "" }));
-    expect(twice.runtime.direction.seq).toBe(once.runtime.direction.seq + 1);
   });
 });

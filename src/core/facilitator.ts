@@ -188,14 +188,31 @@ export function parseRound(text: string): {
     const head = line.match(/^#{2,4}\s*(.+)$/);
     if (leadLine) lead = leadLine[1].trim();
     else if (option && current) {
-      const [label, ...rest] = option[1].split("|").map((p) => p.trim());
-      if (label) current.options.push({ label, description: rest.join(" ") });
+      const { label, description } = splitOption(option[1]);
+      if (label) current.options.push({ label, description });
     } else if (head || (!option && line.includes("?"))) {
       current = question(head ? head[1] : line);
       questions.push(current);
     }
   }
   return { lead, questions: questions.filter((q) => q.options.length >= 2) };
+}
+
+/**
+ * An option line: "label | description". Without the bar, a short lead-in
+ * before a colon is the label ("A slow burn: she grows over months"), so a
+ * whole sentence never lands on the button as its title.
+ */
+export function splitOption(text: string): {
+  label: string;
+  description: string;
+} {
+  const [label, ...rest] = text.split("|").map((p) => p.trim());
+  if (rest.length) return { label, description: rest.join(" ") };
+  const colon = /^([^:]{2,60}):\s+(.+)$/.exec(label);
+  return colon
+    ? { label: colon[1].trim(), description: colon[2].trim() }
+    : { label, description: "" };
 }
 
 /**
@@ -269,7 +286,7 @@ function transcript(state: RootState): Message[] {
 async function updateSeed(): Promise<void> {
   const text = await runGlm({
     id: api.v1.uuid(),
-    label: "Updating the seed",
+    label: "Reading your answer",
     maxTokens: 1500,
     temperature: 0.3,
     messages: async () => {
@@ -319,7 +336,7 @@ async function reply(): Promise<void> {
 async function round(replyId: string): Promise<void> {
   const text = await runGlm({
     id: api.v1.uuid(),
-    label: "Facilitator",
+    label: "Thinking of questions",
     maxTokens: 1200,
     temperature: 0.8,
     messages: async () => {
@@ -367,10 +384,9 @@ async function close(replyId: string): Promise<void> {
   // line lost and the model asked about a filled field.
   const text = await runGlm({
     id: replyId,
-    label: "Facilitator",
+    label: "Reading the brief back",
     maxTokens: 400,
     temperature: 0.7,
-    stream: true,
     messages: async () => {
       const state = store.getState();
       const system = [

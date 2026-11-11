@@ -18,6 +18,7 @@ import { SP } from "../../style";
 import {
   Button,
   Hint,
+  Intro,
   Row,
   SectionTitle,
   StageBody,
@@ -132,12 +133,18 @@ export function DistillStage() {
 
   return (
     <StageBody>
-      <Hint>
-        The canon compiled into what the story model reads: Memory, the Author's
-        Note and the lorebook. Nothing is invented here. Edit an entry by hand
-        and Story Engine leaves it alone; a change of substance belongs in the
-        canon.
-      </Hint>
+      <Intro
+        step={7}
+        title="Distill"
+        steps={[
+          "Press Distill: the canon is compiled into Memory, the Author's Note and the lorebook (category SE: Scenario).",
+          "Under Opening, press Draft the opening. Edit it on the page, then press Keep opening above the editor. The story starts there.",
+        ]}
+      >
+        The canon compiled into what the story model reads while you play.
+        Nothing new is invented here. An entry you edit by hand is left alone;
+        to change substance, change the canon and distill again.
+      </Intro>
       <Row>
         <span style={{ flex: 1, fontSize: "0.85em", opacity: 0.8 }}>
           {rows.length
@@ -160,7 +167,8 @@ export function DistillStage() {
       <SectionTitle>Opening</SectionTitle>
       <Hint>
         Drafted on the page with NovelAI's own context, so it is the first real
-        test of what was distilled. Keeping it turns Workshop Sends off.
+        test of what was distilled. Keeping it makes it the story's first page
+        and turns the workshop off.
       </Hint>
       <Row>
         <Button

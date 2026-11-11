@@ -8,7 +8,6 @@ import {
   docTextSet,
   openingKeptSet,
   autoDraftSet,
-  directionPreset,
   offerUnpicked,
   type RootState,
   type Target,
@@ -34,21 +33,12 @@ const toast = (message: string) =>
   void api.v1.ui.toast(message, { type: "info" });
 
 // ── Direction ────────────────────────────────────────────────────────────────
-// What the writer typed in the direction box. Held here, not in the store: it
-// changes per keystroke, and only a Send reads it. A command that fills the
-// box (a new target, an offer drafted) presets it through the store, so the
-// box shows what the Send will be told.
+// What a workshop Send is told, set by the command that started the draft (an
+// offer drafted); empty means the target's default direction. Retry reuses it.
 
 let direction = "";
-export function setDirection(text: string): void {
-  direction = text;
-}
 function presetDirection(text: string): void {
   direction = text;
-  store.dispatch(directionPreset({ text }));
-}
-export function getDirection(): string {
-  return direction;
 }
 
 function directionFor(target: Target): string {

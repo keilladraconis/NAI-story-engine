@@ -174,6 +174,69 @@ export function Fold(props: {
   );
 }
 
+/**
+ * The top of a stage: which step it is, what it is for, and how to work it,
+ * so the stage needs no other explanation.
+ */
+export function Intro(props: {
+  step: number;
+  title: string;
+  children: preact.ComponentChildren;
+  steps?: readonly string[];
+}) {
+  const steps = props.steps ?? [];
+  return (
+    <header
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: SP.sm,
+        marginBottom: SP.lg,
+        lineHeight: 1.5,
+      }}
+    >
+      <span
+        style={{
+          fontSize: "0.72em",
+          fontWeight: "bold",
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          color: T.textDisabled,
+        }}
+      >
+        {`Step ${props.step} of 7`}
+      </span>
+      <h2
+        style={{
+          margin: 0,
+          fontFamily: T.fontHeadings,
+          fontSize: "1.1em",
+          color: T.textHeadings,
+        }}
+      >
+        {props.title}
+      </h2>
+      <p style={{ margin: 0, fontSize: "0.9em" }}>{props.children}</p>
+      <ol
+        style={{
+          display: steps.length ? "flex" : "none",
+          flexDirection: "column",
+          gap: SP.sm,
+          margin: `${SP.sm} 0 0`,
+          padding: "8px 10px 8px 28px",
+          borderRadius: "8px",
+          background: T.bg1,
+          fontSize: "0.85em",
+        }}
+      >
+        {steps.map((step, i) => (
+          <li key={i}>{step}</li>
+        ))}
+      </ol>
+    </header>
+  );
+}
+
 export function Hint(props: { children: preact.ComponentChildren }) {
   return (
     <p

@@ -3,7 +3,9 @@
 
 import { store, briefUpdated, type Brief } from "../../../core/store";
 import { useSlice } from "../../bridge";
-import { Field, Hint, StageBody } from "../../components/kit";
+import { missingBrief } from "../../../core/facilitator";
+import { Field, Intro, StageBody } from "../../components/kit";
+import { NextStage } from "../NextStage";
 
 const FIELDS: ReadonlyArray<{
   field: keyof Brief;
@@ -76,15 +78,20 @@ function BriefField(props: (typeof FIELDS)[number]) {
 }
 
 export function BriefStage() {
+  const missing = useSlice((s) => missingBrief(s.canon.brief).join(", "));
   return (
     <StageBody>
-      <Hint>
-        What the scenario is. The Talk tab fills these in by interview; edit
-        anything here by hand.
-      </Hint>
+      <Intro step={2} title="Brief">
+        The scenario in your own terms. Talk writes it as you answer; read it
+        over and put anything right here. Every later step is built from it.
+      </Intro>
       {FIELDS.map((f) => (
         <BriefField key={f.field} {...f} />
       ))}
+      <NextStage
+        from="brief"
+        todo={`Still to settle: ${missing}. Talk asks about each, or fill them in above.`}
+      />
     </StageBody>
   );
 }

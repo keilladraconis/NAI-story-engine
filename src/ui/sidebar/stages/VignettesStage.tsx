@@ -9,11 +9,12 @@ import { SP, T } from "../../style";
 import { Offers } from "../../components/Offers";
 import {
   Field,
-  Hint,
+  Intro,
   Row,
   SectionTitle,
   StageBody,
 } from "../../components/kit";
+import { NextStage } from "../NextStage";
 import { ConfirmButton } from "../../components/ConfirmButton";
 
 function VignetteCard(props: { id: string }) {
@@ -84,13 +85,19 @@ export function VignettesStage() {
   const missing = useSlice((s) => missingBrief(s.canon.brief).join(", "));
   return (
     <StageBody>
-      <Hint>
-        Short scenes that set the tone: what the scenario must allow, not what
-        will happen. Pick a scene below, or say what you want, and Story Engine
-        drafts it on the page. Steer it there: edit the direction under the page
-        and Retry, or edit the text itself, then save it. Saving offers the next
-        scenes.
-      </Hint>
+      <Intro
+        step={3}
+        title="Vignettes"
+        steps={[
+          "Pick a scene below, or describe one, and press Draft it.",
+          "It is written on the page, under a Story Engine divider. Edit it there, Retry it, or Draft it again.",
+          "Press Save vignette in the toolbar above the editor. New scenes are offered.",
+        ]}
+      >
+        Short scenes that set the tone and show what the scenario must allow.
+        They are samples, not events: nothing in them has happened yet. Two or
+        three that span the range are enough.
+      </Intro>
       <p
         style={{
           display: missing ? "block" : "none",
@@ -106,9 +113,20 @@ export function VignettesStage() {
       <SectionTitle>What next</SectionTitle>
       <Offers kind="vignette" blocked={Boolean(missing)} noun="scenes" />
       <SectionTitle>Kept · {ids ? ids.split(",").length : 0}</SectionTitle>
+      <p
+        style={{
+          display: ids ? "none" : "block",
+          margin: 0,
+          fontSize: "0.85em",
+          opacity: 0.75,
+        }}
+      >
+        None yet. Saved vignettes are listed here.
+      </p>
       {(ids ? ids.split(",") : []).map((id) => (
         <VignetteCard key={id} id={id} />
       ))}
+      <NextStage from="vignettes" todo="Save at least one vignette." />
     </StageBody>
   );
 }

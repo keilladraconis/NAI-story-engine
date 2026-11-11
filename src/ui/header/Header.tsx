@@ -5,7 +5,7 @@
 
 import { store } from "../../core/store";
 import { cancelGlm, confirmPresence } from "../../core/engine/glm";
-import { useSlice } from "../bridge";
+import { useSlice, useStream } from "../bridge";
 import { SP, T } from "../style";
 import { derive, storeSignature, type WidgetMode } from "./header-model";
 import { Play, X, Clock } from "nai:icons/feather";
@@ -13,8 +13,9 @@ import { Play, X, Clock } from "nai:icons/feather";
 const ICON_SIZE = 13;
 
 /**
- * Re-renders the caller every second while a budget wait counts down. The
- * countdown is wall-clock, not store state, so it needs its own heartbeat.
+ * Re-renders the caller every half second while a budget wait counts down or
+ * work is under way. The countdown and the progress figure are wall-clock,
+ * not store state, so they need their own heartbeat.
  * Self-rescheduling: api.v1.timers has no setInterval.
  */
 function useTick(active: boolean): void {
@@ -30,7 +31,7 @@ function useTick(active: boolean): void {
           pending = null;
           setTick((n) => n + 1);
           arm();
-        }, 1000)
+        }, 500)
         .then((id: number) => {
           if (stopped) void api.v1.timers.clearTimeout(id);
           else pending = id;
@@ -85,10 +86,59 @@ function widgetStyle(mode: WidgetMode): Record<string, string> {
   };
 }
 
+const SWEEP_MS = 1400;
+
+/**
+ * A highlight sweeping across the status text while work is under way. Script
+ * JSX has no <style>, so no keyframes: each sweep is a transition of the
+ * gradient's position, then an instant snap back, two renders a cycle.
+ */
+function useShimmer(active: boolean): Record<string, string> {
+  const [phase, setPhase] = useState<"snap" | "sweep">("snap");
+  useEffect(() => {
+    if (!active) return;
+    let stopped = false;
+    let pending: number | null = null;
+    const step = (next: "snap" | "sweep") => {
+      if (stopped) return;
+      setPhase(next);
+      void api.v1.timers
+        .setTimeout(
+          () => step(next === "snap" ? "sweep" : "snap"),
+          next === "snap" ? 60 : SWEEP_MS + 200,
+        )
+        .then((id: number) => {
+          if (stopped) void api.v1.timers.clearTimeout(id);
+          else pending = id;
+        });
+    };
+    step("sweep");
+    return () => {
+      stopped = true;
+      if (pending !== null) void api.v1.timers.clearTimeout(pending);
+    };
+  }, [active]);
+  if (!active) return { color: T.text };
+  return {
+    backgroundImage: `linear-gradient(90deg, ${T.textPlaceholder} 0%, ${T.textPlaceholder} 32%, ${T.textHeadings} 44%, ${T.textHeadings} 56%, ${T.textPlaceholder} 68%, ${T.textPlaceholder} 100%)`,
+    backgroundSize: "300% 100%",
+    backgroundPosition: phase === "sweep" ? "0% 0" : "100% 0",
+    transition:
+      phase === "sweep" ? `background-position ${SWEEP_MS}ms linear` : "none",
+    WebkitBackgroundClip: "text",
+    backgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    color: "transparent",
+  };
+}
+
 export function Header() {
   useSlice(storeSignature);
-  const model = derive(store.getState(), Date.now());
-  useTick(model.widget.mode === "wait");
+  const oldest = useSlice((s) => s.runtime.jobs[0]?.id ?? "");
+  const streamed = useStream(oldest)?.length ?? 0;
+  const model = derive(store.getState(), Date.now(), streamed);
+  const shimmer = useShimmer(model.busy);
+  useTick(model.widget.mode === "wait" || model.busy);
 
   const onWidget = () => {
     if (model.widget.mode === "continue") confirmPresence();
@@ -105,22 +155,32 @@ export function Header() {
         padding: `${SP.md} 12px`,
       }}
     >
-      <h1 style={{ margin: 0, fontSize: "1.05em", color: T.textHeadings }}>
+      <h1
+        style={{
+          margin: 0,
+          fontFamily: T.fontHeadings,
+          fontSize: "1.05em",
+          color: T.textHeadings,
+        }}
+      >
         Story Engine
       </h1>
       <span
+        role="status"
         style={{
-          flex: "1 1 120px",
+          ...shimmer,
+          flex: "0 1 auto",
           minWidth: 0,
           fontSize: "0.85em",
-          opacity: 0.8,
           overflow: "hidden",
           whiteSpace: "nowrap",
           textOverflow: "ellipsis",
+          fontVariantNumeric: "tabular-nums",
         }}
       >
         {model.statusText}
       </span>
+      <span style={{ flex: 1 }} />
       <button onClick={onWidget} style={widgetStyle(model.widget.mode)}>
         <WidgetIcon mode={model.widget.mode} />
         {model.widget.text}

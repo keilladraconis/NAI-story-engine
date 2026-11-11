@@ -152,6 +152,12 @@ export interface Job {
   id: string;
   /** What the job is doing, for status lines: "Reviewing Tam". */
   label: string;
+  /** How long the job is expected to take once started, in ms. */
+  expectMs: number;
+  /** Characters the reply is expected to run to. */
+  expectChars: number;
+  /** When the job reached the model (0 while it waits in the queue). */
+  startedAt: number;
 }
 
 export interface RuntimeState {
@@ -166,12 +172,6 @@ export interface RuntimeState {
   plan: PlanItem[];
   /** A canon build run, while one is going. */
   build: { running: boolean; done: number; total: number; current: string };
-  /**
-   * A direction put in the workshop box by a command (an offer drafted, a new
-   * target). `seq` changes on every preset so the box refills even when the
-   * text is the same as last time.
-   */
-  direction: { text: string; seq: number };
 }
 
 /** A pitch for the next draft: its label and the piece as a direction. */

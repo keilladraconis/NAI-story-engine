@@ -20,11 +20,12 @@ import { DENSE, SP, T } from "../../style";
 import {
   Button,
   Fold,
-  Hint,
+  Intro,
   Row,
   SectionTitle,
   StageBody,
 } from "../../components/kit";
+import { NextStage } from "../NextStage";
 import { DocCard } from "../DocCard";
 import { BuildCanon } from "../BuildCanon";
 
@@ -34,6 +35,10 @@ const summary = (s: RootState): string => {
   const issues = openIssueCount(s);
   return `${reviewed} of ${withText.length} reviewed · ${issues} ${issues === 1 ? "issue" : "issues"}`;
 };
+
+/** Documents with text whose review is missing or older than the text. */
+const unreviewed = (s: RootState): number =>
+  s.canon.docs.filter((d) => d.text.trim() && !reviewCurrent(d)).length;
 
 /** Every document's id, in the order the stage lists them. */
 const ids = (s: RootState): string =>
@@ -112,6 +117,7 @@ export function CanonStage() {
   );
   const list = useSlice(ids);
   const issueCount = useSlice(openIssueCount);
+  const toReview = useSlice(unreviewed);
   const docOpen = useSlice((s) =>
     s.canon.docs.some((d) => d.id === s.ui.openDocId),
   );
@@ -127,15 +133,24 @@ export function CanonStage() {
 
   return (
     <StageBody>
-      <Hint>
-        The world in full prose: the source of truth. Plan and Build drafts each
-        document on the page; the critic then checks them against the brief, the
-        starting point and each other. Work through the issues under each
-        document, and edit anything by hand.
-      </Hint>
+      <Intro
+        step={5}
+        title="Canon"
+        steps={[
+          "Under Build, press Plan the canon: Story Engine proposes the documents the scenario needs. Untick any you don't want.",
+          "Press Build these. Each is drafted on the page and saved in turn, then the critic reviews them all.",
+          "Under Documents, open each issue: Fix rewrites the document to resolve it, Dismiss drops it.",
+        ]}
+      >
+        The world in full prose: places, culture, tensions, people. It is the
+        source of truth; the lorebook is compiled from it at the end. The critic
+        checks every document against the Brief, Now and the others.
+      </Intro>
       <Fold
         title="Build"
-        summary={missing ? `${missing.split(", ").length} kinds needed` : "✓"}
+        summary={
+          missing ? `${missing.split(", ").length} kinds needed` : "✓ complete"
+        }
         tone={missing ? "warn" : "good"}
         open={buildOpen}
         onToggle={() => setBuildFold(!buildOpen)}
@@ -154,8 +169,18 @@ export function CanonStage() {
       </Fold>
       <Fold
         title="Documents"
-        summary={issueCount ? `${issueCount} to fix` : list ? "✓" : "none yet"}
-        tone={issueCount ? "warn" : list ? "good" : undefined}
+        summary={
+          issueCount
+            ? `${issueCount} to fix`
+            : toReview
+              ? `${toReview} not reviewed`
+              : list
+                ? "✓ reviewed"
+                : "none yet"
+        }
+        tone={
+          issueCount ? "warn" : toReview ? undefined : list ? "good" : undefined
+        }
         open={docsOpen}
         onToggle={() => {
           if (docsOpen && docOpen) store.dispatch(docOpened({ id: null }));
@@ -166,8 +191,13 @@ export function CanonStage() {
           <span style={{ flex: 1, fontSize: "0.85em", opacity: 0.75 }}>
             {line}
           </span>
-          <Button dense onClick={() => void reviewAll()}>
-            Review all
+          <Button
+            dense
+            tone={toReview && !issueCount ? "primary" : "plain"}
+            disabled={!toReview}
+            onClick={() => void reviewAll()}
+          >
+            {toReview ? `Review ${toReview}` : "All reviewed"}
           </Button>
         </Row>
         <div style={{ height: SP.md }} />
@@ -177,6 +207,14 @@ export function CanonStage() {
         <SectionTitle>Add a document</SectionTitle>
         <AddDoc />
       </Fold>
+      <NextStage
+        from="canon"
+        todo={
+          missing
+            ? `Still needed: ${missing}.`
+            : "Resolve or dismiss every issue to finish."
+        }
+      />
     </StageBody>
   );
 }

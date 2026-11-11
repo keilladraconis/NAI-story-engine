@@ -6,17 +6,20 @@ import { store, lorebookEntrySelected } from "../core/store";
 import { loadPersisted, savePersisted } from "../core/store/persistence";
 import { startGlm } from "../core/engine/glm";
 import { enableJournal } from "../core/engine/journal";
-import { registerWorkshopHooks, saveDraft } from "../core/workshop/workshop";
+import {
+  registerWorkshopHooks,
+  saveDraft,
+  setWorkshopOn,
+  stopWriting,
+} from "../core/workshop/workshop";
 import { redraw, setWidgetContent } from "../core/workshop/page";
-import { targetLabel } from "../core/workshop/targets";
+import { saveLabel, targetLabel } from "../core/workshop/targets";
 import { Sidebar } from "./sidebar/Sidebar";
-import { WorkshopPanel, currentSaveLabel } from "./panel/WorkshopPanel";
 import { JournalPanel } from "./panels/journal/JournalPanel";
 import { LorebookPanel } from "./lorebook/LorebookPanel";
 
-const { sidebarPanel, scriptPanel, lorebookPanel } = api.v1.ui.extension;
-
-const PANEL_ID = "se-workshop-panel";
+const { sidebarPanel, scriptPanel, lorebookPanel, toolbarButton } =
+  api.v1.ui.extension;
 
 /** A jsx part that fills its container and lets the tree inside scroll. */
 function fillingJsx(id: string, render_: (elem: unknown) => void): UIPart {
@@ -58,56 +61,68 @@ function buildSidebar(): UIExtension {
   });
 }
 
-/** The panel's name carries the workshop state, so it reads even collapsed. */
-function panelName(): string {
-  return store.getState().workshop.on
-    ? "Story Engine · Workshop on"
-    : "Story Engine";
+// ── The workshop's toolbar buttons ──────────────────────────────────────────
+// While Workshop Sends are on, two buttons sit in the toolbar above the
+// editor: save the draft (or stop a Draft run), and turn the workshop off.
+// Everything else about a draft is chosen from the sidebar.
+
+const SAVE_ID = "se-save-draft";
+const OFF_ID = "se-workshop-off";
+
+function toolbar(): UIExtension[] {
+  const state = store.getState();
+  const writing = state.runtime.autoDraft;
+  return [
+    toolbarButton({
+      id: SAVE_ID,
+      text: writing ? "Stop writing" : saveLabel(state, state.workshop.target),
+      iconId: writing ? "stop-circle" : "save",
+      callback: () => {
+        if (store.getState().runtime.autoDraft) stopWriting();
+        else void saveDraft();
+      },
+    }),
+    toolbarButton({
+      id: OFF_ID,
+      text: "Workshop off",
+      iconId: "power",
+      callback: () => void setWorkshopOn(false),
+    }),
+  ];
+}
+
+/** Show the buttons, with labels for the current target, or take them away. */
+function syncToolbar(): void {
+  if (store.getState().workshop.on)
+    void api.v1.ui.update(toolbar() as (UIExtension & { id: string })[]);
+  else void api.v1.ui.remove([SAVE_ID, OFF_ID]);
 }
 
 /**
- * The script panel. Renaming it means sending the whole extension again:
- * `ui.update([{ id, name }])` removed the panel in the probe.
+ * The divider's label, on a line of its own above the draft: what is being
+ * drafted, that it is not story yet, and the button that saves it.
  */
-function buildPanel(): UIExtensionScriptPanel & { id: string } {
-  const panel = scriptPanel({
-    id: PANEL_ID,
-    name: panelName(),
-    content: [
-      api.v1.ui.part.jsx({
-        id: "se-panel-root",
-        onMount: (el) => render(h(WorkshopPanel, null), el),
-      }),
-    ],
-  });
-  return { ...panel, id: PANEL_ID };
-}
-
-function DividerSave() {
+function DividerLabel() {
+  const state = store.getState();
+  const target = state.workshop.target;
   return h(
-    "button",
+    "div",
     {
-      onClick: () => void saveDraft(),
       style: {
-        minHeight: "36px",
-        padding: "0 12px",
-        cursor: "pointer",
-        fontWeight: "bold",
+        display: "block",
+        padding: "2px 0 4px",
+        fontSize: "0.8em",
+        opacity: 0.8,
       },
     },
-    currentSaveLabel(),
+    `Story Engine draft · ${targetLabel(state, target)} · not part of the story. Edit it, then press ${saveLabel(state, target)} above the editor.`,
   );
 }
 
 /** The divider widget's content, rebuilt on every redraw so labels follow the target. */
 function dividerContent(): UIPart[] {
-  const state = store.getState();
   return [
-    api.v1.ui.part.text({
-      text: `Story Engine draft · ${targetLabel(state, state.workshop.target)} · not part of the story`,
-      noTemplate: true,
-    }),
-    api.v1.ui.part.jsx({ onMount: (el) => render(h(DividerSave, null), el) }),
+    api.v1.ui.part.jsx({ onMount: (el) => render(h(DividerLabel, null), el) }),
   ];
 }
 
@@ -131,7 +146,7 @@ export async function start(): Promise<void> {
 
   const extensions: UIExtension[] = [
     buildSidebar(),
-    buildPanel(),
+    ...(store.getState().workshop.on ? toolbar() : []),
     lorebookPanel({
       id: "se-lorebook",
       name: "Story Engine",
@@ -162,8 +177,9 @@ export async function start(): Promise<void> {
   await api.v1.ui.register(extensions);
 
   store.subscribeSelector(
-    (s) => s.workshop.on,
-    () => void api.v1.ui.update([buildPanel()]),
+    (s) =>
+      `${s.workshop.on}|${s.runtime.autoDraft}|${saveLabel(s, s.workshop.target)}`,
+    syncToolbar,
   );
 
   // Widgets and markers do not survive a reload.

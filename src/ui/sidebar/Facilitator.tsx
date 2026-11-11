@@ -17,7 +17,7 @@ import {
 import { talk, interviewDone, answerText } from "../../core/facilitator";
 import { useSlice, useStream } from "../bridge";
 import { SP, T, SCROLL } from "../style";
-import { Button, Row } from "../components/kit";
+import { Button, Intro, Row } from "../components/kit";
 import { ConfirmButton } from "../components/ConfirmButton";
 import { Choice } from "../components/Choice";
 /** Messages shown at once; Show more reveals this many more. */
@@ -185,9 +185,9 @@ export function Facilitator() {
         <div style={{ display: ids && done && !busy ? "flex" : "none" }}>
           <Button
             tone="primary"
-            onClick={() => store.dispatch(stageOpened({ stage: "vignettes" }))}
+            onClick={() => store.dispatch(stageOpened({ stage: "brief" }))}
           >
-            Go to Vignettes
+            Next: read the Brief ›
           </Button>
         </div>
         {reversed.map((id, i) => (
@@ -203,18 +203,20 @@ export function Facilitator() {
             {`Show ${Math.min(PAGE, hidden)} more`}
           </Button>
         </div>
-        <p
-          style={{
-            display: ids ? "none" : "block",
-            margin: 0,
-            lineHeight: 1.5,
-            opacity: 0.75,
-          }}
-        >
-          Start with whatever you have: a premise, a character, a feeling, five
-          words. The facilitator asks a few rounds of questions to pick from,
-          and keeps the Brief as you go.
-        </p>
+        <div style={{ display: ids ? "none" : "block" }}>
+          <Intro
+            step={1}
+            title="Talk"
+            steps={[
+              "Write whatever you have below and press Send: a premise, a character, a feeling, five words.",
+              "Story Engine answers with a few questions, each with options. Pick any, add your own words, and press Answer.",
+              "After a few rounds the Brief is complete, and you go on to read it.",
+            ]}
+          >
+            Work out the scenario you want to play. Everything you settle here
+            is written into the Brief, which the rest is built from.
+          </Intro>
+        </div>
       </div>
       <div
         style={{

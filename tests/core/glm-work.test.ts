@@ -5,6 +5,7 @@ import {
   nextField,
   interviewDone,
   parseRound,
+  splitOption,
   answerText,
   withoutQuestions,
   answered,
@@ -211,6 +212,25 @@ describe("rounds", () => {
         picks: [[], ["No vore", "No scat"]],
       }),
     ).toBe("Hard limits: No vore, No scat");
+  });
+});
+
+describe("splitOption", () => {
+  it("splits on the bar, or else on a short lead-in's colon", () => {
+    expect(splitOption("Tender | No explicit content")).toEqual({
+      label: "Tender",
+      description: "No explicit content",
+    });
+    expect(
+      splitOption("A slow, steady gluttony: Her size increases gradually."),
+    ).toEqual({
+      label: "A slow, steady gluttony",
+      description: "Her size increases gradually.",
+    });
+    expect(splitOption("No vore.")).toEqual({
+      label: "No vore.",
+      description: "",
+    });
   });
 });
 

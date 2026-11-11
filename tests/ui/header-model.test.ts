@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { derive, storeSignature } from "../../src/ui/header/header-model";
+import {
+  derive,
+  percent,
+  storeSignature,
+} from "../../src/ui/header/header-model";
 import { rootReducer, type RootState } from "../../src/core/store";
 import type { RuntimeState } from "../../src/core/store/types";
 
@@ -47,21 +51,54 @@ describe("derive: widget", () => {
 });
 
 describe("derive: status text", () => {
+  const jobs = [
+    {
+      id: "a",
+      label: "Reviewing Tam",
+      expectMs: 10_000,
+      expectChars: 400,
+      startedAt: NOW - 2_300,
+    },
+    {
+      id: "b",
+      label: "Reviewing Ilse",
+      expectMs: 10_000,
+      expectChars: 400,
+      startedAt: 0,
+    },
+  ];
+
   it("names the oldest job and counts the rest", () => {
+    const m = derive(state({ jobs }), NOW);
+    expect(m.statusText).toBe("Reviewing Tam… · 1 more");
+  });
+
+  it("measures how far a generating reply has got", () => {
     const m = derive(
-      state({
-        jobs: [
-          { id: "a", label: "Reviewing Tam" },
-          { id: "b", label: "Reviewing Ilse" },
-        ],
-      }),
+      state({ jobs, genx: { status: "generating", queueLength: 2 } }),
       NOW,
     );
-    expect(m.statusText).toBe("Reviewing Tam (+1)");
+    expect(m.statusText).toBe("Reviewing Tam 20%… · 1 more");
+    expect(m.busy).toBe(true);
   });
 
   it("is empty with no jobs", () => {
     expect(derive(state(), NOW).statusText).toBe("");
+  });
+});
+
+describe("percent", () => {
+  it("runs with time to 90% at the expected time, then eases", () => {
+    expect(percent(0, 10_000)).toBe(0);
+    expect(percent(5_000, 10_000)).toBe(45);
+    expect(percent(10_000, 10_000)).toBe(90);
+    expect(percent(20_000, 10_000)).toBe(95);
+    expect(percent(1e9, 10_000)).toBe(99);
+    expect(percent(10, 0)).toBe(0);
+  });
+
+  it("is pushed on by the reply streaming in", () => {
+    expect(percent(1_000, 10_000, 300, 400)).toBe(75);
   });
 });
 
@@ -71,9 +108,15 @@ describe("storeSignature", () => {
     expect(
       storeSignature(state({ genx: { status: "queued", queueLength: 1 } })),
     ).not.toBe(base);
-    expect(storeSignature(state({ jobs: [{ id: "a", label: "x" }] }))).not.toBe(
-      base,
-    );
+    expect(
+      storeSignature(
+        state({
+          jobs: [
+            { id: "a", label: "x", expectMs: 1, expectChars: 1, startedAt: 0 },
+          ],
+        }),
+      ),
+    ).not.toBe(base);
     expect(
       storeSignature(
         state({

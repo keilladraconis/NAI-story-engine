@@ -7,11 +7,12 @@ import { addDoc } from "../../../core/canon";
 import { useSlice } from "../../bridge";
 import {
   Button,
-  Hint,
+  Intro,
   Row,
   SectionTitle,
   StageBody,
 } from "../../components/kit";
+import { NextStage } from "../NextStage";
 import { DocCard } from "../DocCard";
 import { AddDoc } from "./CanonStage";
 
@@ -31,11 +32,19 @@ export function CastStage() {
 
   return (
     <StageBody>
-      <Hint>
+      <Intro
+        step={6}
+        title="Cast"
+        steps={[
+          "Open each dossier and read it: body and figures, voice, wants, history, family.",
+          'Change what is wrong with Rewrite ("make her two years older"), or add someone with + Dossier and Draft on page.',
+          "When these are the people you want scenes with, press Mark the cast reviewed.",
+        ]}
+      >
         Everyone with a dossier, the protagonist included, and how they stand
-        with each other. Read them as a whole: who do you want scenes with, who
-        is missing, what misfires?
-      </Hint>
+        with each other, read as a whole. Each dossier becomes a lorebook
+        profile, so get the people right here.
+      </Intro>
       <SectionTitle>Dossiers</SectionTitle>
       {(dossiers ? dossiers.split(",") : []).map((id) => (
         <DocCard key={id} id={id} />
@@ -50,7 +59,7 @@ export function CastStage() {
           + Relationships
         </Button>
       </div>
-      <SectionTitle>Gate</SectionTitle>
+      <SectionTitle>Done reading?</SectionTitle>
       <Row>
         <Button
           tone={reviewed ? "plain" : "primary"}
@@ -61,6 +70,7 @@ export function CastStage() {
           {reviewed ? "✓ Cast reviewed (undo)" : "Mark the cast reviewed"}
         </Button>
       </Row>
+      <NextStage from="cast" todo="Mark the cast reviewed when it is right." />
     </StageBody>
   );
 }
