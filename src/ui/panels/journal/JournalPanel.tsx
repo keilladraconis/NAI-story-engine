@@ -1,41 +1,32 @@
-// Generation Journal panel (JSX) — replaces SUI SeJournalPanel. Shows the
-// recorded-entry count and copy buttons (Full journal + SEGA/Bootstrap/Forge
-// digests) that write to the clipboard, plus Clear. Reads the effect-free
-// generation-journal module directly; the count re-reads on request boundaries
-// (the activeRequest watch, matching SUI) and after Clear.
+// Generation Journal panel: entry count, copy to clipboard, clear. Shown only
+// when the `generation_journal` config is on.
 
 import { useSlice } from "../../bridge";
 import { T, SP } from "../../style";
 import {
-  getJournalCount,
+  journalCount,
   formatJournal,
-  formatDigest,
-  formatBootstrapDigest,
-  formatForgeDigest,
   clearJournal,
-} from "../../../core/generation-journal";
+} from "../../../core/engine/journal";
 
 const btn = {
-  fontSize: "0.75em",
-  padding: "3px 8px",
+  minHeight: "32px",
+  padding: "0 10px",
   background: T.bg2,
   color: T.text,
   border: "none",
   cursor: "pointer",
-  flexShrink: 0,
 } as const;
 
 export function JournalPanel() {
-  // Re-render on request boundaries (proxy for "journal advanced"), like the SUI
-  // watch on runtime.activeRequest. Primitive selector — no render loop.
-  useSlice((s) => s.runtime.activeRequest?.id ?? "");
-  const [, force] = useState(0); // bump after Clear so the count re-reads to 0
+  // Re-render when the job list changes: a finished job is a new entry.
+  useSlice((s) => s.runtime.jobs.length);
+  const [, force] = useState(0);
 
-  const count = getJournalCount();
-  const copy = (fmt: () => string, label: string) => {
+  const copy = () => {
     void (async () => {
-      await api.v1.clipboard.writeText(fmt());
-      void api.v1.ui.toast(`${label} copied to clipboard`, { type: "success" });
+      await api.v1.clipboard.writeText(formatJournal());
+      void api.v1.ui.toast("Journal copied to clipboard", { type: "success" });
     })();
   };
 
@@ -52,25 +43,10 @@ export function JournalPanel() {
       }}
     >
       <span style={{ flex: 1, minWidth: 0, fontSize: "0.85em", opacity: 0.8 }}>
-        {count} entries recorded
+        {journalCount()} entries recorded
       </span>
-      <button style={btn} onClick={() => copy(formatJournal, "Journal")}>
-        Full
-      </button>
-      <button style={btn} onClick={() => copy(formatDigest, "SEGA digest")}>
-        SEGA
-      </button>
-      <button
-        style={btn}
-        onClick={() => copy(formatBootstrapDigest, "Bootstrap digest")}
-      >
-        Bootstrap
-      </button>
-      <button
-        style={btn}
-        onClick={() => copy(formatForgeDigest, "Forge digest")}
-      >
-        Forge
+      <button style={btn} onClick={copy}>
+        Copy
       </button>
       <button
         style={{ ...btn, color: T.warning }}

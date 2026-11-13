@@ -1,27 +1,49 @@
 // Semantic theme tokens for the JSX UI. Values are NAI theme CSS custom
-// properties (see external/theme-variables.d.ts) consumed as inline styles;
-// CSS custom properties inherit through the shadow DOM, so the UI auto-follows
-// the user's active theme. `satisfies Record<string, ThemeVarRef>` enforces
-// theme vars only — no static hex colors.
+// properties (see external/theme-variables.d.ts) used as inline styles; they
+// inherit through the shadow DOM, so the UI follows the writer's theme.
+// `satisfies Record<string, ThemeVarRef>` keeps static colours out.
+//
+// No media queries exist in inline styles, so every layout is one flex layout
+// that wraps: built for a phone, stretched for a desktop.
 
 export const T = {
   bg: "var(--theme-bg0)",
+  bg1: "var(--theme-bg1)",
   bg2: "var(--theme-bg2)",
   bg3: "var(--theme-bg3)",
   text: "var(--theme-text-main)",
   textHeadings: "var(--theme-text-headings)",
   textDisabled: "var(--theme-text-disabled)",
+  textPlaceholder: "var(--theme-text-placeholder)",
   warning: "var(--theme-warning)",
   fontDefault: "var(--theme-font-default)",
-  // Mid-intensity is green in the default theme; SUI's sync-toggle "on" state
-  // (SeFoundationSection SYNC_TOGGLE_THEME) uses the same green literal.
-  midIntensity: "var(--theme-mid-intensity)",
-  // Cool accent for "draft" entity borders (not-yet-live).
-  lowIntensity: "var(--theme-low-intensity)",
+  fontHeadings: "var(--theme-font-headings)",
+  /** Done, current: green in the default theme. */
+  good: "var(--theme-mid-intensity)",
+  /** Hand-edited and other "yours, not ours" states. */
+  cool: "var(--theme-low-intensity)",
 } as const satisfies Record<string, ThemeVarRef>;
 
 export const SP = {
   xs: "2px",
   sm: "4px",
   md: "8px",
+  lg: "12px",
+} as const;
+
+/** Minimum touch target for primary controls. */
+export const TOUCH = "44px";
+/** Minimum height for controls in dense lists. */
+export const DENSE = "36px";
+
+/**
+ * Scroll containers: thin, with a theme-coloured thumb on no track, to match
+ * NovelAI's own sidebar. NovelAI styles its scrollbars with global
+ * `::-webkit-scrollbar` rules, which do not reach into our shadow DOM, and
+ * inline styles cannot hold pseudo-elements; the standard properties can.
+ */
+export const SCROLL = {
+  overflowY: "auto",
+  scrollbarWidth: "thin",
+  scrollbarColor: `${T.bg3} transparent`,
 } as const;

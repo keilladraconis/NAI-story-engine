@@ -1,191 +1,213 @@
-// Bootstrap + mount for the JSX/Preact Story Engine.
-//
-// `start()` is the single entry point (called from src/index.ts). It wires the
-// store (GenX, effects, persistence, migrations, lorebook sync), then registers
-// the sidebar panel — and, when enabled, the Generation Journal panel — in ONE
-// `api.v1.ui.register()` call (NAI requires a single call; multiple overwrite
-// each other). All UI is Preact rendered into a jsx part.
+// Startup: load the story's records, start the GLM queue, register the editor
+// hooks, and mount the surfaces. NovelAI takes extensions in ONE register call;
+// a second call replaces the first.
 
-import { App } from "./App";
+import { store, lorebookEntrySelected } from "../core/store";
+import { loadPersisted, savePersisted } from "../core/store/persistence";
+import { startGlm } from "../core/engine/glm";
+import { enableJournal } from "../core/engine/journal";
+import {
+  registerWorkshopHooks,
+  saveDraft,
+  setWorkshopOn,
+  stopWriting,
+  writeDraft,
+} from "../core/workshop/workshop";
+import { redraw, setWidgetContent } from "../core/workshop/page";
+import { saveLabel, targetLabel } from "../core/workshop/targets";
+import { Sidebar } from "./sidebar/Sidebar";
 import { JournalPanel } from "./panels/journal/JournalPanel";
-import { GenX } from "nai-gen-x";
+import { LorebookPanel } from "./lorebook/LorebookPanel";
 
-import {
-  store,
-  persistedDataLoaded,
-  stateUpdated,
-  requestActivated,
-  importWizardOpened,
-} from "../core/store";
-import {
-  registerEffects,
-  syncEratoCompatibility,
-} from "../core/store/register-effects";
-import {
-  migrateLorebookCategories,
-  registerLorebookSyncHooks,
-} from "../core/store/effects/lorebook-sync";
-import { migrateBrainstormToChat } from "../core/store/migrations/brainstorm-to-chat";
-import { loadJournal } from "../core/generation-journal";
-import { STORAGE_KEYS } from "../core/keys";
-import { hydrateComposerDrafts } from "./panels/chat/composer-draft";
+const { sidebarPanel, scriptPanel, lorebookPanel, toolbarButton } =
+  api.v1.ui.extension;
 
-const { sidebarPanel, scriptPanel } = api.v1.ui.extension;
-
-/** The panel's one child: a full-height grid whose single row can shrink below
- *  its content, so the jsx part is bounded by the panel rather than growing to
- *  fit App. Without it App's `height: 100%` resolves against `auto`. */
-function buildRoot(body: UIPart): UIPart {
-  return api.v1.ui.part.container({
-    id: "kse-root",
+/** A jsx part that fills its container and lets the tree inside scroll. */
+function fillingJsx(id: string, render_: (elem: unknown) => void): UIPart {
+  return api.v1.ui.part.jsx({
+    id,
     style: {
       display: "grid",
       gridTemplateRows: "minmax(0, 1fr)",
       height: "100%",
       minHeight: "0",
     },
-    content: [body],
+    onMount: (elem) => {
+      const el = elem as { style: Record<string, string> };
+      el.style.height = "100%";
+      el.style.minHeight = "0";
+      render_(elem);
+    },
   });
 }
 
-function buildSidebarPanel(hasDocumentContent: boolean): UIExtension {
-  const jsxPart = api.v1.ui.part.jsx({
-    id: "kse-jsx-root",
-    // This `style` lands on the panel's light-DOM wrapper around our shadow host.
-    // A grid whose one row can shrink below content (`minmax(0, 1fr)` — the
-    // responsive, pixel-free equivalent of `min-height:0`) constrains the shadow
-    // host to the panel height instead of letting it grow to content. Together
-    // with the Preact wrapper + App both at height:100%, the chat list scrolls
-    // internally and the composer pins to the bottom.
-    style: {
-      display: "grid",
-      gridTemplateRows: "minmax(0, 1fr)",
-      height: "100%",
-      minHeight: "0",
-    },
-    // captureEvents intentionally omitted — the default (no capture) lets
-    // keydown and wheel pass through normally so panel inputs accept keystrokes.
-    onMount: (elem) => {
-      // `elem` is the (otherwise unstyled) wrapper <div> App renders into, sitting
-      // between the shadow root and App's own root. Give it height:100% so App's
-      // height:100% resolves against the grid-constrained host, not `auto`.
-      (elem as unknown as { style: Record<string, string> }).style.height =
-        "100%";
-      (elem as unknown as { style: Record<string, string> }).style.minHeight =
-        "0";
-      // hasDocumentContent is read before register() so the header's bootstrap
-      // button carries the right label on its first paint.
-      render(h(App, { initialHasDocumentContent: hasDocumentContent }), elem);
-    },
-  });
-
+function buildSidebar(): UIExtension {
   return sidebarPanel({
-    id: "kse-sidebar",
+    id: "se-sidebar",
     name: "Story Engine",
     iconId: "lightning",
-    content: [buildRoot(jsxPart)],
+    content: [
+      api.v1.ui.part.container({
+        style: {
+          display: "grid",
+          gridTemplateRows: "minmax(0, 1fr)",
+          height: "100%",
+          minHeight: "0",
+        },
+        content: [
+          fillingJsx("se-sidebar-root", (el) => render(h(Sidebar, null), el)),
+        ],
+      }),
+    ],
   });
 }
 
-// The Generation Journal panel (gated by `generation_journal`). A short,
-// non-scrolling panel — a plain jsx part, no grid-height constraint.
-function buildJournalPanel(): UIExtension {
-  const jsxPart = api.v1.ui.part.jsx({
-    id: "kse-jsx-journal-root",
-    onMount: (elem) => {
-      render(h(JournalPanel, null), elem);
-    },
-  });
+// ── The workshop's toolbar buttons ──────────────────────────────────────────
+// While Workshop Sends are on, buttons sit in the toolbar above the editor:
+// save the draft (or stop a Draft run), keep writing a draft that stalled
+// short of its end (hidden while a run is going), and turn the workshop off.
+// Everything else about a draft is chosen from the sidebar.
 
-  return scriptPanel({
-    id: "kse-journal",
-    name: "Generation Journal",
-    content: [jsxPart],
-  });
+const SAVE_ID = "se-save-draft";
+const OFF_ID = "se-workshop-off";
+const KEEP_ID = "se-keep-writing";
+
+function toolbar(): UIExtension[] {
+  const state = store.getState();
+  const writing = state.runtime.autoDraft;
+  return [
+    toolbarButton({
+      id: SAVE_ID,
+      text: writing ? "Stop writing" : saveLabel(state, state.workshop.target),
+      iconId: writing ? "stop-circle" : "save",
+      callback: () => {
+        if (store.getState().runtime.autoDraft) stopWriting();
+        else void saveDraft();
+      },
+    }),
+    toolbarButton({
+      id: KEEP_ID,
+      text: "Keep writing",
+      iconId: "play",
+      // Continues the draft as it stands, with the direction it was started on.
+      // A few Sends at a time: a nudge past a stall, not an unattended run.
+      callback: () =>
+        void writeDraft(store.getState().workshop.target, undefined, false, 3),
+    }),
+    toolbarButton({
+      id: OFF_ID,
+      text: "Workshop off",
+      iconId: "power",
+      callback: () => void setWorkshopOn(false),
+    }),
+  ];
 }
 
-// Cold-start heuristic: if the Foundation is empty but the story already has
-// content Story Engine can pull in (unmanaged lorebook entries, Memory, or A/N),
-// open the Import wizard on first run. Store-driven — the App renders it
-// reactively from ui.importWizardOpen.
-async function maybeOpenImportWizard(): Promise<void> {
-  const { attg, style } = store.getState().foundation;
-  const hasFoundationContent = attg.trim() !== "" || style.trim() !== "";
-  if (hasFoundationContent) return;
-
-  const [entries, categories, memText, anText] = await Promise.all([
-    api.v1.lorebook.entries(),
-    api.v1.lorebook.categories(),
-    api.v1.memory.get(),
-    api.v1.an.get(),
-  ]);
-  const seCategories = new Set(
-    categories.filter((c) => (c.name ?? "").startsWith("SE:")).map((c) => c.id),
-  );
-  const unmanagedCount = entries.filter(
-    (e) => !e.category || !seCategories.has(e.category),
-  ).length;
-  if (unmanagedCount > 0 || memText.trim() || anText.trim()) {
-    store.dispatch(importWizardOpened());
+/** Show the buttons, with labels for the current target, or take them away. */
+function syncToolbar(): void {
+  const { workshop, runtime } = store.getState();
+  if (!workshop.on) {
+    void api.v1.ui.remove([SAVE_ID, KEEP_ID, OFF_ID]);
+    return;
   }
+  const buttons = toolbar() as (UIExtension & { id: string })[];
+  if (runtime.autoDraft) {
+    void api.v1.ui
+      .remove([KEEP_ID])
+      .then(() => api.v1.ui.update(buttons.filter((b) => b.id !== KEEP_ID)));
+    return;
+  }
+  // A re-added button goes to the end: take Workshop off away too and add
+  // both back, so Keep writing never trades places with it.
+  void api.v1.ui
+    .remove([KEEP_ID, OFF_ID])
+    .then(() => api.v1.ui.update(buttons));
+}
+
+/**
+ * The divider's label, on a line of its own above the draft: what is being
+ * drafted, that it is not story yet, and the button that saves it.
+ */
+function DividerLabel() {
+  const state = store.getState();
+  const target = state.workshop.target;
+  return h(
+    "div",
+    {
+      style: {
+        display: "block",
+        padding: "2px 0 4px",
+        fontSize: "0.8em",
+        opacity: 0.8,
+      },
+    },
+    `Story Engine draft · ${targetLabel(state, target)} · not part of the story. Edit it, then press ${saveLabel(state, target)} above the editor.`,
+  );
+}
+
+/** The divider widget's content, rebuilt on every redraw so labels follow the target. */
+function dividerContent(): UIPart[] {
+  return [
+    api.v1.ui.part.jsx({ onMount: (el) => render(h(DividerLabel, null), el) }),
+  ];
 }
 
 export async function start(): Promise<void> {
-  api.v1.permissions.request(["storyEdit", "lorebookEdit", "documentEdit"]);
+  api.v1.permissions.request([
+    "storyEdit",
+    "lorebookEdit",
+    "documentEdit",
+    "editorDecorations",
+  ]);
 
-  // ── GenX generation queue ────────────────────────────────────────────────
-  let lastStatus = "idle";
-  let lastQueueLength = 0;
-  const genX = new GenX({
-    onStateChange(genxState) {
-      if (
-        genxState.status !== lastStatus ||
-        genxState.queueLength !== lastQueueLength
-      ) {
-        lastStatus = genxState.status;
-        lastQueueLength = genxState.queueLength;
-        store.dispatch(stateUpdated({ genxState }));
-      }
-    },
-    onTaskStarted(taskId) {
-      store.dispatch(requestActivated({ requestId: taskId }));
-    },
+  startGlm();
+  await loadPersisted(store);
+  savePersisted(store);
+  registerWorkshopHooks();
+  setWidgetContent(dividerContent);
+
+  api.v1.hooks.register("onLorebookEntrySelected", ({ entryId }) => {
+    store.dispatch(lorebookEntrySelected({ entryId: entryId ?? null }));
   });
 
-  registerEffects(store, genX);
-
-  // ── Persistence + migrations ─────────────────────────────────────────────
-  const persisted = await api.v1.storyStorage.get(STORAGE_KEYS.PERSIST);
-  const migrated = migrateBrainstormToChat(persisted ?? {});
-  if (migrated.touched) {
-    await api.v1.storyStorage.set(STORAGE_KEYS.PERSIST, migrated.data);
-    api.v1.ui.toast("Brainstorm chats migrated to new chat system.", {
-      type: "info",
-    });
-  }
-  if (persisted) store.dispatch(persistedDataLoaded(migrated.data));
-
-  // After persistedDataLoaded so the prune sees the real chat list, and before
-  // register() so the composer's first render already carries its unsent text.
-  await hydrateComposerDrafts(store.getState().chat.chats.map((c) => c.id));
-
-  await migrateLorebookCategories();
-  await syncEratoCompatibility(store.getState);
-  registerLorebookSyncHooks(store.dispatch, store.getState);
-
-  // ── Panels (single register call) ────────────────────────────────────────
-  const hasDocumentContent = (await api.v1.document.sectionIds()).length > 0;
-  const panels: UIExtension[] = [buildSidebarPanel(hasDocumentContent)];
-
-  const journalEnabled = await api.v1.config.get("generation_journal");
-  if (journalEnabled) {
+  const extensions: UIExtension[] = [
+    buildSidebar(),
+    ...(store.getState().workshop.on ? toolbar() : []),
+    lorebookPanel({
+      id: "se-lorebook",
+      name: "Story Engine",
+      content: [
+        api.v1.ui.part.jsx({
+          id: "se-lorebook-root",
+          onMount: (el) => render(h(LorebookPanel, null), el),
+        }),
+      ],
+    }),
+  ];
+  if (await api.v1.config.get("generation_journal")) {
     api.v1.permissions.request(["clipboardWrite"]);
-    loadJournal();
-    panels.push(buildJournalPanel());
+    enableJournal();
+    extensions.push(
+      scriptPanel({
+        id: "se-journal",
+        name: "Generation Journal",
+        content: [
+          api.v1.ui.part.jsx({
+            id: "se-journal-root",
+            onMount: (el) => render(h(JournalPanel, null), el),
+          }),
+        ],
+      }),
+    );
   }
+  await api.v1.ui.register(extensions);
 
-  await api.v1.ui.register(panels);
+  store.subscribeSelector(
+    (s) =>
+      `${s.workshop.on}|${s.runtime.autoDraft}|${saveLabel(s, s.workshop.target)}`,
+    syncToolbar,
+  );
 
-  // Auto-open the import wizard once, after the panel is mounted.
-  await maybeOpenImportWizard();
+  // Widgets and markers do not survive a reload.
+  if (store.getState().workshop.on) await redraw();
 }

@@ -1,177 +1,109 @@
 import { describe, it, expect } from "vitest";
 import {
   derive,
+  percent,
   storeSignature,
-  formatOutputBudget,
-  type DeriveInputs,
 } from "../../src/ui/header/header-model";
-import { initialRuntimeState } from "../../src/core/store/slices/runtime";
-import { initialUIState } from "../../src/core/store/slices/ui";
-import type { RootState } from "../../src/core/store";
-import type {
-  GenerationRequest,
-  RuntimeState,
-  UIState,
-} from "../../src/core/store/types";
+import { rootReducer, type RootState } from "../../src/core/store";
+import type { RuntimeState } from "../../src/core/store/types";
 
-const INPUTS: DeriveInputs = {
-  allowedOutput: 4200,
-  hasDocumentContent: false,
-  now: 1_000_000,
-};
+const NOW = 1_000_000;
 
-function req(type: GenerationRequest["type"], id: string): GenerationRequest {
-  return { id, type, targetId: "t", status: "queued" };
+function state(runtime: Partial<RuntimeState> = {}): RootState {
+  const base = rootReducer(undefined, { type: "@@INIT" });
+  return { ...base, runtime: { ...base.runtime, ...runtime } };
 }
 
-function state(
-  runtime: Partial<RuntimeState> = {},
-  ui: Partial<UIState> = {},
-): RootState {
-  return {
-    runtime: { ...initialRuntimeState, ...runtime },
-    ui: { ...initialUIState, ...ui },
-  } as RootState;
-}
-
-describe("formatOutputBudget", () => {
-  it("spells the count out in full, never abbreviated", () => {
-    // An abbreviated "2.0k out" reads as jargon; the exact number is what a
-    // user reasons about when a generation is about to stall.
-    expect(formatOutputBudget(412)).toBe("GenX: 412 tokens");
-    expect(formatOutputBudget(2000)).toBe("GenX: 2000 tokens");
-    expect(formatOutputBudget(12345)).toBe("GenX: 12345 tokens");
+describe("derive: widget", () => {
+  it("is idle, and silent, when nothing runs", () => {
+    expect(derive(state(), NOW).widget).toEqual({ mode: "idle", text: "" });
   });
 
-  it("agrees in number", () => {
-    expect(formatOutputBudget(1)).toBe("GenX: 1 token");
-    expect(formatOutputBudget(0)).toBe("GenX: 0 tokens");
-  });
-});
-
-describe("derive — widget mode", () => {
-  it("shows the output budget when idle", () => {
-    const m = derive(state(), INPUTS);
-    expect(m.widget).toEqual({ mode: "budget", text: "GenX: 4200 tokens" });
-  });
-
-  it("shows Continue while waiting on the user", () => {
+  it("offers Continue while waiting on the writer", () => {
     const m = derive(
-      state({ genx: { status: "waiting_for_user", queueLength: 0 } }),
-      INPUTS,
+      state({ genx: { status: "waiting_for_user", queueLength: 1 } }),
+      NOW,
     );
     expect(m.widget).toEqual({ mode: "continue", text: "Continue" });
   });
 
-  it("counts down while waiting on budget", () => {
+  it("counts down a budget wait", () => {
     const m = derive(
       state({
         genx: {
           status: "waiting_for_budget",
-          queueLength: 0,
-          budgetWaitEndTime: INPUTS.now + 12_000,
+          queueLength: 1,
+          budgetWaitEndTime: NOW + 12_000,
         },
       }),
-      INPUTS,
+      NOW,
     );
     expect(m.widget).toEqual({ mode: "wait", text: "Wait (12s)" });
   });
 
-  it("offers Cancel while generating and while queued", () => {
-    for (const status of ["generating", "queued"] as const) {
-      const m = derive(state({ genx: { status, queueLength: 1 } }), INPUTS);
-      expect(m.widget).toEqual({ mode: "cancel", text: "Cancel" });
-    }
-  });
-
-  it("falls back to budget for completed and failed", () => {
-    for (const status of ["completed", "failed"] as const) {
-      const m = derive(state({ genx: { status, queueLength: 0 } }), INPUTS);
-      expect(m.widget.mode).toBe("budget");
+  it("offers Cancel while queued or generating", () => {
+    for (const status of ["queued", "generating"] as const) {
+      expect(
+        derive(state({ genx: { status, queueLength: 1 } }), NOW).widget.mode,
+      ).toBe("cancel");
     }
   });
 });
 
-describe("derive — bootstrap, status text, import", () => {
-  it("labels bootstrap from document content", () => {
-    expect(derive(state(), INPUTS).bootstrap.text).toBe("Opening Scene");
-    expect(
-      derive(state(), { ...INPUTS, hasDocumentContent: true }).bootstrap.text,
-    ).toBe("Continue Scene");
+describe("derive: status text", () => {
+  const jobs = [
+    { id: "a", label: "Reviewing Tam", maxTokens: 600 },
+    { id: "b", label: "Reviewing Ilse", maxTokens: 600 },
+  ];
+
+  it("names the oldest job and counts the rest", () => {
+    const m = derive(state({ jobs }), NOW);
+    expect(m.statusText).toBe("Reviewing Tam… · 1 more");
   });
 
-  it("disables bootstrap while its request is queued", () => {
-    const m = derive(state({ queue: [req("bootstrap", "b1")] }), INPUTS);
-    expect(m.bootstrap.disabled).toBe(true);
-  });
-
-  it("disables bootstrap while its request is active", () => {
+  it("measures how far a generating reply has got", () => {
     const m = derive(
-      state({
-        activeRequest: {
-          ...req("bootstrapContinue", "b2"),
-          status: "processing",
-        },
-      }),
-      INPUTS,
+      state({ jobs, genx: { status: "generating", queueLength: 2 } }),
+      NOW,
+      138,
     );
-    expect(m.bootstrap.disabled).toBe(true);
+    expect(m.statusText).toBe("Reviewing Tam 23%… · 1 more");
+    expect(m.busy).toBe(true);
   });
 
-  it("leaves bootstrap enabled for unrelated work", () => {
-    const m = derive(state({ queue: [req("foundation", "f1")] }), INPUTS);
-    expect(m.bootstrap.disabled).toBe(false);
+  it("is empty with no jobs", () => {
+    expect(derive(state(), NOW).statusText).toBe("");
   });
+});
 
-  it("passes SEGA status text straight through", () => {
-    const m = derive(
-      state({
-        sega: { ...initialRuntimeState.sega, statusText: "Characters 3/7" },
-      }),
-      INPUTS,
-    );
-    expect(m.statusText).toBe("Characters 3/7");
-  });
-
-  it("disables import only while the wizard is open", () => {
-    expect(derive(state(), INPUTS).importDisabled).toBe(false);
-    expect(
-      derive(state({}, { importWizardOpen: true }), INPUTS).importDisabled,
-    ).toBe(true);
+describe("percent", () => {
+  it("is the tokens received of the tokens requested, short of 100", () => {
+    expect(percent(0, 600)).toBe(0);
+    expect(percent(138, 600)).toBe(23);
+    expect(percent(600, 600)).toBe(99);
+    expect(percent(10, 0)).toBe(0);
   });
 });
 
 describe("storeSignature", () => {
-  it("is stable for an unchanged state", () => {
-    expect(storeSignature(state())).toBe(storeSignature(state()));
-  });
-
-  it("changes when a same-length queue swaps contents", () => {
-    // The load-bearing case: cancelling a queued bootstrap while a foundation
-    // request is enqueued leaves queue.length at 1, but bootstrap.disabled has
-    // to flip. A length-only signature would miss it and go stale.
-    const before = storeSignature(state({ queue: [req("bootstrap", "b1")] }));
-    const after = storeSignature(state({ queue: [req("foundation", "f1")] }));
-    expect(before).not.toBe(after);
-  });
-
-  it("changes for every field derive reads", () => {
+  it("changes with every field derive reads", () => {
     const base = storeSignature(state());
-    const variants = [
-      state({ genx: { status: "generating", queueLength: 0 } }),
-      state({
-        genx: { status: "idle", queueLength: 0, budgetWaitEndTime: 5 },
-      }),
-      state({ sega: { ...initialRuntimeState.sega, statusText: "x" } }),
-      state({ queue: [req("bootstrap", "b1")] }),
-      state({
-        activeRequest: { ...req("chat", "c1"), status: "processing" },
-      }),
-      state({ historyEpoch: 1 }),
-      state({}, { importWizardOpen: true }),
-    ];
-    for (const v of variants) {
-      expect(storeSignature(v)).not.toBe(base);
-    }
+    expect(
+      storeSignature(state({ genx: { status: "queued", queueLength: 1 } })),
+    ).not.toBe(base);
+    expect(
+      storeSignature(
+        state({
+          jobs: [{ id: "a", label: "x", maxTokens: 1 }],
+        }),
+      ),
+    ).not.toBe(base);
+    expect(
+      storeSignature(
+        state({
+          genx: { status: "idle", queueLength: 0, budgetWaitEndTime: 5 },
+        }),
+      ),
+    ).not.toBe(base);
   });
 });
