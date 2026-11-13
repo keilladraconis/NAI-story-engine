@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   replaceContext,
   directOnly,
@@ -284,6 +284,24 @@ describe("writing a whole draft", () => {
     expect(withoutTrailingBreak("She left.\n[ Chap")).toBe("She left.");
     expect(withoutTrailingBreak("She left.")).toBe("She left.");
     expect(withoutTrailingBreak("The river.\n----")).toBe("The river.");
+  });
+
+  it("shows a Send the draft as the page has it, down to a trailing empty paragraph", async () => {
+    const { store, workshopTurnedOn } = await import("../../src/core/store");
+    const { draftPrefill, draftText } =
+      await import("../../src/core/workshop/page");
+    const paragraphs = ["Story.", "", "Our revival facilities", ""];
+    const ids = paragraphs.map((_, i) => i + 1);
+    vi.mocked(api.v1.document.sectionIds).mockResolvedValue(ids);
+    vi.mocked(api.v1.document.scan).mockResolvedValue(
+      paragraphs.map((text, i) => ({
+        sectionId: ids[i],
+        section: { text },
+      })) as Awaited<ReturnType<typeof api.v1.document.scan>>,
+    );
+    store.dispatch(workshopTurnedOn({ boundary: 1 }));
+    expect(await draftPrefill()).toBe("Our revival facilities\n");
+    expect(await draftText()).toBe("Our revival facilities");
   });
 
   it("knows the model has started the next piece", async () => {

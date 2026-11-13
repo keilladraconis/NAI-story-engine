@@ -49,17 +49,30 @@ export async function currentDraftIds(): Promise<number[]> {
   return draftIds(await api.v1.document.sectionIds(), boundary);
 }
 
-/** The draft's text, paragraphs joined with newlines; "" when empty. */
-export async function draftText(): Promise<string> {
+/** The draft exactly as on the page, paragraphs joined with newlines. */
+async function draftRaw(): Promise<string> {
   const ids = new Set(await currentDraftIds());
   if (!ids.size) return "";
-  const all = await sections();
-  return withoutTrailingBreak(
-    all
-      .filter((s) => ids.has(s.sectionId))
-      .map((s) => s.section.text)
-      .join("\n"),
-  );
+  return (await sections())
+    .filter((s) => ids.has(s.sectionId))
+    .map((s) => s.section.text)
+    .join("\n");
+}
+
+/** The draft's text, trimmed; "" when empty. */
+export async function draftText(): Promise<string> {
+  return withoutTrailingBreak(await draftRaw());
+}
+
+/**
+ * The draft as a Send's prefill: as on the page down to a trailing empty
+ * paragraph, since NovelAI writes the reply into the last paragraph. Trimmed,
+ * a draft ending in an empty paragraph read as a sentence to go on with, and
+ * the rest of the sentence landed on a line of its own.
+ */
+export async function draftPrefill(): Promise<string> {
+  const raw = (await draftRaw()).trimStart();
+  return raw.trim() ? raw : "";
 }
 
 /**
@@ -254,6 +267,63 @@ export function keepDraftAsStory(): Promise<void> {
 export function toSentenceEnd(text: string): string {
   const match = text.match(/^[\s\S]*[.!?…]["'”’)\]]*/);
   return match ? match[0] : text;
+}
+
+/** Does the text stop mid-sentence: on a word, a number, a comma or a dash? */
+export function midSentence(text: string): boolean {
+  return /[\p{L}\p{N},;—–-]\s*$/u.test(text);
+}
+
+/**
+ * Before a Send: drop the empty paragraphs after a draft that stops
+ * mid-sentence. NovelAI writes the reply into the last paragraph, and the model
+ * goes on with the sentence whatever follows it: the rest of the sentence
+ * landed on a line of its own, and shown the line break, the model wrapped
+ * every line after it. After a finished sentence an empty paragraph is a new
+ * paragraph begun, and stays.
+ */
+export function joinUnfinishedSentence(): Promise<void> {
+  return serial(async () => {
+    const stray = await strayParagraphs();
+    if (!stray.length) return;
+    await api.v1.document.removeParagraphs(stray);
+    await draw();
+  });
+}
+
+/** Does the draft end mid-sentence followed by empty paragraphs? */
+export async function strayLineBreak(): Promise<boolean> {
+  return (await strayParagraphs()).length > 0;
+}
+
+/** The empty paragraphs after a draft that stops mid-sentence. */
+async function strayParagraphs(): Promise<number[]> {
+  const ids = await currentDraftIds();
+  const draft = (await sections()).filter((s) => ids.includes(s.sectionId));
+  let last = draft.length - 1;
+  while (last >= 0 && !draft[last].section.text.trim()) last--;
+  if (last === -1 || last === draft.length - 1) return [];
+  if (!midSentence(draft[last].section.text)) return [];
+  return draft.slice(last + 1).map((s) => s.sectionId);
+}
+
+/**
+ * What a Send stopped at the next piece leaves behind: the first characters of
+ * a scene break, divider or bracketed line, which went to the page before the
+ * marker was whole.
+ */
+const BREAK_RESIDUE = /^\s*(\*{1,3}|⁂|-{1,4}|\[|#+)\s*$/;
+
+/** Empty a last paragraph that holds only the start of a break. */
+export function dropBreakResidue(): Promise<void> {
+  return serial(async () => {
+    const ids = new Set(await currentDraftIds());
+    const last = (await sections())
+      .filter((s) => ids.has(s.sectionId) && s.section.text.trim())
+      .pop();
+    if (last && BREAK_RESIDUE.test(last.section.text))
+      await api.v1.document.updateParagraph(last.sectionId, { text: "" });
+  });
 }
 
 /** Trim a half-written last sentence off the draft. */

@@ -26,6 +26,10 @@ import {
   keepDraftAsStory,
   redraw,
   endOnSentence,
+  draftPrefill,
+  dropBreakResidue,
+  joinUnfinishedSentence,
+  strayLineBreak,
 } from "./page";
 import { defaultDirection, findDoc, sameTarget, targetLabel } from "./targets";
 
@@ -155,6 +159,8 @@ export function draftLength(target: Target): number {
 
 /** Sends a Draft button makes at most, whatever the length. */
 const MAX_SENDS = 16;
+/** Sends a Draft button retries when the model ends the piece before a word. */
+const MAX_FALSE_STARTS = 3;
 /** A Send that adds less than this has ended the piece. */
 const MIN_GROWTH = 40;
 /** How long to wait for a Send to finish before giving up on it. */
@@ -221,12 +227,14 @@ export async function writeDraft(
   try {
     const goal = draftLength(target);
     let why = "send limit";
+    let falseStarts = 0;
     for (let send = 0; send < MAX_SENDS; send++) {
       const before = (await draftText()).length;
       if (run.stop) why = "writer took over";
       else if (run.ended) why = "scene ended";
       else if (before >= goal) why = "length cap";
       if (run.stop || run.ended || before >= goal) break;
+      await joinUnfinishedSentence();
       const ended = nextEnd();
       // Not awaited: a Send NovelAI never starts (the page lost its draft
       // region) left generate() pending and the run stuck; the timeout ends it.
@@ -238,7 +246,16 @@ export async function writeDraft(
         why = "send timed out";
         break;
       }
+      if (run.ended) await dropBreakResidue();
       const after = (await draftText()).length;
+      // The model opened with a heading or a bracketed line (`[ Title: …`) and
+      // was stopped before writing a word, leaving `[`: try again.
+      if (run.ended && !after && falseStarts < MAX_FALSE_STARTS) {
+        falseStarts++;
+        run.ended = false;
+        api.v1.log(`writeDraft: false start ${falseStarts}, sending again`);
+        continue;
+      }
       if (after - before < MIN_GROWTH) {
         why = "send added almost nothing";
         break;
@@ -328,7 +345,7 @@ export function registerWorkshopHooks(): void {
             params.messages,
             buildFrame(store.getState(), target),
             directionFor(target),
-            await draftText(),
+            await draftPrefill(),
             opener(target, targetTitle(store.getState(), target)),
           );
     return { messages, stopFurtherScripts: true };
@@ -341,7 +358,14 @@ export function registerWorkshopHooks(): void {
     const position = params.generationPosition;
     if (!workshop.on || workshop.boundary === null || !position) return;
     const ids = await api.v1.document.sectionIds();
-    if (inDraft(ids, workshop.boundary, position.sectionId)) return;
+    if (inDraft(ids, workshop.boundary, position.sectionId)) {
+      // The page cannot be edited while a Send is being requested ("the
+      // editor is currently blocked"): stop it, tidy the page, send again. A
+      // Draft run tidies before each of its Sends.
+      if (params.scriptInitiated || !(await strayLineBreak())) return;
+      void joinUnfinishedSentence().then(() => api.v1.editor.generate());
+      return { stopGeneration: true };
+    }
     toast(
       "That Send would write into the story above the draft, so it was stopped.",
     );
