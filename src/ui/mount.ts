@@ -11,6 +11,7 @@ import {
   saveDraft,
   setWorkshopOn,
   stopWriting,
+  writeDraft,
 } from "../core/workshop/workshop";
 import { redraw, setWidgetContent } from "../core/workshop/page";
 import { saveLabel, targetLabel } from "../core/workshop/targets";
@@ -62,12 +63,14 @@ function buildSidebar(): UIExtension {
 }
 
 // ── The workshop's toolbar buttons ──────────────────────────────────────────
-// While Workshop Sends are on, two buttons sit in the toolbar above the
-// editor: save the draft (or stop a Draft run), and turn the workshop off.
+// While Workshop Sends are on, buttons sit in the toolbar above the editor:
+// save the draft (or stop a Draft run), keep writing a draft that stalled
+// short of its end (hidden while a run is going), and turn the workshop off.
 // Everything else about a draft is chosen from the sidebar.
 
 const SAVE_ID = "se-save-draft";
 const OFF_ID = "se-workshop-off";
+const KEEP_ID = "se-keep-writing";
 
 function toolbar(): UIExtension[] {
   const state = store.getState();
@@ -83,6 +86,13 @@ function toolbar(): UIExtension[] {
       },
     }),
     toolbarButton({
+      id: KEEP_ID,
+      text: "Keep writing",
+      iconId: "play",
+      // Continues the draft as it stands, with the direction it was started on.
+      callback: () => void writeDraft(store.getState().workshop.target),
+    }),
+    toolbarButton({
       id: OFF_ID,
       text: "Workshop off",
       iconId: "power",
@@ -93,9 +103,23 @@ function toolbar(): UIExtension[] {
 
 /** Show the buttons, with labels for the current target, or take them away. */
 function syncToolbar(): void {
-  if (store.getState().workshop.on)
-    void api.v1.ui.update(toolbar() as (UIExtension & { id: string })[]);
-  else void api.v1.ui.remove([SAVE_ID, OFF_ID]);
+  const { workshop, runtime } = store.getState();
+  if (!workshop.on) {
+    void api.v1.ui.remove([SAVE_ID, KEEP_ID, OFF_ID]);
+    return;
+  }
+  const buttons = toolbar() as (UIExtension & { id: string })[];
+  if (runtime.autoDraft) {
+    void api.v1.ui
+      .remove([KEEP_ID])
+      .then(() => api.v1.ui.update(buttons.filter((b) => b.id !== KEEP_ID)));
+    return;
+  }
+  // A re-added button goes to the end: take Workshop off away too and add
+  // both back, so Keep writing never trades places with it.
+  void api.v1.ui
+    .remove([KEEP_ID, OFF_ID])
+    .then(() => api.v1.ui.update(buttons));
 }
 
 /**

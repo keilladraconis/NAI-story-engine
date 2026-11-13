@@ -90,7 +90,7 @@ export function VignettesStage() {
         title="Vignettes"
         steps={[
           "Pick a scene below, or describe one, and press Draft it.",
-          "It is written on the page, under a Story Engine divider. Edit it there, Retry it, or Draft it again.",
+          "It is written on the page, under a Story Engine divider. Edit it there, Retry it, or Draft it again. If it stops short of the scene's end, press Keep writing above the editor.",
           "Press Save vignette in the toolbar above the editor. New scenes are offered.",
         ]}
       >

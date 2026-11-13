@@ -225,7 +225,9 @@ export async function writeDraft(
   run = { stop: false, ended: false };
   store.dispatch(autoDraftSet({ on: true }));
   try {
-    const goal = draftLength(target);
+    // The length allowed is counted from where the run starts, so Keep
+    // writing on a long draft still writes.
+    const goal = (await draftText()).length + draftLength(target);
     let why = "send limit";
     let falseStarts = 0;
     for (let send = 0; send < MAX_SENDS; send++) {
