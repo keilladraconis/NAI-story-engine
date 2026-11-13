@@ -17,6 +17,7 @@ import { offer } from "../offers";
 import { buildFrame, docHeading } from "./frames";
 import { replaceContext, directOnly, opener } from "./context";
 import { inDraft, splitStartingPoint } from "./draft-region";
+import { spiral } from "./spiral";
 import {
   turnOn,
   turnOff,
@@ -146,6 +147,8 @@ export async function saveDraft(): Promise<void> {
 export function draftLength(target: Target): number {
   switch (target.kind) {
     case "vignette":
+      // A short sample; at 7000 long runs went round in circles.
+      return 3500;
     case "opening":
       return 7000;
     case "startingPoint":
@@ -216,6 +219,7 @@ export async function writeDraft(
   target: Target,
   direction?: string,
   replace = false,
+  maxSends = MAX_SENDS,
 ): Promise<boolean> {
   if (run) return false;
   await turnOn();
@@ -230,8 +234,10 @@ export async function writeDraft(
     const goal = (await draftText()).length + draftLength(target);
     let why = "send limit";
     let falseStarts = 0;
-    for (let send = 0; send < MAX_SENDS; send++) {
-      const before = (await draftText()).length;
+    const scene = target.kind === "vignette" || target.kind === "opening";
+    for (let send = 0; send < maxSends; send++) {
+      const beforeText = await draftText();
+      const before = beforeText.length;
       if (run.stop) why = "writer took over";
       else if (run.ended) why = "scene ended";
       else if (before >= goal) why = "length cap";
@@ -249,7 +255,8 @@ export async function writeDraft(
         break;
       }
       if (run.ended) await dropBreakResidue();
-      const after = (await draftText()).length;
+      const afterText = await draftText();
+      const after = afterText.length;
       // The model opened with a heading or a bracketed line (`[ Title: …`) and
       // was stopped before writing a word, leaving `[`: try again.
       if (run.ended && !after && falseStarts < MAX_FALSE_STARTS) {
@@ -260,6 +267,25 @@ export async function writeDraft(
       }
       if (after - before < MIN_GROWTH) {
         why = "send added almost nothing";
+        break;
+      }
+      // Left alone, the model can restate one beat for thousands of
+      // characters: cut the Send that went round in circles and stop.
+      const check = scene ? spiral(afterText) : null;
+      if (check) {
+        const { sentenceLength, repeatedStarts, recycledWords } = check.scores;
+        api.v1.log(
+          `writeDraft: send ${send + 1}, last paragraph: ${sentenceLength.toFixed(0)} chars a sentence, ` +
+            `${(repeatedStarts * 100).toFixed(0)}% repeated starts, ${(recycledWords * 100).toFixed(0)}% recycled words`,
+        );
+      }
+      if (check?.spiralling) {
+        await clearDraft();
+        await putOnPage(beforeText);
+        why = "going in circles";
+        toast(
+          "The draft started going in circles, so Story Engine cut the last part and stopped. Edit it, or press Keep writing.",
+        );
         break;
       }
     }

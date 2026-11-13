@@ -90,7 +90,9 @@ function toolbar(): UIExtension[] {
       text: "Keep writing",
       iconId: "play",
       // Continues the draft as it stands, with the direction it was started on.
-      callback: () => void writeDraft(store.getState().workshop.target),
+      // A few Sends at a time: a nudge past a stall, not an unattended run.
+      callback: () =>
+        void writeDraft(store.getState().workshop.target, undefined, false, 3),
     }),
     toolbarButton({
       id: OFF_ID,
