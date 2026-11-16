@@ -1,0 +1,204 @@
+/*---
+compatibilityVersion: naiscript-1.0
+id: 3b9f4d2e-7c61-4a8e-b0d5-91e2f6a4c837
+name: Editor Workshop Probe
+version: 0.2.0
+description: Can scenario content be written by editor Sends instead of script generations, and kept off the page with one button?
+memoryLimit: 8
+---*/
+
+// Four questions, each answered by the report:
+//
+// 1. Budget. Press "Send from script" (api.v1.editor.generate) and, separately,
+//    the editor's own Send. Compare the script output budget before, at the end,
+//    and ten seconds after each.
+//      unchanged for both              -> a script button can drive the workshop
+//      drops for the scripted Send     -> the writer presses Send themselves
+//
+// 2. Native shape. With Workshop off, a Send logs the messages NovelAI built:
+//    roles, sizes, the head of each. Run once on Xialong and once on GLM.
+//    Workshop framing should look like what the model is used to seeing.
+//
+// 3. Replacement. With Workshop on, onContextBuilt swaps the context for the
+//    FRAME below, keeping the native roles. Does the model write a vignette,
+//    and does it stop at "***" (onResponse stopGeneration)?
+//
+// 4. Keep. "Keep page" stores the whole page in storyStorage and clears it. One
+//    big button, no selection, works on mobile.
+
+const FRAME = `[ Author: Sarah Waters; Title: The Keeper's Daughter; Tags: lighthouse, family, debt, isolation; Genre: Literary ]
+Ilse keeps the light on a tidal island off a northern coast, as her father did. Her brother Tam came back from the mainland in spring with good boots and no explanation. The supply boat comes on Thursdays, when the tide allows.`;
+const STOP_MARKER = "\n***";
+const KEPT_KEY = "workshop-probe-kept";
+const DIRECTION_KEY = "workshop-probe-direction";
+const MODE_KEY = "workshop-probe-mode";
+
+let report = "";
+
+function log(line) {
+  report += line + "\n";
+  api.v1.log(line);
+  void api.v1.ui.updateParts([{ id: "report", text: report }]);
+}
+
+const budget = () => api.v1.script.getAllowedOutput();
+
+async function workshopOn() {
+  return (await api.v1.storyStorage.get(MODE_KEY)) === true;
+}
+
+async function pageText() {
+  return api.v1.document.textFromSelection();
+}
+
+// Question 1 -----------------------------------------------------------------
+
+const budgets = new Map(); // continuityId -> budget when requested
+
+api.v1.hooks.register("onGenerationRequested", (params) => {
+  budgets.set(params.continuityId, budget());
+  log(
+    `REQ  model=${params.model} scripted=${params.scriptInitiated} ` +
+      `inline=${!!params.inlineGeneration} toolbox=${params.toolboxMode ?? "-"} budget=${budget()}`,
+  );
+});
+
+api.v1.hooks.register("onGenerationEnd", (params) => {
+  const before = budgets.get(params.continuityId);
+  log(`END  budget ${before} -> ${budget()}`);
+  api.v1.timers.setTimeout(() => {
+    log(`+10s budget ${budget()}`);
+  }, 10000);
+});
+
+// Questions 2 and 3 ----------------------------------------------------------
+
+function describe(messages) {
+  return messages
+    .map((message, index) => {
+      const content = String(message.content ?? "");
+      const head = content.slice(0, 160).replace(/\n/g, "⏎");
+      const tail = content.slice(-160).replace(/\n/g, "⏎");
+      return `  #${index} ${message.role} len=${content.length}\n    head: ${head}\n    tail: ${tail}`;
+    })
+    .join("\n");
+}
+
+// Xialong's native editor context is three messages: its own system prompt; a
+// user message "Relevant persistent information:⏎<memory>⏎***⏎Write." (just
+// "Write." with no memory); the page as the assistant prefill. The frame takes
+// Memory's place and nothing else changes, so the model sees the shape it
+// always sees.
+//
+// The direction box replaces "Write." — the one place a basic instruction fits.
+// An empty page gets the "***⏎" prefill NovelAI gives it.
+function framed(native, page, direction) {
+  return native.map((message) => {
+    if (message.role === "user")
+      return {
+        ...message,
+        content: `Relevant persistent information:\n${FRAME}\n***\n${direction || "Write."}`,
+      };
+    if (message.role === "assistant") return { ...message, content: page || "***\n" };
+    return message;
+  });
+}
+
+api.v1.hooks.register("onContextBuilt", async (params) => {
+  if (params.dryRun) return;
+  log(`CTX  model=${params.model} messages=${params.messages.length}`);
+  log(describe(params.messages));
+  if (!(await workshopOn())) return;
+
+  const direction = ((await api.v1.storyStorage.get(DIRECTION_KEY)) ?? "").trim();
+  const messages = framed(params.messages, await pageText(), direction);
+  log("CTX  replaced with:");
+  log(describe(messages));
+  return { messages, stopFurtherScripts: true };
+});
+
+const streamed = new Map(); // continuityId -> text so far
+
+api.v1.hooks.register("onResponse", async (params) => {
+  const sofar = (streamed.get(params.continuityId) ?? "") + params.text.join("");
+  streamed.set(params.continuityId, sofar);
+  if (params.final) {
+    log(`RESP final, ${sofar.length} chars`);
+    streamed.delete(params.continuityId);
+    return;
+  }
+  if ((await workshopOn()) && sofar.includes(STOP_MARKER)) {
+    log(`RESP stop marker at ${sofar.indexOf(STOP_MARKER)} chars`);
+    streamed.delete(params.continuityId);
+    return { stopGeneration: true };
+  }
+});
+
+// Question 4 -----------------------------------------------------------------
+
+async function keepPage() {
+  const text = (await pageText()).trim();
+  if (!text) {
+    log("KEEP nothing on the page");
+    return;
+  }
+  const kept = (await api.v1.storyStorage.get(KEPT_KEY)) ?? [];
+  await api.v1.storyStorage.set(KEPT_KEY, [...kept, text]);
+  await api.v1.document.removeParagraphs(await api.v1.document.sectionIds());
+  log(`KEEP ${text.length} chars, ${kept.length + 1} kept, page now "${await pageText()}"`);
+}
+
+async function showKept() {
+  const kept = (await api.v1.storyStorage.get(KEPT_KEY)) ?? [];
+  log(`KEPT ${kept.length}`);
+  kept.forEach((text, index) => log(`--- ${index + 1}\n${text}`));
+}
+
+async function sendFromScript() {
+  if (await api.v1.editor.isBlocked()) {
+    log("SEND editor is blocked");
+    return;
+  }
+  log(`SEND scripted, budget=${budget()}`);
+  await api.v1.editor.generate();
+}
+
+// UI -------------------------------------------------------------------------
+
+const button = (text, callback) =>
+  api.v1.ui.part.button({ text, callback, disabledWhileCallbackRunning: true });
+
+api.v1.ui.register([
+  api.v1.ui.extension.scriptPanel({
+    name: "Workshop Probe",
+    content: [
+      api.v1.ui.part.column({
+        content: [
+          api.v1.ui.part.checkboxInput({
+            label: "Workshop mode (replace the context of every Send)",
+            storageKey: `story:${MODE_KEY}`,
+          }),
+          api.v1.ui.part.multilineTextInput({
+            placeholder: 'Direction (replaces "Write."; empty = "Write.")',
+            storageKey: `story:${DIRECTION_KEY}`,
+          }),
+          button("Send from script", () => void sendFromScript()),
+          button("Keep page", () => void keepPage()),
+          button("Show kept", () => void showKept()),
+          button("Clear report", () => {
+            report = "";
+            void api.v1.ui.updateParts([{ id: "report", text: "" }]);
+          }),
+          api.v1.ui.part.text({
+            id: "report",
+            text: `Budget now ${budget()}.`,
+            noTemplate: true,
+            style: { whiteSpace: "pre-wrap", userSelect: "text" },
+          }),
+        ],
+      }),
+    ],
+  }),
+]);
+
+void api.v1.permissions.request("documentEdit", "Keep page clears the page after storing it.");

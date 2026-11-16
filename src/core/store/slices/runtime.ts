@@ -1,218 +1,85 @@
 import { createSlice } from "nai-store";
-import {
+import type { GenerationState } from "nai-gen-x";
+import type {
+  Job,
+  Offer,
+  OfferKind,
+  OfferSet,
+  PlanItem,
   RuntimeState,
-  GenerationRequest,
-  SegaStage,
-  SegaState,
 } from "../types";
-import { GenerationState } from "nai-gen-x";
-
-const initialSegaState: SegaState = {
-  stage: "idle",
-  statusText: "",
-  activeRequestIds: [],
-  keysCompleted: {},
-};
 
 export const initialRuntimeState: RuntimeState = {
-  segaRunning: false,
-  sega: initialSegaState,
-  queue: [],
-  activeRequest: null,
-  status: "idle",
-  budgetTimeRemaining: 0,
-  genx: {
-    status: "idle",
-    queueLength: 0,
+  genx: { status: "idle", queueLength: 0 },
+  jobs: [],
+  autoDraft: false,
+  offers: {
+    vignette: { offers: [], lead: "", picked: "" },
+    startingPoint: { offers: [], lead: "", picked: "" },
   },
-  historyEpoch: 0,
+  plan: [],
+  build: { running: false, done: 0, total: 0, current: "" },
 };
+
+function withSet(
+  state: RuntimeState,
+  kind: OfferKind,
+  set: OfferSet,
+): RuntimeState {
+  return { ...state, offers: { ...state.offers, [kind]: set } };
+}
 
 export const runtimeSlice = createSlice({
   name: "runtime",
   initialState: initialRuntimeState,
   reducers: {
-    stateUpdated: (state, payload: { genxState: GenerationState }) => ({
+    genxUpdated: (state, genx: GenerationState) => ({ ...state, genx }),
+    jobQueued: (state, job: Job) => ({ ...state, jobs: [...state.jobs, job] }),
+    autoDraftSet: (state, p: { on: boolean }) => ({
       ...state,
-      genx: payload.genxState,
+      autoDraft: p.on,
     }),
-    segaToggled: (state) => ({
+    jobFinished: (state, p: { id: string }) => ({
       ...state,
-      segaRunning: !state.segaRunning,
+      jobs: state.jobs.filter((j) => j.id !== p.id),
     }),
-
-    // Just adds to queue (no effect, for when strategy is already built)
-    requestQueued: (state, request: Omit<GenerationRequest, "status">) => ({
-      ...state,
-      queue: [...state.queue, { ...request, status: "queued" as const }],
-      status: state.status === "idle" ? "queued" : state.status,
-    }),
-
-    requestActivated: (state, payload: { requestId: string }) => {
-      const idx = state.queue.findIndex((r) => r.id === payload.requestId);
-      if (idx === -1) return state;
-      const activated = state.queue[idx];
-      return {
-        ...state,
-        queue: state.queue.filter((r) => r.id !== payload.requestId),
-        activeRequest: { ...activated, status: "processing" as const },
-        status: "generating" as const,
-      };
+    offersSet: (state, p: { kind: OfferKind; lead: string; offers: Offer[] }) =>
+      withSet(state, p.kind, { offers: p.offers, lead: p.lead, picked: "" }),
+    /** Pick an offer; picking the picked one again unpicks it. */
+    offerChosen: (state, p: { kind: OfferKind; label: string }) => {
+      const set = state.offers[p.kind];
+      return withSet(state, p.kind, {
+        ...set,
+        picked: set.picked === p.label ? "" : p.label,
+      });
     },
-
-    queueCleared: (state) => ({
+    /** The picked offer was drafted and saved: nothing is picked now. */
+    offerUnpicked: (state, p: { kind: OfferKind }) =>
+      withSet(state, p.kind, { ...state.offers[p.kind], picked: "" }),
+    planSet: (state, p: { items: PlanItem[] }) => ({ ...state, plan: p.items }),
+    /** Pick or unpick one planned document, by its index. */
+    planToggled: (state, p: { index: number }) => ({
       ...state,
-      queue: [],
-      activeRequest: null,
-      status: "idle" as const,
+      plan: state.plan.map((item, i) =>
+        i === p.index ? { ...item, picked: !item.picked } : item,
+      ),
     }),
-
-    budgetUpdated: (state, payload: { timeRemaining: number }) => ({
+    buildProgressed: (state, build: RuntimeState["build"]) => ({
       ...state,
-      budgetTimeRemaining: payload.timeRemaining,
-    }),
-
-    // Mark a request as cancelled (status change on the request itself)
-    requestCancelled: (state, payload: { requestId: string }) => {
-      // Check if in queue
-      const queueIndex = state.queue.findIndex(
-        (r) => r.id === payload.requestId,
-      );
-      if (queueIndex >= 0) {
-        const newQueue = [...state.queue];
-        newQueue[queueIndex] = { ...newQueue[queueIndex], status: "cancelled" };
-        return { ...state, queue: newQueue };
-      }
-
-      // Check if active request
-      if (state.activeRequest?.id === payload.requestId) {
-        return {
-          ...state,
-          activeRequest: { ...state.activeRequest, status: "cancelled" },
-        };
-      }
-
-      return state;
-    },
-
-    // Mark a request as completed and clear from active/queue
-    requestCompleted: (state, payload: { requestId: string }) => {
-      const isActive = state.activeRequest?.id === payload.requestId;
-      const newQueue = state.queue.filter((r) => r.id !== payload.requestId);
-
-      if (!isActive && newQueue.length === state.queue.length) {
-        return state;
-      }
-
-      return {
-        ...state,
-        activeRequest: isActive ? null : state.activeRequest,
-        queue: newQueue,
-      };
-    },
-
-    // SEGA Reducers
-    segaStageSet: (state, payload: { stage: SegaStage }) => ({
-      ...state,
-      sega: { ...state.sega, stage: payload.stage },
-    }),
-
-    segaRequestTracked: (state, payload: { requestId: string }) => ({
-      ...state,
-      sega: {
-        ...state.sega,
-        activeRequestIds: [...state.sega.activeRequestIds, payload.requestId],
-      },
-    }),
-
-    segaRequestUntracked: (state, payload: { requestId: string }) => ({
-      ...state,
-      sega: {
-        ...state.sega,
-        activeRequestIds: state.sega.activeRequestIds.filter(
-          (id) => id !== payload.requestId,
-        ),
-      },
-    }),
-
-    // Batch untrack multiple SEGA request IDs in one dispatch
-    segaBulkUntracked: (state, payload: { requestIds: string[] }) => {
-      const removeSet = new Set(payload.requestIds);
-      return {
-        ...state,
-        sega: {
-          ...state.sega,
-          activeRequestIds: state.sega.activeRequestIds.filter(
-            (id) => !removeSet.has(id),
-          ),
-        },
-      };
-    },
-
-    // Batch complete multiple requests in one dispatch
-    requestsBulkCompleted: (state, payload: { requestIds: string[] }) => {
-      const removeSet = new Set(payload.requestIds);
-      const isActive =
-        state.activeRequest !== null && removeSet.has(state.activeRequest.id);
-      const newQueue = state.queue.filter((r) => !removeSet.has(r.id));
-      if (!isActive && newQueue.length === state.queue.length) return state;
-      return {
-        ...state,
-        activeRequest: isActive ? null : state.activeRequest,
-        queue: newQueue,
-      };
-    },
-
-    segaReset: (state) => ({
-      ...state,
-      sega: initialSegaState,
-    }),
-
-    segaStatusUpdated: (state, payload: { statusText: string }) => ({
-      ...state,
-      sega: { ...state.sega, statusText: payload.statusText },
-    }),
-
-    segaKeysCompleted: (state, payload: { entryId: string }) => ({
-      ...state,
-      sega: {
-        ...state.sega,
-        keysCompleted: {
-          ...state.sega.keysCompleted,
-          [payload.entryId]: true,
-        },
-      },
-    }),
-
-    // `guidance` is the writer's free-text answer to "Open the story with:" —
-    // empty string when they generated without typing anything.
-    bootstrapRequested: (state, _payload: { guidance: string }) => state,
-    bootstrapContinueRequested: (state) => state,
-    documentHistoryNavigated: (state) => ({
-      ...state,
-      historyEpoch: state.historyEpoch + 1,
+      build,
     }),
   },
 });
 
 export const {
-  stateUpdated,
-  segaToggled,
-  requestQueued,
-  requestActivated,
-  queueCleared,
-  budgetUpdated,
-  requestCancelled,
-  requestCompleted,
-  segaStageSet,
-  segaRequestTracked,
-  segaRequestUntracked,
-  segaBulkUntracked,
-  requestsBulkCompleted,
-  segaReset,
-  segaStatusUpdated,
-  segaKeysCompleted,
-  bootstrapRequested,
-  bootstrapContinueRequested,
-  documentHistoryNavigated,
+  genxUpdated,
+  jobQueued,
+  jobFinished,
+  autoDraftSet,
+  offersSet,
+  offerChosen,
+  offerUnpicked,
+  planSet,
+  planToggled,
+  buildProgressed,
 } = runtimeSlice.actions;
