@@ -52,21 +52,21 @@ export function replaceContext(
   };
   const out: Message[] = [];
   let placedUser = false;
-  let placedPrefill = false;
   for (const message of native) {
+    // The page starts at the first assistant message, and the draft replaces
+    // it all: NovelAI splits the story around the Author's Note and entries it
+    // places inside it, as system messages. Kept, the Author's Note came after
+    // the draft: the model began a new reply instead of continuing the draft,
+    // and NovelAI warned "Bottom of context is not story text".
+    if (message.role === "assistant") break;
     if (message.role === "user") {
       if (!placedUser) out.push(user);
       placedUser = true;
-    } else if (message.role === "assistant") {
-      // The direction has to come before the prefill it directs.
-      if (!placedUser) out.push(user);
-      placedUser = true;
-      if (!placedPrefill) out.push(prefill);
-      placedPrefill = true;
     } else out.push(message);
   }
+  // The direction has to come before the prefill it directs, which ends it.
   if (!placedUser) out.push(user);
-  if (!placedPrefill) out.push(prefill);
+  out.push(prefill);
   return out;
 }
 

@@ -78,6 +78,20 @@ describe("replaceContext", () => {
     expect(out.map((m) => m.role)).toEqual(["system", "user", "assistant"]);
   });
 
+  it("ends with the draft, dropping what NovelAI placed inside the story", () => {
+    // The Author's Note splits the story, as the context viewer showed it.
+    const native: Message[] = [
+      NATIVE[0],
+      NATIVE[1],
+      { role: "assistant", content: "Most of the story." },
+      { role: "system", content: "[ Style: playful, warm ]" },
+      { role: "assistant", content: "Its last lines." },
+    ];
+    const out = replaceContext(native, "F", "D", "The draft");
+    expect(out.map((m) => m.role)).toEqual(["system", "user", "assistant"]);
+    expect(out[2].content).toBe("The draft");
+  });
+
   it("adds both when the native context has neither", () => {
     const out = replaceContext([NATIVE[0]], "F", "D", "");
     expect(out.map((m) => m.role)).toEqual(["system", "user", "assistant"]);

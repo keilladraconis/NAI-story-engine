@@ -231,7 +231,8 @@ export async function writeDraft(
   try {
     // The length allowed is counted from where the run starts, so Keep
     // writing on a long draft still writes.
-    const goal = (await draftText()).length + draftLength(target);
+    const start = (await draftText()).length;
+    const goal = start + draftLength(target);
     let why = "send limit";
     let falseStarts = 0;
     const scene = target.kind === "vignette" || target.kind === "opening";
@@ -257,9 +258,15 @@ export async function writeDraft(
       if (run.ended) await dropBreakResidue();
       const afterText = await draftText();
       const after = afterText.length;
-      // The model opened with a heading or a bracketed line (`[ Title: …`) and
-      // was stopped before writing a word, leaving `[`: try again.
-      if (run.ended && !after && falseStarts < MAX_FALSE_STARTS) {
+      // The model started the next piece before writing a word: a heading or
+      // a bracketed line (`[ Title: …`) opening a draft left only `[`, and a
+      // scene break opening a Send on a stalled scene added nothing. Try again;
+      // a scene the model keeps ending is ended.
+      if (
+        run.ended &&
+        after - before < MIN_GROWTH &&
+        falseStarts < MAX_FALSE_STARTS
+      ) {
         falseStarts++;
         run.ended = false;
         api.v1.log(`writeDraft: false start ${falseStarts}, sending again`);
@@ -292,6 +299,11 @@ export async function writeDraft(
     api.v1.log(`writeDraft stopped: ${why}`);
     // The writer took over: the page is theirs.
     if (run.stop) return false;
+    if ((await draftText()).length - start < MIN_GROWTH) {
+      toast(
+        "Nothing more was written: the model ends the scene here. Change the last lines to steer it on, or press Keep writing again.",
+      );
+    }
     // Cut off (the cap, a stalled Send): end on a whole sentence. A piece the
     // model ended itself is whole, and trimming would cut a last list item
     // that has no full stop.
@@ -361,6 +373,26 @@ function targetTitle(state: RootState, target: Target): string {
 
 // ── Hooks ────────────────────────────────────────────────────────────────────
 
+/**
+ * Send again for the writer, after their Send was stopped to tidy the page.
+ * The stopped Send can still hold the editor for a moment; a refusal is tried
+ * once more, then reported, so the Send never vanishes without a word.
+ */
+async function resend(): Promise<void> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await api.v1.editor.generate();
+      return;
+    } catch (error) {
+      api.v1.log(`resend: ${String(error)}`);
+      await new Promise<void>((resolve) => {
+        void api.v1.timers.setTimeout(resolve, 500);
+      });
+    }
+  }
+  toast("Story Engine could not send for you; press Send again.");
+}
+
 export function registerWorkshopHooks(): void {
   api.v1.hooks.register("onContextBuilt", async (params) => {
     const { workshop } = store.getState();
@@ -391,7 +423,7 @@ export function registerWorkshopHooks(): void {
       // editor is currently blocked"): stop it, tidy the page, send again. A
       // Draft run tidies before each of its Sends.
       if (params.scriptInitiated || !(await strayLineBreak())) return;
-      void joinUnfinishedSentence().then(() => api.v1.editor.generate());
+      void joinUnfinishedSentence().then(resend);
       return { stopGeneration: true };
     }
     toast(
