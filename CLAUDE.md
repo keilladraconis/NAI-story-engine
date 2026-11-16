@@ -45,6 +45,7 @@ npx tsc --noEmit   # typecheck (the build does not)
   - Deleting the boundary paragraph disposes the node widget (`dispose: sectionRemoved`); the boundary is recovered from the last draft seen.
   - A node widget "before the first section" does not render; a boundary recovered to the top of the page (0) falls back to an inline widget.
   - Widget content stays plain: a `row` wrapper or `display` made `createWidget` refuse its options.
+  - A redraw **keeps the divider while it is unchanged** (same place, same labels) and only redraws the tint. Recreated on every redraw (each Send ends with one), it raced NovelAI mounting it, which then asked for a mount callback already disposed: "JSX mount callback not found", shown to the writer.
   - The page **cannot be edited inside `onGenerationRequested`** ("the editor is currently blocked"). Empty paragraphs after a draft that stops mid-sentence are dropped before a Send (`joinUnfinishedSentence`): a Draft run does it before each Send; a Send the writer presses is stopped, tidied and sent again. With them in the prefill the model wrapped every line at the first line's width; without them, the reply landed in the empty paragraph.
   - The prefill is the draft as on the page (`draftPrefill`), not the trimmed `draftText`.
   - Page work is serialised (`serial`); code already inside the chain calls `draw()` directly, never `redraw()`, or it waits on itself.

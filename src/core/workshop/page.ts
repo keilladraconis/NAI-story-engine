@@ -14,10 +14,13 @@ import {
   workshopTurnedOff,
 } from "../store";
 import { draftIds, recoverBoundary } from "./draft-region";
+import { saveLabel, targetLabel } from "./targets";
 
 const TINT = { backgroundColor: "rgba(128, 128, 128, 0.08)" };
 
 let widget: { dispose(): Promise<void> } | null = null;
+/** What the divider shows and where, so a redraw keeps an unchanged one. */
+let widgetKey = "";
 let markers: { dispose(): Promise<void> }[] = [];
 /** The draft paragraphs as of the last redraw, for recovering a lost boundary. */
 let lastDraft: number[] = [];
@@ -87,15 +90,27 @@ export function withoutTrailingBreak(text: string): string {
     .trim();
 }
 
-async function clearDecorations(): Promise<void> {
+async function clearWidget(): Promise<void> {
   disposing = true;
   try {
-    await Promise.all([widget?.dispose(), ...markers.map((m) => m.dispose())]);
+    await widget?.dispose();
   } finally {
     disposing = false;
     widget = null;
+    widgetKey = "";
+  }
+}
+
+async function clearMarkers(): Promise<void> {
+  try {
+    await Promise.all(markers.map((m) => m.dispose()));
+  } finally {
     markers = [];
   }
+}
+
+async function clearDecorations(): Promise<void> {
+  await Promise.all([clearWidget(), clearMarkers()]);
 }
 
 async function onBoundaryLost(): Promise<void> {
@@ -109,9 +124,9 @@ async function onBoundaryLost(): Promise<void> {
 }
 
 async function draw(): Promise<void> {
-  await clearDecorations();
-  const { on, boundary } = store.getState().workshop;
-  if (!on || boundary === null) return;
+  const state = store.getState();
+  const { on, boundary, target } = state.workshop;
+  if (!on || boundary === null) return clearDecorations();
   const ids = await api.v1.document.sectionIds();
   if (boundary !== 0 && !ids.includes(boundary)) {
     // The boundary paragraph went while nothing was watching (a reload, an undo).
@@ -121,6 +136,30 @@ async function draw(): Promise<void> {
     return draw();
   }
   lastDraft = draftIds(ids, boundary);
+  await clearMarkers();
+  // Recreating the divider on every redraw (each Send ends with one) raced
+  // NovelAI mounting it: it asked to mount a divider already disposed, and
+  // showed "JSX mount callback not found". Keep it while it is the same.
+  const key = [
+    boundary || lastDraft[0],
+    targetLabel(state, target),
+    saveLabel(state, target),
+  ].join("|");
+  if (!widget || key !== widgetKey) await drawWidget(boundary, key);
+  markers = lastDraft.length
+    ? await api.v1.editor.decorations.createMarkers(
+        lastDraft.map((sectionId) => ({
+          type: "node" as const,
+          sectionId,
+          style: TINT,
+        })),
+      )
+    : [];
+}
+
+async function drawWidget(boundary: number, key: string): Promise<void> {
+  await clearWidget();
+  widgetKey = key;
   // Plain content only: a row wrapper or `display` made createWidget refuse its
   // options in the probe.
   if (boundary === 0) {
@@ -140,19 +179,14 @@ async function draw(): Promise<void> {
       sectionId: boundary,
       content: widgetContent(),
       onChange: (event) => {
-        if (event.type === "dispose" && !disposing) void serial(onBoundaryLost);
+        if (event.type !== "dispose" || disposing) return;
+        // Its paragraph was deleted: the widget is gone with it.
+        widget = null;
+        widgetKey = "";
+        void serial(onBoundaryLost);
       },
     });
   }
-  markers = lastDraft.length
-    ? await api.v1.editor.decorations.createMarkers(
-        lastDraft.map((sectionId) => ({
-          type: "node" as const,
-          sectionId,
-          style: TINT,
-        })),
-      )
-    : [];
 }
 
 /** Redraw the divider and tint from the store. Safe to call any time. */
